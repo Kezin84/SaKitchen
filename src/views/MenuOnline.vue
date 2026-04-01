@@ -424,17 +424,10 @@
   v-if="totalPages > 1"
   :key="pageKey"
 >
-<div v-if="isMobile" class="powered-by powered-by-mobile">
+<a v-if="isMobile" class="powered-by powered-by-mobile" href="https://t.me/FBC8386" target="_blank" rel="noopener">
   POWERED BY
-  <a 
-    class="powered-link"
-    href="https://www.facebook.com/profile.php?id=100092383541391"
-    target="_blank"
-    rel="noopener"
-  >
-    FBC
-  </a>
-</div>
+  <span class="powered-link">FBC</span>
+</a>
         <button
   :disabled="currentPage === 1"
   @click="
@@ -474,28 +467,14 @@
 </button>
 
       </div>
-      <div v-if="isMobile" class="powered-by-mobile-footer">
-  FREE WEBSITE BY 
-  <a 
-    class="powered-link"
-    href="https://www.facebook.com/profile.php?id=100092383541391"
-    target="_blank"
-    rel="noopener"
-  >
-    FBC
-  </a>
-</div>
-      <div class="powered-by">
+      <a v-if="isMobile" class="powered-by-mobile-footer" href="https://t.me/FBC8386" target="_blank" rel="noopener">
         FREE WEBSITE BY 
-        <a
-          class="powered-link"
-          href="https://www.facebook.com/profile.php?id=100092383541391"
-          target="_blank"
-          rel="noopener"
-        >
-          FBC
-        </a>
-      </div>
+        <span class="powered-link">FBC</span>
+      </a>
+      <a class="powered-by" href="https://t.me/FBC8386" target="_blank" rel="noopener">
+        FREE WEBSITE BY 
+        <span class="powered-link">FBC</span>
+      </a>
 <!-- FOOTER -->
     
       </template>
@@ -9729,7 +9708,9 @@ box-shadow: 0 4px 10px rgba(239, 243, 16, 0.45);
 .powered-by-mobile-footer {
   /* backwards đảm bảo ở trạng thái opacity 0 (ẩn) lúc chờ tới lượt animation */
   animation: slideInUpMenu 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  text-decoration: none;
 }
+
 
 /* Stagger delay để thả rơi từng phần tử một */
 .sidebar-left        { animation-delay: 0s; }

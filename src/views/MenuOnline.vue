@@ -851,7 +851,7 @@
     ></textarea>
   </div>
  <button
-  v-if="canFinish && !isMobile"
+  v-if="!isMobile"
   class="finish-btn"
   @click="onFinish"
 >
@@ -6066,11 +6066,26 @@ h3, h4, h5, p, span, div {
 
 .finish-btn:active {
   transform: scale(0.97);
+  animation: none;
 }
 .finish-btn:hover {
   transform: scale(0.97);
   background: white;
   color: #009e47;
+  animation: none;
+}
+
+/* HIỆU ỨNG PHÓNG TO THU NHỎ NHẸ (PC) */
+@media (min-width: 769px) {
+  .finish-btn {
+    animation: finishBtnPulse 2s ease-in-out infinite;
+  }
+}
+
+@keyframes finishBtnPulse {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.04); }
+  100% { transform: scale(1); }
 }
 .mobile-finish-wrap {
   position: fixed;

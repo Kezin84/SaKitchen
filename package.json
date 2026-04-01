@@ -18,6 +18,7 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "duckduckgo-images-api": "^1.0.5",
     "googlethis": "^1.8.0",
     "html2canvas": "^1.4.1",

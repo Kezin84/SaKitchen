@@ -18,6 +18,8 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
+    "duckduckgo-images-api": "^1.0.5",
+    "googlethis": "^1.8.0",
     "html2canvas": "^1.4.1",
     "leaflet": "^1.9.4",
     "qrcode.vue": "^3.7.0",

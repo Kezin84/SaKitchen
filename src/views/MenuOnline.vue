@@ -2064,8 +2064,8 @@ const filteredMenu = computed(() => {
     list.sort((a, b) => finalPrice(b) - finalPrice(a))
   }
   else {
-    // 🔥 CHỈ ĐẢO NGƯỢC KHI KHÔNG SORT GIÁ
-    list.reverse()
+    // Đã bỏ list.reverse() theo yêu cầu để đảo ngược lại vị trí mặc định từ API
+    // list.reverse()
   }
 
   return list
@@ -4281,24 +4281,32 @@ h3, h4, h5, p, span, div {
 /* ===== SEARCH WRAPPER ===== */
 .search-wrapper {
   position: sticky;
-  top: 0;
+  top: 8px; 
   z-index: 15;
-  padding: 12px 10px;
- backdrop-filter: blur(4px);
-  background: transparent;
-  overflow: visible;   /* ❌ bỏ nền */
+  
+  margin: 0 auto;
+  width: calc(100% - 24px);
+  max-width: 440px; 
+  padding: 6px; 
+  
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.15); 
+  border-radius: 14px; /* Bogóc vừa vừa (14px) thay vì tròn ú (999px) */
+  overflow: visible;
 }
 
 /* ===== SEARCH BOX ===== */
 .search-box {
-  max-width: 420px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
 
   display: flex;
   align-items: center;
 
   background: #ffffff;
-  border-radius: 999px;
+  border-radius: 10px; /* Bogóc trong nhỏ hơn một chút ôm sát theo cha */
   padding: 6px;
 
   /* 🔥 VIỀN XANH TEMPLATE */
@@ -6265,15 +6273,7 @@ h3, h4, h5, p, span, div {
   transition: all 0.2s ease;
 }
 
-/* ===== SEARCH WRAPPER ===== */
-.search-wrapper {
-  position: sticky;
-  top: 0;
-  z-index: 15;
-
-  padding: 12px 10px;
-  backdrop-filter: blur(4px);
-}
+/* (Duplicate search-wrapper removed) */
 
 /* ===== SCROLL TO TOP FLOAT BUTTON ===== */
 /* ===== SCROLL TO TOP – GLOBAL FLOAT ===== */
@@ -9687,8 +9687,54 @@ box-shadow: 0 4px 10px rgba(239, 243, 16, 0.45);
   }
 }
 
-</style>
+/* ========================================================
+   HIỆU ỨNG TRƯỢT THÁC NƯỚC (STAGGER) TOÀN BỘ TRANG
+   ======================================================== */
+@keyframes slideInUpMenu {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
+.sidebar-left,
+.sidebar-right,
+.mobile-header-clean,
+.notice-bar,
+.banner,
+.search-wrapper,
+.filter-bar,
+.menu,
+.pagination,
+.powered-by,
+.powered-by-mobile-footer {
+  /* backwards đảm bảo ở trạng thái opacity 0 (ẩn) lúc chờ tới lượt animation */
+  animation: slideInUpMenu 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+/* Stagger delay để thả rơi từng phần tử một */
+.sidebar-left        { animation-delay: 0s; }
+.sidebar-right       { animation-delay: 0.05s; }
+.mobile-header-clean { animation-delay: 0s; }
+.notice-bar          { animation-delay: 0.1s; }
+.banner              { animation-delay: 0.15s; }
+.search-wrapper      { animation-delay: 0.2s; }
+.filter-bar          { animation-delay: 0.25s; }
+.menu                { animation-delay: 0.35s; }
+.pagination          { animation-delay: 0.45s; }
+.powered-by          { animation-delay: 0.5s; }
+.powered-by-mobile-footer { animation-delay: 0.5s; }
+
+/* Tránh giật lag lên loading skeleton */
+.main-skeleton {
+  animation: none !important;
+}
+
+</style>
 
 
 

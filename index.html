@@ -1,141 +1,147 @@
 <!DOCTYPE html>
 <html lang="vi">
-  <head>
-    <meta charset="UTF-8" />
-    <!-- 🔥 BỎ DÒNG NÀY -->
-    <!-- <link rel="icon" href="/favicon.ico" /> -->
-    
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
-    />
 
-    <!-- Remix Icon -->
-    <link
-      href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css"
-      rel="stylesheet"
-    />
+<head>
+  <meta charset="UTF-8" />
+  <!-- 🔥 BỎ DÒNG NÀY -->
+  <!-- <link rel="icon" href="/favicon.ico" /> -->
 
-    <title id="page-title">MENU</title>
-    
-    <script>
-      (function() {
-        try {
-          const params = new URLSearchParams(window.location.search);
-          const ncc = params.get('ncc');
-          
-          if (ncc) {
-            const cachedTitle = localStorage.getItem('SHOP_TITLE_' + ncc);
-            const cachedIcon = localStorage.getItem('SHOP_ICON_' + ncc);
-            
-            if (cachedTitle) {
-              document.title = cachedTitle;
-            } else {
-              document.title = 'MENU';
-            }
-            
-            if (cachedIcon) {
-              var link = document.querySelector("link[rel~='icon']");
-              if (!link) {
-                link = document.createElement('link');
-                link.rel = 'icon';
-                link.type = 'image/png';
-                document.head.appendChild(link);
-              }
-              link.href = cachedIcon;
-            } else {
-              // 🔥 BỎ FAVICON MẶC ĐỊNH
-              var link = document.querySelector("link[rel~='icon']");
-              if (!link) {
-                link = document.createElement('link');
-                link.rel = 'icon';
-                link.type = 'image/png';
-                document.head.appendChild(link);
-              }
-              link.href = 'data:,'; // 🔥 ICON TRỐNG
-            }
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+
+  <!-- Remix Icon -->
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" rel="stylesheet" />
+
+  <meta name="description" content="SA KITCHEN - ẨM THỰC VIỆT TẠI PHILLIPINES" />
+  <meta property="og:title" content="SA KITCHEN" />
+  <meta property="og:description" content="SA KITCHEN - ẨM THỰC VIỆT TẠI PHILLIPINES" />
+  <meta property="og:image" content="/slide-6.jpg" />
+  <meta property="og:type" content="website" />
+
+  <link rel="icon" href="/logo-sa.jpg" type="image/jpeg" />
+  <title id="page-title">SA KITCHEN</title>
+
+  <script>
+    (function () {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const ncc = params.get('ncc');
+
+        if (ncc) {
+          const cachedTitle = localStorage.getItem('SHOP_TITLE_' + ncc);
+          const cachedIcon = localStorage.getItem('SHOP_ICON_' + ncc);
+
+          if (cachedTitle) {
+            document.title = cachedTitle;
           } else {
-            document.title = 'MENU';
-            // 🔥 BỎ FAVICON MẶC ĐỊNH
+            document.title = 'SA KITCHEN';
+          }
+
+          if (cachedIcon) {
             var link = document.querySelector("link[rel~='icon']");
             if (!link) {
               link = document.createElement('link');
               link.rel = 'icon';
-              link.type = 'image/png';
+              link.type = 'image/jpeg';
               document.head.appendChild(link);
             }
-            link.href = 'data:,'; // 🔥 ICON TRỐNG
+            link.href = cachedIcon;
+          } else {
+            var link = document.querySelector("link[rel~='icon']");
+            if (!link) {
+              link = document.createElement('link');
+              link.rel = 'icon';
+              link.type = 'image/jpeg';
+              document.head.appendChild(link);
+            }
+            link.href = '/logo-sa.jpg';
           }
-        } catch (e) {
-          document.title = 'MENU';
+        } else {
+          document.title = 'SA KITCHEN';
+          var link = document.querySelector("link[rel~='icon']");
+          if (!link) {
+            link = document.createElement('link');
+            link.rel = 'icon';
+            link.type = 'image/jpeg';
+            document.head.appendChild(link);
+          }
+          link.href = '/logo-sa.jpg';
         }
-      })();
-    </script>
-    
-    <style>
-      /* 🔥 LOADING SCREEN */
-      #app-loader {
-        position: fixed;
-        inset: 0;
-        background: linear-gradient(135deg, #16a34a, #22c55e);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 9999;
+      } catch (e) {
+        document.title = 'SA KITCHEN';
       }
-      
-      .loader-spinner {
-        width: 50px;
-        height: 50px;
-        border: 4px solid rgba(255, 255, 255, 0.3);
-        border-top-color: #ffffff;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-      }
-      
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-      
-      input, 
-      textarea, 
-      select {
-        font-size: 16px !important;
-      }
-      
-      input.small-text,
-      textarea.small-text {
-        font-size: 16px !important;
-        transform: scale(0.875);
-        transform-origin: left top;
-      }
-    </style>
-  </head>
+    })();
+  </script>
 
-  <body>
-    <!-- 🔥 LOADING SCREEN -->
-    <div id="app-loader">
-      <div class="loader-spinner"></div>
-    </div>
-    
-    <div id="app"></div>
-    
-    <script type="module" src="/src/main.ts"></script>
-    
-    <!-- 🔥 ẨN LOADER KHI VUE MOUNT -->
-    <script>
-      window.addEventListener('DOMContentLoaded', function() {
-        setTimeout(function() {
-          var loader = document.getElementById('app-loader');
-          if (loader) {
-            loader.style.opacity = '0';
-            loader.style.transition = 'opacity 0.3s ease';
-            setTimeout(function() {
-              loader.remove();
-            }, 300);
-          }
-        }, 100);
-      });
-    </script>
-  </body>
+  <style>
+    /* 🔥 LOADING SCREEN */
+    #app-loader {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(135deg, #16a34a, #22c55e);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    .loader-spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    input,
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
+
+    input.small-text,
+    textarea.small-text {
+      font-size: 16px !important;
+      transform: scale(0.875);
+      transform-origin: left top;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- 🔥 LOADING SCREEN -->
+  <div id="app-loader">
+    <div class="loader-spinner"></div>
+  </div>
+
+  <div id="app"></div>
+
+  <script type="module" src="/src/main.ts"></script>
+
+  <!-- 🔥 ẨN LOADER KHI VUE MOUNT -->
+  <script>
+    window.addEventListener('DOMContentLoaded', function () {
+      setTimeout(function () {
+        var loader = document.getElementById('app-loader');
+        if (loader) {
+          loader.style.opacity = '0';
+          loader.style.transition = 'opacity 0.3s ease';
+          setTimeout(function () {
+            loader.remove();
+          }, 300);
+        }
+      }, 100);
+    });
+  </script>
+
+  <!-- 🔥 Đã mở khóa Dev Tools và F12 theo yêu cầu -->
+</body>
+
 </html>

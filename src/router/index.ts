@@ -18,12 +18,14 @@ import ChiPhiPhatSinh from '@/views/chiPhiPhatSinh.vue'
 
 import KhachHang from '@/views/khachHang.vue'
 
+import LandingPage from '@/views/LandingPage.vue'
+
 const SUPPORTED_LANGS = ['vi', 'en', 'zh-CN', 'fil']
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', redirect: '/vi' },
+    { path: '/', name: 'landing', component: LandingPage },
     { path: '/login', name: 'login', component: Login },
 
     {

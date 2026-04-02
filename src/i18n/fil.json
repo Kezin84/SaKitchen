@@ -35,7 +35,8 @@
     "note": "Karagdagang tala para sa shop",
     "notePlaceholder": "Tala (konting anghang, ihatid bago 7pm…)",
     "finish": "Ipadala ang Order sa Shop",
-    "back": "BUMALIK"
+    "back": "BUMALIK",
+    "emptyAlert": "WALANG LAMAN ANG CART, MANGYARING MAG-ORDER"
   },
   "export": {
     "title": "NILALAMAN NG ORDER",
@@ -66,6 +67,7 @@
     "chooseCategory": "PUMILI NG KATEGORYA"
   },
   "common": {
-    "scrollTop": "Bumalik sa itaas"
+    "scrollTop": "Bumalik sa itaas",
+    "ok": "NAINTINDIHAN"
   }
 }

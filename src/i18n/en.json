@@ -35,7 +35,8 @@
     "note": "Additional note for shop",
     "notePlaceholder": "Note for shop (less spicy, deliver before 7pm...)",
     "finish": "Send Order to Shop",
-    "back": "BACK"
+    "back": "BACK",
+    "emptyAlert": "CART IS EMPTY, PLEASE ORDER"
   },
   "export": {
     "title": "ORDER CONTENT",
@@ -66,6 +67,7 @@
     "chooseCategory": "CHOOSE CATEGORY"
   },
   "common": {
-    "scrollTop": "Scroll to top"
+    "scrollTop": "Scroll to top",
+    "ok": "UNDERSTOOD"
   }
 }

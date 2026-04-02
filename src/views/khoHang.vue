@@ -141,6 +141,9 @@
           <button class="menu-item" @click="selectExport('price')">
              <i class="ri-money-dollar-circle-line"></i> Giá bán
           </button>
+          <button class="menu-item" @click="selectExport('full')">
+            <i class="ri-file-list-3-line"></i> Tên : Giá tệ / ĐVT
+          </button>
         </div>
       </transition>
     </div>
@@ -1493,6 +1496,7 @@ function selectStatus(key) {
 function selectExport(type) {
   showExportMenu.value = false
   if (type === 'text') exportText()
+  if (type === 'full') exportFull()
   if (type === 'name') exportTen()
   if (type === 'price') exportGia()
 }
@@ -1853,11 +1857,26 @@ function exportText() {
 
   const text = list.value
     .filter(item => selected.value.includes(item.Ma_hang))
-    .map(item => `${item.Ten_hang} : ${item.Gia_ban}`)
+    .map(item => `${item.Ten_hang} : ${formatNumber(item.Gia_ban)}`)
     .join('\n')
 
   navigator.clipboard.writeText(text)
   showAlert(`Đã sao chép ${selected.value.length} sản phẩm`, 'success')
+}
+
+function exportFull() {
+  if (!selected.value.length) {
+    showAlert('Vui lòng chọn sản phẩm để xuất', 'error')
+    return
+  }
+
+  const text = list.value
+    .filter(item => selected.value.includes(item.Ma_hang))
+    .map(item => `${item.Ten_hang} : ${formatNumber(item.Gia_ban)}${item.Don_vi_tien_te ? ' ' + item.Don_vi_tien_te : ''}${item.Dvt ? ' / ' + item.Dvt : ''}`)
+    .join('\n')
+
+  navigator.clipboard.writeText(text)
+  showAlert(`Đã sao chép ${selected.value.length} sản phẩm đầy đủ`, 'success')
 }
 
 function exportTen() {
@@ -1883,7 +1902,7 @@ function exportGia() {
 
   const text = list.value
     .filter(item => selected.value.includes(item.Ma_hang))
-    .map(item => item.Gia_ban)
+    .map(item => formatNumber(item.Gia_ban))
     .join('\n')
 
   navigator.clipboard.writeText(text)

@@ -1,4 +1,4 @@
-﻿{
+{
   "menu": {
     "category": "Danh mục",
     "detail": "Xem chi tiết",
@@ -35,7 +35,8 @@
     "note": "Ghi chú thêm cho quán",
     "notePlaceholder": "Ghi chú cho quán (ít cay, giao trước 7h...)",
     "finish": "Gửi đơn cho shop",
-    "back": "QUAY LẠI"
+    "back": "QUAY LẠI",
+    "emptyAlert": "GIỎ HÀNG TRỐNG, VUI LÒNG ORDER"
   },
   "export": {
     "title": "NỘI DUNG ĐƠN HÀNG",
@@ -66,6 +67,7 @@
     "chooseCategory": "CHỌN DANH MỤC"
   },
   "common": {
-    "scrollTop": "Lên đầu trang"
+    "scrollTop": "Lên đầu trang",
+    "ok": "ĐÃ HIỂU"
   }
 }

@@ -1590,6 +1590,19 @@
     </div>
   </div>
 </div>
+<!-- ===== MODAL THÔNG BÁO GIỎ HÀNG TRỐNG ===== -->
+<div v-if="showEmptyCartModal" class="modal-overlay z-top" @click="showEmptyCartModal = false">
+  <div class="modal-card empty-cart-modal" @click.stop>
+    <button class="modal-close" @click="showEmptyCartModal = false">✕</button>
+    <div class="empty-modal-content">
+      <i class="ri-shopping-basket-line empty-icon"></i>
+      <h3 class="empty-title">{{ $t('cart.emptyAlert') }}</h3>
+      <button class="empty-close-btn" @click="showEmptyCartModal = false">
+        {{ $t('common.ok') }}
+      </button>
+    </div>
+  </div>
+</div>
 </template>
 
 <script setup>
@@ -1707,6 +1720,7 @@ const previewImage = ref('')
 const thongTinChuyenKhoan = ref([])
 const showCKModal = ref(false)
 const showFullCartModal = ref(false)
+const showEmptyCartModal = ref(false)
 
 const ckList = computed(() =>
   (thongTinChuyenKhoan.value || []).filter(
@@ -2874,6 +2888,11 @@ const canFinish = computed(() => {
   )
 })
 function onFinish() {
+  if (cartItems.value.length === 0) {
+    showEmptyCartModal.value = true
+    return
+  }
+
   if (isMobile.value) {
     showCart.value = false
   }
@@ -2884,6 +2903,11 @@ function onFinish() {
 }
 function openMobilePanel(name) {
   if (!isMobile.value) return
+
+  if (name === 'export' && cartItems.value.length === 0) {
+    showEmptyCartModal.value = true
+    return
+  }
 
   // nếu bấm lại chính nó → đóng
   activeMobilePanel.value =
@@ -6031,7 +6055,7 @@ h3, h4, h5, p, span, div {
   border: none;
   border-radius: 14px;
 
-  background: linear-gradient(135deg, #22c55e, #16a34a);
+  background: linear-gradient(135deg, #ef4444, #dc2626);
   color: #ffffff;
 
   font-family: 'Inter', sans-serif;
@@ -6040,7 +6064,7 @@ h3, h4, h5, p, span, div {
   letter-spacing: 0px;
   text-transform: uppercase;
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(22,163,74,0.45);
+  box-shadow: 0 8px 18px rgba(220,38,38,0.45);
 }
 
 .finish-btn:active {
@@ -6050,7 +6074,7 @@ h3, h4, h5, p, span, div {
 .finish-btn:hover {
   transform: scale(0.97);
   background: white;
-  color: #009e47;
+  color: #dc2626;
   animation: none;
 }
 
@@ -6128,8 +6152,8 @@ h3, h4, h5, p, span, div {
 
   background: linear-gradient(
     135deg,
-    #0ea5e9,
-    #2563eb
+    #ef4444,
+    #dc2626
   );
 
   color: #ffffff;
@@ -6145,13 +6169,13 @@ h3, h4, h5, p, span, div {
 
   cursor: pointer;
 
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.45);
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.45);
   transition: all 0.2s ease;
 }
 
 .send-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.6);
+  box-shadow: 0 8px 20px rgba(220, 38, 38, 0.6);
 }
 
 .send-btn:active {
@@ -9730,6 +9754,44 @@ box-shadow: 0 4px 10px rgba(239, 243, 16, 0.45);
   animation: none !important;
 }
 
+/* ===== MODAL GIỎ TRỐNG ===== */
+.empty-cart-modal {
+  max-width: 380px !important;
+  text-align: center;
+  padding: 30px 20px !important;
+}
+.empty-modal-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.empty-icon {
+  font-size: 60px;
+  color: #ef4444;
+}
+.empty-title {
+  color: #374151;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin: 0;
+}
+.empty-close-btn {
+  width: 100%;
+  padding: 12px;
+  background: #f3f4f6;
+  border: none;
+  border-radius: 12px;
+  color: #4b5563;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 10px;
+}
+.empty-close-btn:hover {
+  background: #e5e7eb;
+}
 </style>
 
 

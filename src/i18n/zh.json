@@ -35,7 +35,8 @@
     "note": "给商家的备注",
     "notePlaceholder": "备注（少辣，7点前送达…）",
     "finish": "发送订单给商家",
-    "back": "返回"
+    "back": "返回",
+    "emptyAlert": "购物车为空，请下单"
   },
   "export": {
     "title": "订单内容",
@@ -66,6 +67,7 @@
     "chooseCategory": "选择分类"
   },
   "common": {
-    "scrollTop": "返回顶部"
+    "scrollTop": "返回顶部",
+    "ok": "确定"
   }
 }

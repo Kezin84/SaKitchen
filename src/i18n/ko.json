@@ -35,7 +35,8 @@
     "note": "가게에 남길 메모",
     "notePlaceholder": "메모 입력 (덜 맵게, 7시 전에 배달 등)",
     "finish": "매장에 주문 보내기",
-    "back": "뒤로"
+    "back": "뒤로",
+    "emptyAlert": "장바구니가 비어 있습니다. 주문해 주세요"
   },
   "export": {
     "title": "주문 내용",
@@ -66,6 +67,7 @@
     "chooseCategory": "카테고리 선택"
   },
   "common": {
-    "scrollTop": "맨 위로"
+    "scrollTop": "맨 위로",
+    "ok": "확인"
   }
 }

@@ -84,6 +84,7 @@
     "backToMenu": "Back to menu",
     "continueBtn": "Continue",
     "viewProgressBtn": "View Order Progress",
+    "pendingProgressBtn": "Confirming order, view progress",
     "cartLockedHint": "Order in progress — view only, items are locked.",
     "cartPendingHint": "Pending shop confirmation — you can still edit items.",
     "cartTerminalHint": "This order has ended — tap New Order below to order again.",

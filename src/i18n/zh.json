@@ -84,6 +84,7 @@
     "backToMenu": "返回点餐",
     "continueBtn": "继续",
     "viewProgressBtn": "查看订单进度",
+    "pendingProgressBtn": "商家确认中，查看订单进度",
     "cartLockedHint": "订单处理中 — 仅供查看，无法修改菜品。",
     "cartPendingHint": "等待商家确认中 — 您仍可修改菜品。",
     "cartTerminalHint": "订单已结束 — 点击下方“新建订单”重新下单。",

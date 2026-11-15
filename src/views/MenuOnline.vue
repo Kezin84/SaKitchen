@@ -1488,7 +1488,7 @@
               <span>{{ $t('cart.viewProgressBtn') }}</span>
             </button>
             <button
-              v-else-if="isMobile && liveStatus === 'Chờ duyệt' && hasOrderChangesAfterSubmit"
+              v-else-if="liveStatus === 'Chờ duyệt' && hasOrderChangesAfterSubmit"
               type="button"
               class="finish-btn continue-full-btn"
               @click="onContinueToFullModal"
@@ -1497,13 +1497,13 @@
               <i class="ri-arrow-right-line"></i>
             </button>
             <button
-              v-else-if="isMobile && liveStatus === 'Chờ duyệt'"
+              v-else-if="liveStatus === 'Chờ duyệt'"
               type="button"
-              class="finish-btn view-progress-finish-btn"
-              @click="onOrderStatusClick"
+              class="finish-btn pending-progress-finish-btn"
+              @click="onPendingProgressClick"
             >
-              <i class="ri-route-line"></i>
-              <span>{{ $t('cart.viewProgressBtn') }}</span>
+              <i class="ri-time-line"></i>
+              <span>{{ $t('cart.pendingProgressBtn') }}</span>
             </button>
             <button
               v-else
@@ -1807,6 +1807,57 @@
       >
         <i class="ri-checkbox-circle-fill"></i> {{ $t('export.savedWeb') }}
       </span>
+    </div>
+
+    <div
+      class="grab-status-card in-full-modal in-export-modal"
+      :class="[orderStatusInfo.stateClass, { 'is-cancelled': orderStatusProgress.isCancelled }]"
+    >
+      <div class="gs-top-row">
+        <span class="gs-status-main">
+          <span class="gs-live-dot" :class="{ paused: orderStatusProgress.isTerminal }"></span>
+          <i class="gs-main-ico" :class="orderStatusInfo.icon"></i>
+          <strong class="gs-status-text">{{ orderStatusInfo.text }}</strong>
+        </span>
+        <span v-if="!orderStatusProgress.isCancelled" class="gs-step-count">
+          {{ orderStatusProgress.activeIndex + 1 }}/{{ orderStatusProgress.steps.length }}
+        </span>
+      </div>
+
+      <div v-if="!orderStatusProgress.isCancelled" class="gs-stepper">
+        <div class="gs-rail">
+          <div
+            class="gs-rail-fill"
+            :style="{ width: `${orderStatusProgress.fillPercent}%` }"
+          ></div>
+        </div>
+
+        <div class="gs-steps-grid">
+          <div
+            v-for="(st, sIdx) in orderStatusProgress.steps"
+            :key="'exm-st-' + st.key"
+            class="gs-step"
+            :class="{
+              'is-done': sIdx < orderStatusProgress.activeIndex,
+              'is-current': sIdx === orderStatusProgress.activeIndex,
+              'is-upcoming': sIdx > orderStatusProgress.activeIndex,
+              'is-shipping-active': st.key === 'shipping' && sIdx === orderStatusProgress.activeIndex
+            }"
+          >
+            <div class="gs-node">
+              <span v-if="sIdx === orderStatusProgress.activeIndex && !orderStatusProgress.isTerminal" class="gs-pulse-ring"></span>
+              <i
+                :class="
+                  sIdx < orderStatusProgress.activeIndex
+                    ? 'ri-check-line'
+                    : st.icon
+                "
+              ></i>
+            </div>
+            <span class="gs-label">{{ st.label }}</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="exm-content-card">
@@ -3538,7 +3589,7 @@
           </div>
 
           <div
-            v-if="!isMobile"
+            v-if="!isMobile || (liveStatus && liveStatus !== 'Nháp')"
             class="grab-status-card in-full-modal"
             :class="[orderStatusInfo.stateClass, { 'is-cancelled': orderStatusProgress.isCancelled }]"
           >
@@ -3592,21 +3643,39 @@
           <!-- UNIFIED SUBMIT VIA SOCIAL MEDIA (HOST) / GUEST READY ACTION -->
           <template v-if="isGroupHost">
             <button
-              v-if="!isOrderLocked"
+              v-if="isOrderTerminal"
+              type="button"
+              class="finish-btn new-order-finish-btn fcm-submit-btn"
+              @click="startNewOrder"
+            >
+              + {{ $t('group.newOrderBtn') }}
+            </button>
+            <button
+              v-else-if="isOrderLocked"
+              type="button"
+              class="finish-btn view-progress-finish-btn fcm-submit-btn"
+              @click="onOrderStatusClick"
+            >
+              <i class="ri-route-line"></i>
+              <span>{{ $t('cart.viewProgressBtn') }}</span>
+            </button>
+            <button
+              v-else-if="liveStatus === 'Chờ duyệt' && !hasOrderChangesAfterSubmit"
+              type="button"
+              class="finish-btn pending-progress-finish-btn fcm-submit-btn"
+              @click="onPendingProgressClick"
+            >
+              <i class="ri-time-line"></i>
+              <span>{{ $t('cart.pendingProgressBtn') }}</span>
+            </button>
+            <button
+              v-else
               type="button"
               class="finish-btn fcm-submit-btn"
               :disabled="submittingOrder"
               @click="onFinish"
             >
               {{ finishBtnLabel }} <i class="ri-send-plane-fill"></i>
-            </button>
-            <button
-              v-else
-              type="button"
-              class="finish-btn new-order-finish-btn fcm-submit-btn"
-              @click="startNewOrder"
-            >
-              + {{ $t('group.newOrderBtn') }}
             </button>
           </template>
 
@@ -5498,6 +5567,14 @@ function onOrderStatusClick() {
     return
   }
   showFullCartModal.value = true
+}
+
+function onPendingProgressClick() {
+  if (isMobile.value) {
+    openMobileProgressAfterSubmit({ toast: false })
+    return
+  }
+  showExportModal.value = true
 }
 
 function onContinueToFullModal() {
@@ -7581,19 +7658,32 @@ async function submitOrderToWebCore({ silentToast = false } = {}) {
     if (res?.success && res.orderId) {
       lastSubmittedSig.value = nextSubmittedSig
       saveCustomerFormLocal()
-      if (!liveOrderData.value) {
-        liveOrderData.value = {
-          meta: {
-            Trang_thai: 'Chờ duyệt',
-            Ten_khach_hang: recipientName,
-            So_dien_thoai: sdt.value.trim(),
-            Dia_chi: diaChi.value.trim(),
-            Thoi_gian_nhan_hang: thoiGian.value.trim(),
-            Hinh_thuc_thanh_toan: hinhThucTT.value || 'TIEN_MAT',
-            Ghi_chu: ghiChu.value,
-          },
-          itemsList: payloadItems,
-        }
+      const prevLive = liveOrderData.value || {}
+      const nextItemsMap = { ...(prevLive.itemsMap || {}) }
+      for (const pit of payloadItems) {
+        if (pit.lineId) nextItemsMap[pit.lineId] = pit
+      }
+      liveOrderData.value = {
+        ...prevLive,
+        meta: {
+          ...(prevLive.meta || {}),
+          Ma_hoa_don: res.orderId,
+          Trang_thai: 'Chờ duyệt',
+          Ten_khach_hang: recipientName,
+          So_dien_thoai: sdt.value.trim(),
+          Dia_chi: diaChi.value.trim(),
+          Thoi_gian_nhan_hang: thoiGian.value.trim(),
+          Hinh_thuc_thanh_toan: hinhThucTT.value || 'TIEN_MAT',
+          Ghi_chu: ghiChu.value,
+          Submitted_sig: nextSubmittedSig,
+          Submitted_at: Date.now(),
+          Updated_at: Date.now(),
+          Host_id: prevLive.meta?.Host_id || memberId,
+          Host_name: prevLive.meta?.Host_name || memberName.value.trim() || recipientName,
+        },
+        itemsMap: nextItemsMap,
+        itemsList: payloadItems,
+        membersList: prevLive.membersList || [],
       }
       localCartLines.value = {}
       try {
@@ -7708,12 +7798,53 @@ async function onFinish(arg) {
     thoiGian.value = format24hDateTimeObj(new Date())
   }
 
+  // Cập nhật optimistic trạng thái tiến trình lên 'Chờ duyệt' ngay trong modal trước khi đợi Firebase
+  const prevLiveBeforeSubmit = liveOrderData.value
+  const shouldOptimisticPromote = !liveStatus.value || liveStatus.value === 'Nháp'
+  if (shouldOptimisticPromote) {
+    const baseLive = prevLiveBeforeSubmit || {
+      itemsMap: {},
+      itemsList: cartItems.value.map((i) => ({
+        lineId: i.lineId,
+        Ma_hang: i.Ma_hang,
+        Ten_hang: i.Ten_hang,
+        Gia_ban: i.unitPrice,
+        Don_vi_tien_te: i.Don_vi_tien_te,
+        Main_img: i.Main_img,
+        So_luong: i.qty,
+        Ghi_chu: i.note || '',
+        Nguoi_dat: i.rawAuthor || memberName.value.trim() || tenKhach.value.trim(),
+        Nguoi_dat_id: i.memberId || memberId,
+        Added_by_role: (i.memberId || memberId) === memberId ? 'host' : 'guest',
+      })),
+      membersList: [],
+    }
+    liveOrderData.value = {
+      ...baseLive,
+      meta: {
+        ...(baseLive.meta || {}),
+        Trang_thai: 'Chờ duyệt',
+        Ten_khach_hang: tenKhach.value.trim(),
+        So_dien_thoai: sdt.value.trim(),
+        Dia_chi: diaChi.value.trim(),
+        Thoi_gian_nhan_hang: thoiGian.value.trim(),
+        Hinh_thuc_thanh_toan: hinhThucTT.value || 'TIEN_MAT',
+        Ghi_chu: ghiChu.value,
+        Host_id: baseLive.meta?.Host_id || memberId,
+      },
+    }
+  }
+
   // Mở modal gửi đơn MXH ngay lập tức, đồng thời gửi ngầm đơn về web ở background
   if (isMobile.value) {
     openMobileProgressAfterSubmit({ toast: false, keepExport: true })
   }
   showExportModal.value = true
-  void submitOrderToWebCore({ silentToast: true })
+  void submitOrderToWebCore({ silentToast: true }).then((ok) => {
+    if (!ok && shouldOptimisticPromote && liveOrderData.value?.meta?.Trang_thai === 'Chờ duyệt') {
+      liveOrderData.value = prevLiveBeforeSubmit
+    }
+  })
 }
 
 function onMobileSendTab() {
@@ -19785,6 +19916,10 @@ const hasSale = computed(() =>
   cursor: default;
 }
 
+.grab-status-card.in-export-modal {
+  margin: 8px 0 12px;
+}
+
 .gs-top-row {
   display: flex;
   align-items: center;
@@ -20213,6 +20348,18 @@ const hasSale = computed(() =>
   gap: 8px;
   background: linear-gradient(135deg, #16a34a, #15803d);
   color: #ffffff;
+}
+
+.finish-btn.pending-progress-finish-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #d97706, #f59e0b);
+  color: #ffffff;
+  font-size: 13.5px;
+  line-height: 1.25;
+  padding: 10px 14px;
 }
 
 .finish-btn.mps-contact-shop-btn {

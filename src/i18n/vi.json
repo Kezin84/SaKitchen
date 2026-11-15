@@ -84,6 +84,7 @@
     "backToMenu": "Quay lại chọn món",
     "continueBtn": "Tiếp tục",
     "viewProgressBtn": "Xem tiến trình đơn",
+    "pendingProgressBtn": "Quán đang xác nhận đơn, xem tiến trình",
     "cartLockedHint": "Đơn đang được xử lý — chỉ xem, không thể sửa món.",
     "cartPendingHint": "Đơn đang chờ quán xác nhận — bạn vẫn có thể chỉnh sửa món.",
     "cartTerminalHint": "Đơn hàng đã kết thúc — bấm Tạo đơn mới bên dưới để đặt lại.",

@@ -84,6 +84,7 @@
     "backToMenu": "Bumalik sa menu",
     "continueBtn": "Magpatuloy",
     "viewProgressBtn": "Tingnan ang Progreso ng Order",
+    "pendingProgressBtn": "Kinukumpirma ang order, tingnan ang progreso",
     "cartLockedHint": "Pinoproseso ang order — para sa pagtingin lang, hindi na mababago.",
     "cartPendingHint": "Naghihintay ng kumpirmasyon — maaari ka pa ring magbago ng order.",
     "cartTerminalHint": "Tapos na ang order — pindutin ang Bagong Order sa ibaba para umorder ulit.",

@@ -1659,6 +1659,10 @@ export async function submitCustomerOrder(body = {}) {
     })
   }
 
+  const existingOrderStatus = s(existingParsed?.meta?.Trang_thai).trim()
+  const isNewOrderNotification =
+    !dhTarget && (!existingOrderStatus || existingOrderStatus === 'Nháp')
+
   const updates = {
     [`live_orders/${orderKey}`]: {
       meta: nextMeta,
@@ -1669,12 +1673,42 @@ export async function submitCustomerOrder(body = {}) {
   }
 
   await update(dbRef(db), updates)
+
+  if (isNewOrderNotification) {
+    notifyNewOrderTelegram({
+      orderId: cleanOrderId,
+      tenKhach,
+      sdt,
+      diaChi,
+      thoiGian,
+      hinhThucTT: thanhToan,
+      ghiChu: stripAutoPromoTagText(rawGhiChu),
+      khuyenMai: earnedPromoVi,
+      tongCong,
+      donViTienTe: currency,
+      items: resolvedList,
+      adminUrl: 'https://sakitchen.vercel.app/admin/don-hang',
+    })
+  }
+
   return {
     success: true,
     orderId: cleanOrderId,
     status: 'Chờ duyệt',
     Tong_cong: tongCong,
   }
+}
+
+function notifyNewOrderTelegram(payload) {
+  if (typeof fetch !== 'function') return
+  try {
+    fetch('/api/telegram-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      body: JSON.stringify(payload),
+    }).catch(() => {})
+  } catch {}
 }
 
 export async function adminSyncOrderItems(body = {}) {

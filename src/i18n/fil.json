@@ -45,7 +45,7 @@
     "quantity": "Dami",
     "total": "Kabuuan",
     "name": "Telegram ng tatanggap",
-    "namePlaceholder": "Ilagay ang @username o pangalan sa Telegram",
+    "namePlaceholder": "Ilagay ang {'@'}username o pangalan sa Telegram",
     "payment": "Paraan ng pagbabayad",
     "cash": "Cash",
     "transfer": "Bank transfer",

@@ -45,7 +45,7 @@
     "quantity": "수량",
     "total": "총합",
     "name": "수령인 텔레그램",
-    "namePlaceholder": "@username 또는 텔레그램 이름 입력",
+    "namePlaceholder": "{'@'}username 또는 텔레그램 이름 입력",
     "payment": "결제 방식",
     "cash": "현금",
     "transfer": "계좌 이체",

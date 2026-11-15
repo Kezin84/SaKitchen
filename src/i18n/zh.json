@@ -45,7 +45,7 @@
     "quantity": "数量",
     "total": "总计",
     "name": "收货人 Telegram",
-    "namePlaceholder": "输入 @username 或 Telegram 昵称",
+    "namePlaceholder": "输入 {'@'}username 或 Telegram 昵称",
     "payment": "支付方式",
     "cash": "现金",
     "transfer": "转账",

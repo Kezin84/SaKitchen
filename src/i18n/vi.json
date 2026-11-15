@@ -45,7 +45,7 @@
     "quantity": "Số lượng",
     "total": "Tổng cộng",
     "name": "Telegram người nhận",
-    "namePlaceholder": "Nhập @username hoặc tên Telegram",
+    "namePlaceholder": "Nhập {'@'}username hoặc tên Telegram",
     "payment": "Hình thức thanh toán",
     "cash": "Tiền mặt",
     "transfer": "Chuyển khoản",

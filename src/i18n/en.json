@@ -45,7 +45,7 @@
     "quantity": "Quantity",
     "total": "Total",
     "name": "Recipient Telegram",
-    "namePlaceholder": "Enter @username or Telegram name",
+    "namePlaceholder": "Enter {'@'}username or Telegram name",
     "payment": "Payment method",
     "cash": "Cash",
     "transfer": "Bank transfer",

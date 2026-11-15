@@ -62,7 +62,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { API_URL, IMGBB_KEY } from '@/config/api'
+import { loginWithFirebase } from '@/config/api'
 const router = useRouter()
 
 const username = ref('')
@@ -74,49 +74,35 @@ const handleLogin = async () => {
   loading.value = true
   error.value = ''
 
- try {
-  const formData = new FormData()
-  formData.append('action', 'login')
-  formData.append('username', username.value.trim())
-  formData.append('password', password.value.trim())
+  try {
+    const data = await loginWithFirebase(username.value.trim(), password.value.trim())
 
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    body: formData
-  })
+    if (data.code === 'EXPIRED') {
+      localStorage.removeItem('user')
+      error.value = data.message || 'Gói dịch vụ đã hết hạn'
+      loading.value = false
+      return
+    }
+    if (!data.success) {
+      error.value = data.message || 'Đăng nhập thất bại'
+      loading.value = false
+      return
+    }
 
-  const text = await res.text()
-  console.log('RAW RESPONSE:', text)
+    // ✅ LƯU LOGIN
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        username: data.user.username,
+      }),
+    )
 
-  const data = JSON.parse(text)
-  if (data.code === 'EXPIRED') {
-  localStorage.removeItem('user')
-  error.value = data.message || 'Gói dịch vụ đã hết hạn'
-  loading.value = false
-  return
-}
-  if (!data.success) {
-    error.value = data.message || 'Đăng nhập thất bại'
-    loading.value = false
-    return
+    // ✅ CHUYỂN TRANG SAU LOGIN
+    router.replace({ name: 'kho-hang' })
+  } catch (err) {
+    console.error(err)
+    error.value = 'Không kết nối được Firebase Database (kiểm tra Rules trên Console)'
   }
-
-  // ✅ LƯU LOGIN
-  localStorage.setItem(
-    'user',
-    JSON.stringify({
-      username: data.user.username
-    })
-  )
-
-  // ✅ CHUYỂN TRANG SAU LOGIN
-  router.replace({ name: 'kho-hang' })
-
-} catch (err) {
-  console.error(err)
-  error.value = 'Không kết nối được server'
-}
-
 
   loading.value = false
 }

@@ -336,7 +336,7 @@
 </template>
 
 <script>
-import { API_URL, IMGBB_KEY } from '@/config/api'
+import { getSheets, dispatchAction } from '@/config/api'
 export default {
   name: 'KhachHangManager',
   
@@ -604,8 +604,7 @@ export default {
     async loadData() {
       this.loading = true
       try {
-        const res = await fetch(`${API_URL}?action=all`)
-        const json = await res.json()
+        const json = await getSheets(['khach_hang', 'don_hang', 'so_thu_chi'])
 
         if (json.success) {
           this.khachHangList = json.data.khach_hang || []
@@ -735,18 +734,17 @@ export default {
           }
         }
 
-        await fetch(API_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          body: JSON.stringify(payload)
-        })
+        const res = await dispatchAction(payload)
+        if (!res.success) {
+          throw new Error(res.message || 'Cập nhật thất bại')
+        }
 
         this.showNotify('success', 'Thành công', 'Cập nhật khách hàng thành công!')
         this.closeEditModal()
-        this.loadData()
+        await this.loadData()
       } catch (err) {
         console.error('Update error:', err)
-        this.showNotify('error', 'Lỗi', 'Không thể kết nối server!')
+        this.showNotify('error', 'Lỗi', 'Không thể kết nối Firebase!')
       } finally {
         this.saving = false
       }
@@ -770,19 +768,18 @@ export default {
           Ma_khach_hang: this.deleteTarget.Ma_khach_hang
         }
 
-        await fetch(API_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          body: JSON.stringify(payload)
-        })
+        const res = await dispatchAction(payload)
+        if (!res.success) {
+          throw new Error(res.message || 'Xóa thất bại')
+        }
 
         this.showNotify('success', 'Thành công', 'Xóa khách hàng thành công!')
         this.showDeleteModal = false
         this.deleteTarget = null
-        this.loadData()
+        await this.loadData()
       } catch (err) {
         console.error('Delete error:', err)
-        this.showNotify('error', 'Lỗi', 'Không thể kết nối server!')
+        this.showNotify('error', 'Lỗi', 'Không thể kết nối Firebase!')
       } finally {
         this.deleting = false
       }

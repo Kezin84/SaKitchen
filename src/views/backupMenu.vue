@@ -65,7 +65,7 @@
   class="shop-contact"
 >
   <h4 class="contact-title">
-    {{ $t('contact.sendOrder') }}
+    {{ $t('contact.sendOrder') }} <i class="ri-customer-service-2-fill"></i>
   </h4>
 
   <a
@@ -138,12 +138,12 @@
   </div>
   <template v-else>
       <!-- THÔNG BÁO -->
-<div v-if="thongBaoList.length" class="notice-bar">
+<div v-if="thongBaoTexts.length" class="notice-bar">
   <div class="notice-icon"><i class="ri-volume-up-fill"></i></div>
 
   <div class="notice-marquee">
     <span class="notice-text">
-      {{ thongBaoList.map(t => t.Noi_dung).join(' • ') }}
+      {{ thongBaoTexts.join(' • ') }}
     </span>
   </div>
 </div>
@@ -339,7 +339,7 @@
   class="detail-link"
   @click.stop.prevent="openDetail(m)"
 >
-  {{ $t('menu.detail') }}
+  {{ $t('menu.detailNote') }}
 </a>
 
 
@@ -389,6 +389,9 @@
   <template v-if="addedMap[m.Ma_hang]">
     <i class="ri-checkbox-circle-fill"></i>
   </template>
+  <template v-else-if="m.Trang_thai === 'Hết hàng'">
+    {{ $t('status.outOfStock') }}
+  </template>
   <template v-else>
     {{ $t('menu.add') }}
   </template>
@@ -421,17 +424,10 @@
   v-if="totalPages > 1"
   :key="pageKey"
 >
-<div v-if="isMobile" class="powered-by powered-by-mobile">
+<a v-if="isMobile" class="powered-by powered-by-mobile" href="https://t.me/FBC8386" target="_blank" rel="noopener">
   POWERED BY
-  <a 
-    class="powered-link"
-    href="https://www.facebook.com/profile.php?id=100092383541391"
-    target="_blank"
-    rel="noopener"
-  >
-    FBC
-  </a>
-</div>
+  <span class="powered-link">FBC</span>
+</a>
         <button
   :disabled="currentPage === 1"
   @click="
@@ -471,28 +467,14 @@
 </button>
 
       </div>
-      <div v-if="isMobile" class="powered-by-mobile-footer">
-  FREE WEBSITE BY 
-  <a 
-    class="powered-link"
-    href="https://www.facebook.com/profile.php?id=100092383541391"
-    target="_blank"
-    rel="noopener"
-  >
-    FBC
-  </a>
-</div>
-      <div class="powered-by">
+      <a v-if="isMobile" class="powered-by-mobile-footer" href="https://t.me/FBC8386" target="_blank" rel="noopener">
         FREE WEBSITE BY 
-        <a
-          class="powered-link"
-          href="https://www.facebook.com/profile.php?id=100092383541391"
-          target="_blank"
-          rel="noopener"
-        >
-          FBC
-        </a>
-      </div>
+        <span class="powered-link">FBC</span>
+      </a>
+      <a class="powered-by" href="https://t.me/FBC8386" target="_blank" rel="noopener">
+        FREE WEBSITE BY 
+        <span class="powered-link">FBC</span>
+      </a>
 <!-- FOOTER -->
     
       </template>
@@ -514,10 +496,10 @@
   <button
     class="detail-add-btn"
     type="button"
-    :disabled="selectedItem?.Trang_thai === 'H?t h…ng'"
+    :disabled="selectedItem?.Trang_thai === 'Hết hàng'"
     @click.stop="addFromDetailSidebar"
   >
-    {{ $t('menu.add') }}
+    {{ selectedItem?.Trang_thai === 'Hết hàng' ? $t('status.outOfStock') : $t('menu.add') }}
   </button>
 </div>
    <!-- ✅ ẢNH SẢN PHẨM (BỊ THIẾU) -->
@@ -652,6 +634,9 @@
     <template v-if="addedMap[selectedItem.Ma_hang]">
       <i class="ri-checkbox-circle-fill"></i>
     </template>
+    <template v-else-if="selectedItem.Trang_thai === 'Hết hàng'">
+      {{ $t('status.outOfStock') }}
+    </template>
     <template v-else>
       {{ $t('menu.add') }}
     </template>
@@ -664,7 +649,7 @@
 
     <!-- ========== SIDEBAR RIGHT – CART (7) ========== -->
     <aside class="sidebar-right" :class="{ collapsed: !showCart }">
- <button class="toggle-btn" @click="showCart = !showCart">
+ <button class="toggle-btn" @click="showCart ? closeCart() : showCart = true">
   <i
     :class="[
       showCart
@@ -845,11 +830,11 @@
     ></textarea>
   </div>
  <button
-  v-if="canFinish && !isMobile"
+  v-if="!isMobile"
   class="finish-btn"
   @click="onFinish"
 >
-  {{ $t('cart.finish') }}
+  {{ $t('cart.finish') }} <i class="ri-send-plane-fill"></i>
 </button>
 <!-- 👈 NÚT QUAY LẠI (MOBILE ONLY) -->
 </div>
@@ -862,7 +847,7 @@
   </div>
     <button
     class="scroll-top-fab"
-    v-show="showScrollTop"
+    v-show="showScrollTop && activeMobilePanel !== 'cart'"
     :title="$t('common.scrollTop')"
     @click="scrollToTop"
   >
@@ -999,6 +984,9 @@
 >
   <template v-if="addedMap[selectedItem.Ma_hang]">
     <i class="ri-checkbox-circle-fill"></i>
+  </template>
+  <template v-else-if="selectedItem.Trang_thai === 'Hết hàng'">
+    {{ $t('status.outOfStock') }}
   </template>
   <template v-else>
     {{ $t('menu.add') }}
@@ -1148,6 +1136,26 @@
   </button>
 </div>
 
+<!-- ===== MINI CART BAR (MOBILE) ===== -->
+<transition name="cart-bar-slide">
+  <div 
+    v-if="isMobile && cartItems.length > 0 && activeMobilePanel !== 'cart'" 
+    class="mobile-cart-bar"
+  >
+    <!-- PILL TRÁI: Icon giỏ hàng + badge số lượng -->
+    <div class="cart-bar-pill-left" @click="openMobilePanel('cart')">
+      <i class="ri-shopping-cart-2-fill cart-bar-icon"></i>
+      <span class="cart-bar-badge">{{ cartQtyTotal }}</span>
+    </div>
+
+    <!-- PILL PHẢI: Thanh toán + số tiền -->
+    <button class="cart-bar-pill-right" @click="openMobilePanel('cart')">
+      <span class="cart-bar-label">{{ $t('mobile.checkout') }}</span>
+      <span class="cart-bar-total">{{ formatPrice(totalAmount, cartItems[0]?.Don_vi_tien_te) }}</span>
+    </button>
+  </div>
+</transition>
+
 <div v-if="isMobile" class="mobile-bottom-bar">
   <!-- HOME -->
   <button
@@ -1194,7 +1202,7 @@
     <div class="btn-inner">
       <div class="btn-scale">
         <div class="cart-icon-wrap">
-          <i class="ri-shopping-cart-2-fill" style="color:green"></i>
+          <i class="ri-shopping-cart-2-fill" :style="{ color: activeMobilePanel === 'cart' ? '#ffffff' : '#16a34a' }"></i>
 
           <span
             v-if="cartItems.length"
@@ -1232,7 +1240,15 @@
   >
     <div class="btn-inner">
       <div class="btn-scale">
-        <i class="ri-send-plane-fill"></i>
+        <div class="send-icon-wrap">
+          <i class="ri-send-plane-fill" :style="{ color: activeMobilePanel === 'export' ? '#ffffff' : '#16a34a' }"></i>
+          <span
+            v-if="cartItems.length"
+            class="send-badge"
+          >
+            {{ cartQtyTotal }}
+          </span>
+        </div>
         <span class="btn-label">{{ $t('mobile.send') }}</span>
       </div>
     </div>
@@ -1380,7 +1396,7 @@
   />
 
   <div class="ck-ncc">
-    {{ c.Ten_nha_cung_cap || 'Nhà cung cấp' }}
+    {{ logo?.Name || 'SA KITCHEN' }}
   </div>
 </div>
 
@@ -1574,6 +1590,19 @@
     </div>
   </div>
 </div>
+<!-- ===== MODAL THÔNG BÁO GIỎ HÀNG TRỐNG ===== -->
+<div v-if="showEmptyCartModal" class="modal-overlay z-top" @click="showEmptyCartModal = false">
+  <div class="modal-card empty-cart-modal" @click.stop>
+    <button class="modal-close" @click="showEmptyCartModal = false">✕</button>
+    <div class="empty-modal-content">
+      <i class="ri-shopping-basket-line empty-icon"></i>
+      <h3 class="empty-title">{{ $t('cart.emptyAlert') }}</h3>
+      <button class="empty-close-btn" @click="showEmptyCartModal = false">
+        {{ $t('common.ok') }}
+      </button>
+    </div>
+  </div>
+</div>
 </template>
 
 <script setup>
@@ -1581,18 +1610,15 @@ import { ref, computed, onMounted, watch ,nextTick,onUnmounted  } from 'vue'
 import L from 'leaflet'
 import { useRoute,useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { getStorefrontSheets, IMGBB_KEY } from '@/config/api'
+import {
+  localizeProduct,
+  productMatchesKeyword,
+  resolveNoticeText,
+} from '@/utils/i18nData'
 const route = useRoute()
 const router = useRouter()
 const { locale, t } = useI18n()
-watch(
-  () => route.query.ncc,
-  (ncc) => {
-    if (ncc) {
-      localStorage.setItem('CURRENT_NCC', ncc)
-    }
-  },
-  { immediate: true }
-)
 // ===== THÊM VÀO PHẦN KHAI BÁO REF =====
 const showGuideModal = ref(false)
 const guideData = ref({})
@@ -1644,23 +1670,22 @@ const searchWrapperRef = ref(null)
 const currentLang = computed(() => route.params.lang || 'vi')
 const langLoading = ref(false)
 /* ===== CONFIG ===== */
-const API_URL =
-  'https://script.google.com/macros/s/AKfycbye90xvM0df2PvH-sbYpdrJthTF6_psz3m6JwbT700ZJBKTkKFf7JJItKUUYr0FL9bb/exec'
+
 const closingModal = ref(false)
 const shopContacts = ref([])
 const cartListRef = ref(null)
-const params = new URLSearchParams(location.search)
-const maNCC = params.get('ncc')
 let bannerTimer = null
 const BANNER_INTERVAL = 4500
 const BANNER_FADE_MS = 450
 const tempQty = ref({})
 /* ===== STATE ===== */
-const menu = ref([])
+const rawMenu = ref([])
+const menu = computed(() =>
+  rawMenu.value.map((m) => localizeProduct(m, currentLang.value))
+)
 const thongBao = ref([])
 const banners = ref([])
 const logos = ref([])
-const footers = ref([])
 const diaChi = ref('')
 const sdt = ref('')
 const thoiGian = ref('')
@@ -1678,7 +1703,7 @@ let marker = null
 const priceSort = ref('all')   // 🔥 mặc định TẤT CẢ
 const addedMap = ref({})
 const loadingMain = ref(true)
-const CACHE_VERSION = 1
+const CACHE_VERSION = 2
 const CACHE_TTL = 1000 * 60 * 10 // 10 phút
 const showCategoryModal = ref(false)
 const showContactModal = ref(false)
@@ -1691,14 +1716,9 @@ const previewImage = ref('')
 const thongTinChuyenKhoan = ref([])
 const showCKModal = ref(false)
 const showFullCartModal = ref(false)
+const showEmptyCartModal = ref(false)
 
-const ckList = computed(() =>
-  (thongTinChuyenKhoan.value || []).filter(
-    (x) =>
-      String(x.Ma_nha_cung_cap || '').trim() ===
-      String(maNCC || '').trim()
-  )
-)
+const ckList = computed(() => thongTinChuyenKhoan.value || [])
 
 const ckListStyle = computed(() => {
   if (isMobile.value) return { gridTemplateColumns: '1fr' }
@@ -1790,11 +1810,12 @@ async function selectLanguage(lang) {
 
 
 function redirectToLang(lang) {
-  const isMobile = route.path.includes('/mobile')
+  const isMobilePath = route.path.includes('/mobile')
+  const { ncc: _ncc, ...cleanQuery } = route.query || {}
 
   router.replace({
-    path: `/${lang}${isMobile ? '/mobile' : ''}`,
-    query: route.query, // 🔥 GIỮ ?ncc
+    path: `/${lang}${isMobilePath ? '/mobile' : ''}`,
+    query: cleanQuery,
   })
 }
 
@@ -1828,32 +1849,53 @@ const pages = computed(() => {
   const tp = totalPages.value
   const cp = currentPage.value
   const DOT = '...'
-  const WINDOW = 4   // số trang hiển thị liền nhau (desktop + mobile)
+  const WINDOW = 3   // số trang hiển thị liền nhau (giảm từ 4 xuống 3)
 
   // Ít trang → show hết
-  if (tp <= WINDOW + 1) {
+  if (tp <= WINDOW + 2) {
     return Array.from({ length: tp }, (_, i) => i + 1)
   }
 
-  // ===== SLIDING WINDOW (CHUNG) =====
-  let start = cp
-  let end = cp + WINDOW - 1
+  const result = []
 
-  if (end >= tp) {
-    end = tp
-    start = Math.max(1, tp - WINDOW + 1)
+  // ===== LUÔN HIỂN THỊ TRANG 1 =====
+  result.push(1)
+
+  // ===== TÍNH SLIDING WINDOW =====
+  let start = Math.max(2, cp - 1)
+  let end = Math.min(tp - 1, cp + 1)
+
+  // Nếu gần đầu, mở rộng về cuối
+  if (cp <= 3) {
+    start = 2
+    end = Math.min(tp - 1, WINDOW + 1)
   }
 
-  const range = []
+  // Nếu gần cuối, mở rộng về đầu
+  if (cp >= tp - 2) {
+    end = tp - 1
+    start = Math.max(2, tp - WINDOW)
+  }
+
+  // Thêm "..." nếu có khoảng cách từ trang 1
+  if (start > 2) {
+    result.push(DOT)
+  }
+
+  // Thêm các trang trong window
   for (let i = start; i <= end; i++) {
-    range.push(i)
+    result.push(i)
   }
 
-  if (end < tp) {
-    range.push(DOT, tp)
+  // Thêm "..." nếu có khoảng cách đến trang cuối
+  if (end < tp - 1) {
+    result.push(DOT)
   }
 
-  return range
+  // ===== LUÔN HIỂN THỊ TRANG CUỐI =====
+  result.push(tp)
+
+  return result
 })
 
 
@@ -1879,59 +1921,27 @@ const isBannerTransitioning = ref(false)
 
 /* ===== LOAD ===== */
 onMounted(async () => {
-  const res = await fetch(`${API_URL}?action=all`)
-  const json = await res.json()
-thongTinChuyenKhoan.value = json.data.thong_tin_chuyen_khoan || []
+  nextTick(() => {
+    if (mapRef.value && !map) {
+      map = L.map(mapRef.value, {
+        worldCopyJump: true,
+      }).setView([20, 0], 2)
 
-menu.value = (json.data.hang_hoa || []).filter(
-  (m) =>
-    m.Ma_nha_cung_cap === maNCC &&
-    m.Lang === currentLang.value &&
-    ['Còn hàng', 'Hết hàng'].includes(m.Trang_thai)
-)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 19,
+      }).addTo(map)
 
-  // 🔥 KHỞI TẠO TEMP QTY CHUẨN
-  menu.value.forEach((m) => {
-    tempQty.value[m.Ma_hang] = 1
-  })
-  shopContacts.value = json.data.shop_contact || []
-  thongBao.value = json.data.thong_bao || []
-  banners.value = json.data.banner || []
-  logos.value = json.data.logo || []
-  times.value = json.data.time || []
-
-
-  footers.value = json.data.footer || []
-
-
-  khuyenMaiInfo.value = (json.data.khuyenmai_info || []).filter(
-  (k) => k.Ma_nha_cung_cap === maNCC
-)
-
-nextTick(() => {
-  if (mapRef.value && !map) {
-    // 1️⃣ TẠO MAP (GLOBAL VIEW)
-    map = L.map(mapRef.value, {
-      worldCopyJump: true,
-    }).setView([20, 0], 2) // 🌍 view toàn cầu
-
-    // 2️⃣ TILE
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap',
-      maxZoom: 19,
-    }).addTo(map)
-
-    // 3️⃣ 📍 AUTO LẤY VỊ TRÍ USER (OPTION)
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords
-          map.setView([latitude, longitude], 12)
-        },
-        () => {
-          map.setView([20, 0], 2) // fallback global
-        }
-      )
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const { latitude, longitude } = pos.coords
+            map.setView([latitude, longitude], 12)
+          },
+          () => {
+            map.setView([20, 0], 2)
+          }
+        )
     }
   }
 })
@@ -1974,11 +1984,7 @@ function resetToAllCategory() {
   currentCategory.value = allCategoryLabel.value || 'T §t c §œ'
 }
 
-  const shopContactList = computed(() =>
-  shopContacts.value.filter(
-    (c) => c.Ma_nha_cung_cap === maNCC
-  )
-)
+  const shopContactList = computed(() => shopContacts.value || [])
 const filteredMenu = computed(() => {
   let list = [...menu.value]
 
@@ -1990,12 +1996,9 @@ const filteredMenu = computed(() => {
     list = list.filter(m => m.Danh_muc === currentCategory.value)
   }
 
-  // SEARCH
+  // SEARCH (matches across all 5 languages)
   if (keyword.value) {
-    const kw = keyword.value.toLowerCase()
-    list = list.filter(m =>
-      m.Ten_hang.toLowerCase().includes(kw)
-    )
+    list = list.filter(m => productMatchesKeyword(m, keyword.value))
   }
 
   // SORT
@@ -2006,21 +2009,19 @@ const filteredMenu = computed(() => {
     list.sort((a, b) => finalPrice(b) - finalPrice(a))
   }
   else {
-    // 🔥 CHỈ ĐẢO NGƯỢC KHI KHÔNG SORT GIÁ
-    list.reverse()
+    // Đã bỏ list.reverse() theo yêu cầu để đảo ngược lại vị trí mặc định từ API
+    // list.reverse()
   }
 
   return list
 })
 
 const searchSuggestions = computed(() => {
-  const kw = (searchInput.value || '').trim().toLowerCase()
+  const kw = (searchInput.value || '').trim()
   if (!kw) return []
 
   return menu.value
-    .filter((m) =>
-      (m.Ten_hang || '').toLowerCase().includes(kw)
-    )
+    .filter((m) => productMatchesKeyword(m, kw))
     .slice(0, 12)
 })
 
@@ -2118,22 +2119,23 @@ ${t('export.note')}: ${ghiChu.value}
 })
 
 const thongBaoList = computed(() =>
-  thongBao.value
-    .filter(t => t.Ma_nha_cung_cap === maNCC)
-    .sort((a, b) => {
-      // NOTI_YYYYMMDD_HHMMSS → mới nhất lên trước
-      return String(b.ID).localeCompare(String(a.ID))
-    })
+  [...(thongBao.value || [])].sort((a, b) => {
+    return String(b.ID).localeCompare(String(a.ID))
+  })
+)
+
+const thongBaoTexts = computed(() =>
+  thongBaoList.value
+    .map((item) => resolveNoticeText(item, currentLang.value))
+    .filter(Boolean)
 )
 
 
 const bannerList = computed(() =>
-  banners.value
-    .filter(b => b.Ma_nha_cung_cap === maNCC)
-    .sort((a, b) => {
-      // ID mới (thời gian lớn hơn) lên trước
-      return String(b.ID).localeCompare(String(a.ID))
-    })
+  [...(banners.value || [])].sort((a, b) => {
+    // ID mới (thời gian lớn hơn) lên trước
+    return String(b.ID).localeCompare(String(a.ID))
+  })
 )
 
 watch(bannerList, () => {
@@ -2143,9 +2145,7 @@ watch(bannerList, () => {
 })
 
 
-const logo = computed(() =>
-  logos.value.find((l) => l.Ma_nha_cung_cap === maNCC)
-)
+const logo = computed(() => logos.value?.[0] || null)
 watch(
   logo,
   (val) => {
@@ -2174,10 +2174,6 @@ function setTitleAndFavicon(name, iconUrl) {
 
   document.head.appendChild(link)
 }
-
-const footerList = computed(() =>
-  footers.value.filter((f) => f.Ma_nha_cung_cap === maNCC)
-)
 
 /* ===== METHODS ===== */
 function inc(m) {
@@ -2553,9 +2549,8 @@ watch(
 const khuyenMaiNoiDung = computed(() =>
   [
     ...new Set(
-      khuyenMaiInfo.value
-        .filter(k => k.Ma_nha_cung_cap === maNCC)
-        .map(k => (k.Noi_dung || '').trim())
+      (khuyenMaiInfo.value || [])
+        .map(k => resolveNoticeText(k, currentLang.value))
         .filter(Boolean)
     )
   ]
@@ -2751,14 +2746,11 @@ function setCache(key, data) {
 
 
 function applyData(data) {
-  menu.value = (data.hang_hoa || []).filter(
-    m =>
-      m.Ma_nha_cung_cap === maNCC &&
-      m.Lang === currentLang.value &&
-      ['Còn hàng', 'Hết hàng'].includes(m.Trang_thai)
+  rawMenu.value = (data.hang_hoa || []).filter((m) =>
+    ['Còn hàng', 'Hết hàng'].includes(m.Trang_thai)
   )
 
-  menu.value.forEach(m => {
+  rawMenu.value.forEach((m) => {
     if (!tempQty.value[m.Ma_hang]) {
       tempQty.value[m.Ma_hang] = 1
     }
@@ -2767,56 +2759,13 @@ function applyData(data) {
   banners.value = data.banner || []
   thongBao.value = data.thong_bao || []
   logos.value = data.logo || []
-  footers.value = data.footer || []
   shopContacts.value = data.shop_contact || []
   khuyenMaiInfo.value = data.khuyenmai_info || []
   times.value = data.time || []
   thongTinChuyenKhoan.value = data.thong_tin_chuyen_khoan || []
 }
 
-
-onMounted(async () => {
-  loadingMain.value = true
-
-  const cacheKey = `MENU_CACHE_${maNCC}_${currentLang.value}`
-
-  const cached = getCache(cacheKey)
-
-  // 🔥 1. LOAD TỨC THÌ TỪ CACHE
-  if (cached) {
-    applyData(cached)
-    loadingMain.value = false
-  }
-
-  // 🔄 2. FETCH NGẦM ĐỂ UPDATE
-  try {
-    const res = await fetch(`${API_URL}?action=all`)
-    const json = await res.json()
-thongTinChuyenKhoan.value = json.data.thong_tin_chuyen_khoan || []
-
-    const freshData = {
-      hang_hoa: json.data.hang_hoa || [],
-      banner: json.data.banner || [],
-      thong_bao: json.data.thong_bao || [],
-      logo: json.data.logo || [],
-      footer: json.data.footer || [],
-      shop_contact: json.data.shop_contact || [],
-      khuyenmai_info: json.data.khuyenmai_info || [],
-      time: json.data.time || []  ,      // ✅ THÊM
-        thong_tin_chuyen_khoan: json.data.thong_tin_chuyen_khoan || [], // ✅ thêm
-    }
-
-    setCache(cacheKey, freshData)
-
-    // nếu chưa có cache thì apply ngay
-    if (!cached) {
-      applyData(freshData)
-      loadingMain.value = false
-    }
-  } catch (e) {
-    if (!cached) loadingMain.value = false
-  }
-})
+const UNIFIED_MENU_CACHE_KEY = 'MENU_CACHE_SA_UNIFIED'
 
 const currentLangFlagImg = computed(() => {
   const found = languages.find(l => l.code === currentLang.value)
@@ -2837,6 +2786,11 @@ const canFinish = computed(() => {
   )
 })
 function onFinish() {
+  if (cartItems.value.length === 0) {
+    showEmptyCartModal.value = true
+    return
+  }
+
   if (isMobile.value) {
     showCart.value = false
   }
@@ -2848,6 +2802,11 @@ function onFinish() {
 function openMobilePanel(name) {
   if (!isMobile.value) return
 
+  if (name === 'export' && cartItems.value.length === 0) {
+    showEmptyCartModal.value = true
+    return
+  }
+
   // nếu bấm lại chính nó → đóng
   activeMobilePanel.value =
     activeMobilePanel.value === name ? null : name
@@ -2858,6 +2817,14 @@ function openMobilePanel(name) {
   showCart.value          = activeMobilePanel.value === 'cart'
   showExportModal.value   = activeMobilePanel.value === 'export'
 }
+
+function closeCart() {
+  showCart.value = false
+  if (isMobile.value) {
+    activeMobilePanel.value = null
+  }
+}
+
 function selectCategory(c) {
   currentCategory.value = c
   currentPage.value = 1
@@ -2914,18 +2881,14 @@ function closeCartMobile() {
 async function reloadData() {
   loadingMain.value = true
 
-  const lang = route.params.lang || 'vi'
-  const cacheKey = `MENU_CACHE_${maNCC}_${lang}`
-
-  const cached = getCache(cacheKey)
+  const cached = getCache(UNIFIED_MENU_CACHE_KEY)
   if (cached) {
     applyData(cached)
     loadingMain.value = false
   }
 
   try {
-    const res = await fetch(`${API_URL}?action=all`)
-    const json = await res.json()
+    const json = await getStorefrontSheets()
     thongTinChuyenKhoan.value = json.data.thong_tin_chuyen_khoan || []
 
     const freshData = {
@@ -2933,47 +2896,44 @@ async function reloadData() {
       banner: json.data.banner || [],
       thong_bao: json.data.thong_bao || [],
       logo: json.data.logo || [],
-      footer: json.data.footer || [],
       shop_contact: json.data.shop_contact || [],
       khuyenmai_info: json.data.khuyenmai_info || [],
-      time: json.data.time || [] ,       // ✅ THÊM
-        thong_tin_chuyen_khoan: json.data.thong_tin_chuyen_khoan || [], // ✅ thêm
+      time: json.data.time || [],
+      thong_tin_chuyen_khoan: json.data.thong_tin_chuyen_khoan || [],
     }
 
-    setCache(cacheKey, freshData)
-
-    if (!cached) {
-      applyData(freshData)
-      loadingMain.value = false
-    }
+    setCache(UNIFIED_MENU_CACHE_KEY, freshData)
+    applyData(freshData)
+    loadingMain.value = false
   } catch (e) {
     if (!cached) loadingMain.value = false
   }
 }
+
 watch(
   () => route.params.lang,
   (lang) => {
     if (!lang) return
 
-    /* 🔥 1. SYNC I18N (QUAN TRỌNG NHẤT) */
     if (locale.value !== lang) {
       locale.value = lang
     }
 
-    /* 2. RESET STATE */
     currentPage.value = 1
     keyword.value = ''
     searchInput.value = ''
-
-    /* ⚠️ Nếu category là text tĩnh */
     resetToAllCategory()
-    // hoặc nếu mày có biến:
-    // currentCategory.value = defaultCategory.value
 
-    /* 3. RELOAD DATA */
-    reloadData()
+    if (selectedItem.value?.Ma_hang) {
+      const updated = menu.value.find((m) => m.Ma_hang === selectedItem.value.Ma_hang)
+      if (updated) selectedItem.value = updated
+    }
+
+    if (!rawMenu.value.length) {
+      reloadData()
+    }
   },
-  { immediate: true } // 🔥 BẮT BUỘC
+  { immediate: true }
 )
 
 onUnmounted(() => {
@@ -3033,12 +2993,7 @@ const times = ref([])
 
 
 const shopTime = computed(() => {
-  if (!logo.value) return ''
-  return (
-    times.value.find(
-      t => t.Ma_nha_cung_cap === logo.value.Ma_nha_cung_cap
-    )?.thoi_gian_hoat_dong_shop || ''
-  )
+  return times.value?.[0]?.thoi_gian_hoat_dong_shop || ''
 })
 
 const showEditQtyModal = ref(false)
@@ -3194,25 +3149,22 @@ const hasSale = computed(() =>
   padding: 14px 10px 18px;
   margin: 8px 6px 18px;
 
-  /* 🌌 GLASS CARD – THEME XANH ĐẬM */
+  /* Linear gradient xanh teal + trắng */
   background: linear-gradient(
-    135deg,
-    rgba(0, 4, 40, 0.85),   /* #000428 */
-    rgba(0, 78, 146, 0.65)  /* #004e92 */
+    150deg,
+    #01041b 0%,
+    #004581 100%
   );
 
-  backdrop-filter: blur(14px) saturate(1.6);
-  -webkit-backdrop-filter: blur(14px) saturate(1.6);
+  border-radius: 16px;
 
-  border-radius: 15px;
+  /* Viền phát sáng cyan */
+  border: 2px solid #004166;
 
-  /* viền kính nhẹ */
-  border: 1px solid rgba(255, 255, 255, 0.35);
-
-  /* chiều sâu */
+  /* Glow effect */
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.35),
-    0 10px 28px rgba(0,0,0,0.35);
+    0 0 15px rgba(26, 154, 154, 0.4),
+    0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 
@@ -3223,7 +3175,7 @@ const hasSale = computed(() =>
   height: 60px;
 
   border-radius: 25px;
-  border: 1px solid yellow;
+  border: 1px solid #39FF14;
 
 
 
@@ -3236,7 +3188,7 @@ const hasSale = computed(() =>
 .logo-name {
   max-width: 100%;
   text-align: center;
-  color: #e5ff00;                 /* vàng chữ */
+  color: #39FF14;                 /* xanh neon */
   
   font-size: 17px;
   font-weight: bold;
@@ -3287,6 +3239,90 @@ const hasSale = computed(() =>
   0% { transform: translate3d(-140%, -140%, 0); }
   55% { transform: translate3d(120%, 120%, 0); }
   100% { transform: translate3d(160%, 160%, 0); }
+}
+
+/* ===== SHOP CONTACT ===== */
+.shop-contact {
+  margin-top: auto;
+  padding: 8px 0;
+}
+
+.contact-title {
+  display: block;
+  width: 100%;
+  padding: 5px 14px;
+  margin-bottom: 10px;
+  border-radius: 12px;
+  text-align: left;
+  text-transform:uppercase ;
+  /* Background xanh navy giống logo */
+  background: linear-gradient(
+    135deg,
+    #001106 0%,
+    #015539 100%
+  );
+  
+  /* Chữ xanh neon */
+  color: #ffffff !important;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  
+  border: 1px solid rgba(29, 194, 0, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.contact-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  text-decoration: none;
+  
+  /* Background xanh giống box logo */
+  background: linear-gradient(
+    135deg,
+    #0a1a30 0%,
+    #0a4d80 100%
+  );
+  
+  border: 1px solid rgba(57, 255, 20, 0.3);
+  transition: all 0.2s ease;
+}
+
+.contact-item:hover {
+  transform: translateX(4px);
+  border-color: rgba(57, 255, 20, 0.6);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+.contact-icon-wrap {
+  flex-shrink: 0;
+}
+
+.contact-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.contact-info {
+  flex: 1;
+}
+
+.contact-name {
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.contact-desc {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  font-style: italic;
 }
 
 .categories .cat {
@@ -4134,24 +4170,32 @@ h3, h4, h5, p, span, div {
 /* ===== SEARCH WRAPPER ===== */
 .search-wrapper {
   position: sticky;
-  top: 0;
+  top: 8px; 
   z-index: 15;
-  padding: 12px 10px;
- backdrop-filter: blur(4px);
-  background: transparent;
-  overflow: visible;   /* ❌ bỏ nền */
+  
+  margin: 0 auto;
+  width: calc(100% - 24px);
+  max-width: 440px; 
+  padding: 6px; 
+  
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.15); 
+  border-radius: 14px; /* Bogóc vừa vừa (14px) thay vì tròn ú (999px) */
+  overflow: visible;
 }
 
 /* ===== SEARCH BOX ===== */
 .search-box {
-  max-width: 420px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
 
   display: flex;
   align-items: center;
 
   background: #ffffff;
-  border-radius: 999px;
+  border-radius: 10px; /* Bogóc trong nhỏ hơn một chút ôm sát theo cha */
   padding: 6px;
 
   /* 🔥 VIỀN XANH TEMPLATE */
@@ -5897,24 +5941,40 @@ h3, h4, h5, p, span, div {
   border: none;
   border-radius: 14px;
 
-  background: linear-gradient(135deg, #22c55e, #16a34a);
+  background: linear-gradient(135deg, #ef4444, #dc2626);
   color: #ffffff;
 
-  font-size: 15px;
-  font-weight: 900;
-  letter-spacing: 0.3px;
-
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0px;
+  text-transform: uppercase;
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(22,163,74,0.45);
+  box-shadow: 0 8px 18px rgba(220,38,38,0.45);
 }
 
 .finish-btn:active {
   transform: scale(0.97);
+  animation: none;
 }
 .finish-btn:hover {
   transform: scale(0.97);
   background: white;
-  color: #009e47;
+  color: #dc2626;
+  animation: none;
+}
+
+/* HIỆU ỨNG PHÓNG TO THU NHỎ NHẸ (PC) */
+@media (min-width: 769px) {
+  .finish-btn {
+    animation: finishBtnPulse 2s ease-in-out infinite;
+  }
+}
+
+@keyframes finishBtnPulse {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.04); }
+  100% { transform: scale(1); }
 }
 .mobile-finish-wrap {
   position: fixed;
@@ -5978,8 +6038,8 @@ h3, h4, h5, p, span, div {
 
   background: linear-gradient(
     135deg,
-    #0ea5e9,
-    #2563eb
+    #ef4444,
+    #dc2626
   );
 
   color: #ffffff;
@@ -5995,13 +6055,13 @@ h3, h4, h5, p, span, div {
 
   cursor: pointer;
 
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.45);
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.45);
   transition: all 0.2s ease;
 }
 
 .send-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.6);
+  box-shadow: 0 8px 20px rgba(220, 38, 38, 0.6);
 }
 
 .send-btn:active {
@@ -6117,15 +6177,7 @@ h3, h4, h5, p, span, div {
   transition: all 0.2s ease;
 }
 
-/* ===== SEARCH WRAPPER ===== */
-.search-wrapper {
-  position: sticky;
-  top: 0;
-  z-index: 15;
-
-  padding: 12px 10px;
-  backdrop-filter: blur(4px);
-}
+/* (Duplicate search-wrapper removed) */
 
 /* ===== SCROLL TO TOP FLOAT BUTTON ===== */
 /* ===== SCROLL TO TOP – GLOBAL FLOAT ===== */
@@ -6527,7 +6579,7 @@ h3, h4, h5, p, span, div {
   }
   .scroll-top-fab {
     right: 14px !important; /* 🔥 sát mép phải */
-    bottom: 96px !important; /* 🔥 trên bottom bar 70px + khoảng cách */
+    bottom: 140px !important; /* 🔥 trên bottom bar 70px + cart bar 52px + khoảng cách */
     
     width: 48px; /* 🔥 to hơn tí cho dễ bấm */
     height: 48px;
@@ -7151,6 +7203,123 @@ h3, h4, h5, p, span, div {
   );
 }
 
+/* ================= MOBILE CART BAR ================= */
+.mobile-cart-bar {
+  position: fixed;
+  bottom: 78px;
+  left: 12px;
+  right: 12px;
+  
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  
+  z-index: 1200;
+}
+
+/* PILL TRÁI: Icon + Badge */
+.cart-bar-pill-left {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  border-radius: 14px;
+  
+  box-shadow: 
+    0 4px 12px rgba(220, 38, 38, 0.4),
+    inset 0 1px 0 rgba(255,255,255,0.25);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.cart-bar-pill-left:active {
+  transform: scale(0.94);
+}
+
+.cart-bar-icon {
+  font-size: 24px;
+  color: #ffffff;
+}
+
+.cart-bar-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  
+  background: #ffffff;
+  color: #dc2626;
+  font-size: 11px;
+  font-weight: 800;
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  border-radius: 999px;
+  border: 2px solid #dc2626;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* PILL PHẢI: Thanh toán + số tiền */
+.cart-bar-pill-right {
+  flex: 1;
+  height: 48px;
+  padding: 0 16px;
+  
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  border: none;
+  border-radius: 999px;
+  
+  box-shadow: 
+    0 4px 12px rgba(220, 38, 38, 0.4),
+    inset 0 1px 0 rgba(255,255,255,0.25);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.cart-bar-pill-right:active {
+  transform: scale(0.98);
+}
+
+.cart-bar-label {
+  font-size: 15px;
+  font-weight: 900;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cart-bar-total {
+  font-size: 17px;
+  font-weight: 900;
+  color: #ffffff;
+}
+
+/* Animation */
+.cart-bar-slide-enter-active,
+.cart-bar-slide-leave-active {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.cart-bar-slide-enter-from,
+.cart-bar-slide-leave-to {
+  transform: translateY(100%);
+  opacity: 0;
+}
+
 /* ================= MOBILE BOTTOM BAR – FINAL VIP ================= */
 
 .mobile-bottom-bar {
@@ -7316,6 +7485,38 @@ h3, h4, h5, p, span, div {
   30%  { transform: scale(1.35); }
   60%  { transform: scale(0.95); }
   100% { transform: scale(1); }
+}
+
+/* ===== SEND ICON + BADGE ===== */
+.mobile-bottom-bar .send-icon-wrap {
+  position: relative;
+}
+
+.mobile-bottom-bar .send-icon-wrap i {
+  color: inherit;
+}
+
+.send-badge {
+  position: absolute;
+  top: -6px;
+  right: -10px;
+
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+
+  background: #ef4444;
+  color: #ffffff;
+
+  font-size: 11px;
+  font-weight: 900;
+
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
 }
   /* ===== MODAL CHI TIẾT MOBILE – NHỎ LẠI ===== */
 @media (max-width: 768px) {
@@ -7865,33 +8066,24 @@ h3, h4, h5, p, span, div {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
-@property --angle {
-  syntax: "<angle>";
-  initial-value: 0deg;
-  inherits: false;
-}
-
+/* ===== CARD BORDER - STATIC ===== */
 .card-border {
-  --angle: 0deg;
-
   position: relative;
-  padding: 2.5px;            /* viền dày hơn chút */
+  padding: 2.5px;
   border-radius: 16px;
-filter: saturate(1.15);
-  background: conic-gradient(
-    from var(--angle),
-    transparent 0deg,
-    #22c55e 70deg,
-    #fef08a 140deg,
-    #22c55e 210deg,
-    #16a34a 280deg,
-    transparent 360deg
+
+  /* Static gradient border - không xoay */
+  background: linear-gradient(
+    135deg,
+    #22c55e 0%,
+    #16a34a 25%,
+    #22c55e 50%,
+    #86efac 75%,
+    #22c55e 100%
   );
 
-  animation: border-spin 1.6s linear infinite; /* 🚀 nhanh hơn */
-  
-  /* glow mạnh hơn */
-
+  /* Subtle glow */
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
 }
 
 /* card bên trong */
@@ -7899,13 +8091,6 @@ filter: saturate(1.15);
   background: #ffffff;
   border-radius: 14px;
   height: 100%;
-}
-
-/* chỉ xoay gradient */
-@keyframes border-spin {
-  to {
-    --angle: 360deg;
-  }
 }
 .page-dots{
   color:#fff;
@@ -7977,21 +8162,7 @@ filter: saturate(1.15);
   white-space: nowrap;
 }
 
-.dot-online {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  display: inline-block;
-  position: relative;
 
-  background: #22c55e;
-
-  box-shadow:
-    0 0 0 5px rgba(34,197,94,0.38),
-    0 0 14px rgba(34,197,94,0.72),
-    0 0 28px rgba(34,197,94,0.6);
-  filter: drop-shadow(0 0 6px rgba(34,197,94,0.35));
-}
 
 @keyframes pulse {
   0% {
@@ -8086,36 +8257,32 @@ filter: saturate(1.15);
   animation: pulseRing 0.9s ease-out infinite;
 }
 
-/* Soften dot when trong badge th?i gian m? c?a */
+/* Dot trong badge thời gian - giống như danh mục */
 .badge-online .dot-online {
-  animation: pulseSoft 1.6s ease-in-out infinite;
-  box-shadow:
-    0 0 0 3px rgba(34,197,94,0.24),
-    0 0 10px rgba(34,197,94,0.38),
-    0 0 18px rgba(34,197,94,0.28);
-  filter: none;
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  background: #22c55e;
+  border-radius: 50%;
+  position: relative;
+  animation: pulse 0.9s infinite;
 }
 
 .badge-online .dot-online::before {
-  inset: -3px;
-  opacity: 0.5;
-  animation: pulseGlowSoft 1.6s ease-in-out infinite;
+  display: none;
 }
 
 .badge-online .dot-online::after {
-  inset: -6px;
-  border: 2px solid rgba(34,197,94,0.35);
-  animation: pulseRingSoft 1.6s ease-out infinite;
+  display: none;
 }
 
 .badge-online:active .dot-online {
-  animation: pulseSoft 1.1s ease-in-out infinite;
-  transform: scale(1.05);
+  animation: pulse 0.7s infinite;
+  transform: scale(1.12);
 }
 
 .badge-online:active .dot-online::after {
-  animation: pulseRingSoft 1.1s ease-out infinite;
-  opacity: 0.5;
+  display: none;
 }
 .logo-time {
   transform: scale(0.95);
@@ -9424,8 +9591,94 @@ box-shadow: 0 4px 10px rgba(239, 243, 16, 0.45);
   }
 }
 
-</style>
+/* ========================================================
+   HIỆU ỨNG TRƯỢT THÁC NƯỚC (STAGGER) TOÀN BỘ TRANG
+   ======================================================== */
+@keyframes slideInUpMenu {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
+.sidebar-left,
+.sidebar-right,
+.mobile-header-clean,
+.notice-bar,
+.banner,
+.search-wrapper,
+.filter-bar,
+.menu,
+.pagination,
+.powered-by,
+.powered-by-mobile-footer {
+  /* backwards đảm bảo ở trạng thái opacity 0 (ẩn) lúc chờ tới lượt animation */
+  animation: slideInUpMenu 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  text-decoration: none;
+}
+
+
+/* Stagger delay để thả rơi từng phần tử một */
+.sidebar-left        { animation-delay: 0s; }
+.sidebar-right       { animation-delay: 0.05s; }
+.mobile-header-clean { animation-delay: 0s; }
+.notice-bar          { animation-delay: 0.1s; }
+.banner              { animation-delay: 0.15s; }
+.search-wrapper      { animation-delay: 0.2s; }
+.filter-bar          { animation-delay: 0.25s; }
+.menu                { animation-delay: 0.35s; }
+.pagination          { animation-delay: 0.45s; }
+.powered-by          { animation-delay: 0.5s; }
+.powered-by-mobile-footer { animation-delay: 0.5s; }
+
+/* Tránh giật lag lên loading skeleton */
+.main-skeleton {
+  animation: none !important;
+}
+
+/* ===== MODAL GIỎ TRỐNG ===== */
+.empty-cart-modal {
+  max-width: 380px !important;
+  text-align: center;
+  padding: 30px 20px !important;
+}
+.empty-modal-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.empty-icon {
+  font-size: 60px;
+  color: #ef4444;
+}
+.empty-title {
+  color: #374151;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin: 0;
+}
+.empty-close-btn {
+  width: 100%;
+  padding: 12px;
+  background: #f3f4f6;
+  border: none;
+  border-radius: 12px;
+  color: #4b5563;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 10px;
+}
+.empty-close-btn:hover {
+  background: #e5e7eb;
+}
+</style>
 
 
 

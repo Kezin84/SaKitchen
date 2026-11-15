@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { API_URL, IMGBB_KEY } from '@/config/api'
+import { getOneSheet, dispatchAction } from '@/config/api'
+import { uploadImageToImgBB } from '@/utils/imageUpload.js'
 /* ======================
    CONFIG
 ====================== */
@@ -10,7 +11,6 @@ import { API_URL, IMGBB_KEY } from '@/config/api'
    STATE
 ====================== */
 const banners = ref([])
-const ncc = ref(null)
 
 const file = ref(null)
 const fileInput = ref(null)
@@ -42,21 +42,20 @@ function genBannerId() {
 }
 
 async function uploadImgBB(file) {
-  const form = new FormData()
-  form.append('image', file)
-
-  const res = await fetch(
-    `https://api.imgbb.com/1/upload?key=${IMGBB_KEY}`,
-    { method: 'POST', body: form }
-  )
-
-  const json = await res.json()
-  return json?.data?.url || ''
+  return uploadImageToImgBB(file, {
+    targetKB: 100,
+    maxWidth: 1600,
+    maxHeight: 1000,
+  })
 }
 
 function onSelectFile(e) {
   const f = e.target.files[0]
   if (!f) return
+  if (!f.type.startsWith('image/')) {
+    alert('Vui lòng chọn file ảnh')
+    return
+  }
 
   file.value = f
   previewUrl.value = URL.createObjectURL(f)
@@ -68,18 +67,11 @@ function onSelectFile(e) {
 async function loadBanners() {
   tableLoading.value = true
   try {
-    const res = await fetch(`${API_URL}?action=sheet&sheet=banner`)
-    const json = await res.json()
+    const json = await getOneSheet('banner')
     banners.value = (json.data || []).reverse()
   } finally {
     tableLoading.value = false
   }
-}
-
-async function loadNCC() {
-  const res = await fetch(`${API_URL}?action=sheet&sheet=nha_cung_cap`)
-  const json = await res.json()
-  ncc.value = json.data?.[0] || null
 }
 
 /* ======================
@@ -92,30 +84,32 @@ async function addBanner() {
   }
 
   loading.value = true
+  try {
+    const imgUrl = await uploadImgBB(file.value)
 
-  const imgUrl = await uploadImgBB(file.value)
-
-  fetch(API_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+    await dispatchAction({
       action: 'addBanner',
       data: {
         ID: genBannerId(),
         URL: imgUrl,
-        Ma_nha_cung_cap: ncc.value.Ma_nha_cung_cap,
-        Ten_nha_cung_cap: ncc.value.Ten_nha_cung_cap,
       },
-    }),
-  })
+    })
 
-  resetForm()
-  setTimeout(loadBanners, 1200)
+    resetForm()
+    await loadBanners()
+  } catch (e) {
+    console.error(e)
+    alert('Lỗi thêm banner')
+    loading.value = false
+  }
 }
 function onSelectEditFile(e) {
   const f = e.target.files[0]
   if (!f) return
+  if (!f.type.startsWith('image/')) {
+    alert('Vui lòng chọn file ảnh')
+    return
+  }
 
   editBannerFile.value = f
   editBannerPreview.value = URL.createObjectURL(f)
@@ -139,26 +133,24 @@ async function saveEdit() {
   }
 
   loading.value = true
+  try {
+    const imgUrl = await uploadImgBB(editBannerFile.value)
 
-  const imgUrl = await uploadImgBB(editBannerFile.value)
-
-  fetch(API_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+    await dispatchAction({
       action: 'updateBanner',
       data: {
         ID: editingBanner.value.ID,
         URL: imgUrl,
-        Ma_nha_cung_cap: editingBanner.value.Ma_nha_cung_cap,
-        Ten_nha_cung_cap: editingBanner.value.Ten_nha_cung_cap,
       },
-    }),
-  })
+    })
 
-  closeEditBannerModal()
-  setTimeout(loadBanners, 1200)
+    closeEditBannerModal()
+    await loadBanners()
+  } catch (e) {
+    console.error(e)
+    alert('Lỗi cập nhật banner')
+    loading.value = false
+  }
 }
 
 
@@ -176,20 +168,19 @@ function closeEditBannerModal() {
 /* ======================
    DELETE
 ====================== */
-function deleteBanner(id) {
+async function deleteBanner(id) {
   if (!confirm('Xóa banner này?')) return
 
-  fetch(API_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  try {
+    await dispatchAction({
       action: 'deleteBanner',
       ID: id,
-    }),
-  })
-
-  setTimeout(loadBanners, 800)
+    })
+    await loadBanners()
+  } catch (e) {
+    console.error(e)
+    alert('Lỗi xóa banner')
+  }
 }
 
 /* ======================
@@ -207,7 +198,6 @@ function resetForm() {
    INIT
 ====================== */
 onMounted(async () => {
-  await loadNCC()
   await loadBanners()
 })
 </script>
@@ -244,7 +234,7 @@ onMounted(async () => {
               <div class="upload-icon"><i class="ri-image-add-fill" style="color:white"></i></div>
               <div class="upload-text">
                 <span class="upload-primary">Chọn ảnh banner</span>
-                <span class="upload-secondary">PNG, JPG, GIF tối đa 10MB</span>
+                <span class="upload-secondary">PNG, JPG, WebP · Tự động nén JPG (~100KB)</span>
               </div>
             </div>
           </label>

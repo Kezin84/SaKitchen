@@ -20,52 +20,45 @@ import KhachHang from '@/views/khachHang.vue'
 
 import LandingPage from '@/views/LandingPage.vue'
 
-const SUPPORTED_LANGS = ['vi', 'en', 'zh-CN', 'fil']
+const SUPPORTED_LANGS = ['vi', 'en', 'zh-CN', 'fil', 'ko']
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', name: 'landing', component: LandingPage },
-    { path: '/login', name: 'login', component: Login },
-
     {
-      path: '/:lang',
-      name: 'menu-online',
-      component: MenuOnline,
+      path: '/',
+      name: 'landing',
+      component: LandingPage,
       beforeEnter: (to) => {
-        if (!SUPPORTED_LANGS.includes(to.params.lang)) {
-          return { name: 'menu-online', params: { lang: 'vi' } }
+        if ('ncc' in to.query) {
+          const { ncc: _ncc, ...cleanQuery } = to.query
+          return { path: '/', query: cleanQuery, replace: true }
         }
       },
     },
-
+    { path: '/login', name: 'login', component: Login },
 
     {
-      path: '/crm',
+      path: '/admin',
       component: AdminLayout,
       meta: { requiresAuth: true },
       children: [
-        { path: '', redirect: 'nhap-hang' },
-        { path: 'nhap-hoa-don', name: 'nhap-hoa-don', component: NhapHoaDon }, // ✅ THÊM
+        { path: '', redirect: '/admin/kho-hang' },
+        { path: 'nhap-hoa-don', name: 'nhap-hoa-don', component: NhapHoaDon },
         {
           path: 'don-hang',
           name: 'admin-don-hang',
           component: DonHang
         },
-        // ✅ THÊM route trong children của /crm (đặt chỗ nào cũng được)
         { path: 'khach-hang', name: 'admin-khach-hang', component: KhachHang },
-
         { path: 'nhap-hang', name: 'nhap-hang', component: NhapHang },
         { path: 'kho-hang', name: 'kho-hang', component: KhoHang },
         { path: 'chi-phi-phat-sinh', name: 'admin-chi-phi-phat-sinh', component: ChiPhiPhatSinh },
-
-
         {
           path: 'bao-cao',
           name: 'admin-bao-cao',
           component: BaoCao,
         },
-
         { path: 'banner', name: 'admin-banner', component: Banner },
         { path: 'thong-bao', name: 'admin-thong-bao', component: Thongbao },
         { path: 'logo', name: 'admin-logo', component: Logo },
@@ -74,6 +67,35 @@ const router = createRouter({
         { path: 'contact-shop', name: 'admin-contact-shop', component: ContactShop },
         { path: 'qr-banking', name: 'admin-qr-banking', component: QRBanking },
       ],
+    },
+
+    // Tương thích ngược từ đường dẫn /crm cũ sang /admin
+    { path: '/crm', redirect: '/admin' },
+    {
+      path: '/crm/:subPath(.*)*',
+      redirect: (to) => {
+        const sub = Array.isArray(to.params.subPath)
+          ? to.params.subPath.join('/')
+          : String(to.params.subPath || '')
+        return sub ? `/admin/${sub}` : '/admin'
+      },
+    },
+
+    {
+      path: '/:lang',
+      name: 'menu-online',
+      component: MenuOnline,
+      beforeEnter: (to) => {
+        const lang = String(to.params.lang || '')
+        if (!SUPPORTED_LANGS.includes(lang)) {
+          return { name: 'menu-online', params: { lang: 'vi' }, replace: true }
+        }
+        // Tương thích ngược: nếu khách mở link cũ có ?ncc=SA thì tự làm sạch URL về /:lang
+        if ('ncc' in to.query) {
+          const { ncc: _ncc, ...cleanQuery } = to.query
+          return { name: 'menu-online', params: { lang }, query: cleanQuery, replace: true }
+        }
+      },
     },
 
     { path: '/:pathMatch(.*)*', redirect: '/vi' },
@@ -90,7 +112,7 @@ router.beforeEach((to, from, next) => {
   }
 
   if (user && isLoginPage) {
-    return next('/crm')
+    return next('/admin/kho-hang')
   }
 
   if (isPublicMenu || isLoginPage) {

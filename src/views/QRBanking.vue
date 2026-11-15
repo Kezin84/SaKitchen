@@ -1,13 +1,13 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { API_URL, IMGBB_KEY } from '@/config/api'
+import { getOneSheet, dispatchAction } from '@/config/api'
+import { uploadImageToImgBB } from '@/utils/imageUpload.js'
 /* ================= CONFIG ================= */
 
 
 
 /* ================= STATE ================= */
 const list = ref([])
-const ncc = ref(null)
 const loading = ref(false)
 const tableLoading = ref(true)
 
@@ -81,15 +81,11 @@ function genId() {
 }
 
 async function uploadImgBB(file) {
-  const form = new FormData()
-  form.append('image', file)
-
-  const res = await fetch(
-    `https://api.imgbb.com/1/upload?key=${IMGBB_KEY}`,
-    { method: 'POST', body: form }
-  )
-  const json = await res.json()
-  return json?.data?.url || ''
+  return uploadImageToImgBB(file, {
+    targetKB: 100,
+    maxWidth: 1000,
+    maxHeight: 1000,
+  })
 }
 
 function buildThongTin() {
@@ -112,11 +108,8 @@ const hasPreviewData = computed(() => {
 async function loadData() {
   tableLoading.value = true
   try {
-    const res = await fetch(`${API_URL}?action=all`)
-    const json = await res.json()
-
-    list.value = json.data.thong_tin_chuyen_khoan || []
-    ncc.value = json.data.nha_cung_cap?.[0] || null
+    const json = await getOneSheet('thong_tin_chuyen_khoan')
+    list.value = json.data || []
   } finally {
     tableLoading.value = false
   }
@@ -124,7 +117,7 @@ async function loadData() {
 
 /* ================= ADD ================= */
 async function addQR() {
-  if (!file.value || !ncc.value) {
+  if (!file.value) {
     showNotification('error', 'Thiếu dữ liệu', 'Vui lòng điền đầy đủ thông tin và chọn ảnh QR')
     return
   }
@@ -133,28 +126,21 @@ async function addQR() {
   try {
     const url = await uploadImgBB(file.value)
 
-    fetch(API_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'addThongTinChuyenKhoan',
-        data: {
-          ID: genId(),
-          Tieu_de: tieuDe.value,
-          ThongTin: buildThongTin(),
-          QR_IMG: url,
-          Ma_nha_cung_cap: ncc.value.Ma_nha_cung_cap,
-          Ten_nha_cung_cap: ncc.value.Ten_nha_cung_cap,
-          Ti_gia: tiGia.value,
-          Don_vi_tien_te: donViTienTe.value,
-        },
-      }),
+    await dispatchAction({
+      action: 'addThongTinChuyenKhoan',
+      data: {
+        ID: genId(),
+        Tieu_de: tieuDe.value,
+        ThongTin: buildThongTin(),
+        QR_IMG: url,
+        Ti_gia: tiGia.value,
+        Don_vi_tien_te: donViTienTe.value,
+      },
     })
 
     resetForm()
     showNotification('success', 'Thành công', 'Đã thêm QR Banking thành công!')
-    setTimeout(loadData, 1200)
+    await loadData()
   } catch (e) {
     showNotification('error', 'Lỗi', 'Không thể thêm QR: ' + e.message)
   }
@@ -182,28 +168,21 @@ async function saveEdit() {
       url = await uploadImgBB(file.value)
     }
 
-    fetch(API_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'updateThongTinChuyenKhoan',
-        data: {
-          ID: editing.value.ID,
-          Tieu_de: tieuDe.value,
-          ThongTin: buildThongTin(),
-          QR_IMG: url,
-          Ma_nha_cung_cap: editing.value.Ma_nha_cung_cap,
-          Ten_nha_cung_cap: editing.value.Ten_nha_cung_cap,
-          Ti_gia: tiGia.value,
-          Don_vi_tien_te: donViTienTe.value,
-        },
-      }),
+    await dispatchAction({
+      action: 'updateThongTinChuyenKhoan',
+      data: {
+        ID: editing.value.ID,
+        Tieu_de: tieuDe.value,
+        ThongTin: buildThongTin(),
+        QR_IMG: url,
+        Ti_gia: tiGia.value,
+        Don_vi_tien_te: donViTienTe.value,
+      },
     })
 
     closeEdit()
     showNotification('success', 'Thành công', 'Đã cập nhật QR Banking thành công!')
-    setTimeout(loadData, 1200)
+    await loadData()
   } catch (e) {
     showNotification('error', 'Lỗi', 'Không thể cập nhật: ' + e.message)
   }
@@ -216,19 +195,18 @@ function deleteQR(id) {
     'confirm',
     'Xác nhận xóa',
     'Bạn có chắc chắn muốn xóa QR Banking này không?',
-    () => {
-      fetch(API_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+    async () => {
+      try {
+        await dispatchAction({
           action: 'deleteThongTinChuyenKhoan',
           ID: id,
-        }),
-      })
+        })
 
-      showNotification('success', 'Đã xóa', 'QR Banking đã được xóa thành công!')
-      setTimeout(loadData, 800)
+        showNotification('success', 'Đã xóa', 'QR Banking đã được xóa thành công!')
+        await loadData()
+      } catch (e) {
+        showNotification('error', 'Lỗi', 'Không thể xóa QR: ' + e.message)
+      }
     }
   )
 }
@@ -243,8 +221,8 @@ function onFileChange(e) {
     return
   }
   
-  if (f.size > 5 * 1024 * 1024) {
-    showNotification('warning', 'File quá lớn', 'Kích thước ảnh tối đa 5MB')
+  if (f.size > 25 * 1024 * 1024) {
+    showNotification('warning', 'File quá lớn', 'Kích thước ảnh tối đa 25MB')
     return
   }
   

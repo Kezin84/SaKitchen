@@ -1,0 +1,86 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "hang_hoa": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["Ma_hang", "Trang_thai"]
+    },
+    "khach_hang": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["Ma_khach_hang", "So_dien_thoai"]
+    },
+    "hoa_don_tong_quat": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["Ma_hoa_don", "So_hoa_don", "Ma_khach_hang"]
+    },
+    "hoa_don_chi_tiet": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["Ma_hoa_don", "Ma_hang"]
+    },
+    "so_thu_chi": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["Ma_hoa_don", "Ma_dich_vu", "Trang_thai"]
+    },
+    "bao_cao": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["Ma_hoa_don"]
+    },
+    "don_hang": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["Ma_hoa_don", "So_hoa_don", "Trang_thai"]
+    },
+    "live_orders": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["Trang_thai", "Updated_at"]
+    },
+    "thong_bao": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["ID"]
+    },
+    "banner": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["ID"]
+    },
+    "logo": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["ID"]
+    },
+    "khuyenmai_info": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["ID"]
+    },
+    "shop_contact": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["ID"]
+    },
+    "time": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["ID"]
+    },
+    "thong_tin_chuyen_khoan": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["ID"]
+    },
+    "Login": {
+      ".read": true,
+      ".write": "!data.exists()",
+      ".indexOn": ["USERNAME"]
+    }
+  }
+}

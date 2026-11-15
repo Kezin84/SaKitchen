@@ -15,11 +15,13 @@
     "lint:oxlint": "oxlint . --fix -D correctness --ignore-path .gitignore",
     "lint:eslint": "eslint . --fix --cache",
     "lint": "run-s lint:*",
-    "format": "prettier --write --experimental-cli src/"
+    "format": "prettier --write --experimental-cli src/",
+    "migrate:firebase": "node scripts/migrate-to-firebase.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
     "duckduckgo-images-api": "^1.0.5",
+    "firebase": "^13.3.0",
     "googlethis": "^1.8.0",
     "html2canvas": "^1.4.1",
     "leaflet": "^1.9.4",

@@ -13,6 +13,7 @@ export const i18n = createI18n({
     vi,
     en,
     zh,
+    'zh-CN': zh,
     fil,
     ko
   }

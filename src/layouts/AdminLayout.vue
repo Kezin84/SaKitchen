@@ -2,33 +2,35 @@
 import { ref, computed, onMounted, onUnmounted, provide } from 'vue'
 import { RouterView, useRouter } from 'vue-router'
 import { KeepAlive } from 'vue'
-import { API_URL, IMGBB_KEY } from '@/config/api'
+import {
+  getOneSheet,
+  subscribeSheet,
+  checkUserExpired,
+  logoutFirebase,
+} from '@/config/api'
 const sidebarOpen = ref(true)
 const mobileSidebarOpen = ref(false)
 const router = useRouter()
-const menuOnlineNcc = ref(localStorage.getItem('CURRENT_NCC') || '')
 const nccInfo = ref({
-  name: localStorage.getItem('NCC_NAME') || 'FBC',
+  name: localStorage.getItem('NCC_NAME') || 'SA KITCHEN',
   logo: localStorage.getItem('NCC_LOGO') || '/Logo/FBC ONLY LOGO NO TEXT.png'
 })
 const pendingOrderCount = ref(0)
 
 // Provide function để child component có thể gọi refresh
 provide('refreshPendingCount', () => loadPendingOrders())
-provide('updatePendingCount', (delta) => {
-  pendingOrderCount.value = Math.max(0, pendingOrderCount.value + delta)
-})
+provide('updatePendingCount', () => loadPendingOrders())
 
 const menuOnlineLink = computed(() => {
-  const query = menuOnlineNcc.value ? { ncc: menuOnlineNcc.value } : {}
-  return { name: 'menu-online', params: { lang: 'vi' }, query }
+  return { name: 'menu-online', params: { lang: 'vi' } }
 })
 
 const closeMobileSidebar = () => {
   mobileSidebarOpen.value = false
 }
 
-const logout = () => {
+const logout = async () => {
+  await logoutFirebase()
   localStorage.removeItem('user')
   mobileSidebarOpen.value = false
   router.replace('/login')
@@ -37,23 +39,26 @@ const logout = () => {
 
 
 let expiredTimer = null
-let pendingTimer = null
+let unsubDonHang = null
+let unsubLogo = null
 let checking = false
 
-// Parse datetime từ format VN
+// Parse datetime từ format VN (an toàn với chuỗi tự do như "18h30")
 function parseVNDateTime(str) {
-  if (!str) return null
-  const [time, date] = str.split(' ')
-  if (!time || !date) return null
+  if (!str || typeof str !== 'string') return null
+  const [time, date] = str.trim().split(' ')
+  if (!time || !date || !time.includes(':') || !date.includes('/')) return null
   const [hh, mm, ss] = time.split(':').map(Number)
   const [dd, MM, yyyy] = date.split('/').map(Number)
-  return new Date(yyyy, MM - 1, dd, hh, mm, ss || 0)
+  if ([hh, mm, dd, MM, yyyy].some((v) => !Number.isFinite(v))) return null
+  return new Date(yyyy, MM - 1, dd, hh, mm, Number.isFinite(ss) ? ss : 0)
 }
 
 // Tính trạng thái đơn hàng
 function getDonStatus(dh) {
   if (!dh) return ''
   if (dh.Trang_thai === 'Hoàn thành') return 'Hoàn thành'
+  if (dh.Trang_thai === 'Chờ duyệt') return 'Chờ duyệt'
   const thoiGianGiao = parseVNDateTime(dh.Thoi_gian_nhan_hang)
   if (!thoiGianGiao) return dh.Trang_thai
   const endOfDay = new Date(thoiGianGiao)
@@ -63,40 +68,30 @@ function getDonStatus(dh) {
   return dh.Trang_thai
 }
 
-// Load số đơn hàng đang xử lý
+function isActionableOrder(dh) {
+  const st = getDonStatus(dh)
+  return st === 'Chờ duyệt' || st === 'Đang xử lý' || st === 'Đang ship'
+}
+
+// Load số đơn hàng chờ duyệt + đang xử lý (fallback manual refresh)
 const loadPendingOrders = async () => {
   try {
-    const res = await fetch(`${API_URL}?action=sheet&sheet=don_hang`)
-    const json = await res.json()
+    const json = await getOneSheet('don_hang')
     const donHangList = json.data || []
-    
-    // Đếm đơn "Đang xử lý" (chưa hoàn thành và chưa quá hạn)
-    const count = donHangList.filter(dh => getDonStatus(dh) === 'Đang xử lý').length
-    pendingOrderCount.value = count
+    pendingOrderCount.value = donHangList.filter(isActionableOrder).length
   } catch (err) {
     console.warn('Load pending orders failed:', err)
   }
 }
+
 const loadMenuOnlineNcc = async () => {
   try {
-    // Load NCC
-    const resNcc = await fetch(`${API_URL}?action=sheet&sheet=nha_cung_cap`)
-    const jsonNcc = await resNcc.json()
-    const ncc = jsonNcc.data?.[0]
-    if (ncc) {
-      const maNcc = ncc.Ma_nha_cung_cap || ''
-      menuOnlineNcc.value = maNcc
-      localStorage.setItem('CURRENT_NCC', maNcc)
-    }
-
-    // Load Logo từ sheet logo
-    const resLogo = await fetch(`${API_URL}?action=sheet&sheet=logo`)
-    const jsonLogo = await resLogo.json()
+    const jsonLogo = await getOneSheet('logo')
     const logo = jsonLogo.data?.[0]
     if (logo) {
-      const tenNcc = logo.Name || 'FBC'
+      const tenNcc = logo.Name || 'SA KITCHEN'
       const logoNcc = logo.URL || '/Logo/FBC ONLY LOGO NO TEXT.png'
-      
+
       nccInfo.value = { name: tenNcc, logo: logoNcc }
       localStorage.setItem('NCC_NAME', tenNcc)
       localStorage.setItem('NCC_LOGO', logoNcc)
@@ -124,29 +119,7 @@ const checkExpiredSilently = async () => {
   }
 
   try {
-    const form = new FormData()
-    form.append('action', 'checkExpired')
-    form.append('username', user.username)
-
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      body: form
-    })
-
-    if (!res.ok) {
-      console.warn('checkExpired not ok:', res.status)
-      return
-    }
-
-    const text = await res.text()
-    let data = null
-    try {
-      data = JSON.parse(text)
-    } catch {
-      console.warn('checkExpired returned non-JSON:', text?.slice(0, 80))
-      return
-    }
-
+    const data = await checkUserExpired(user.username)
     if (data?.expired === true) {
       localStorage.removeItem('user')
       router.replace('/login')
@@ -161,17 +134,31 @@ const checkExpiredSilently = async () => {
 onMounted(() => {
   checkExpiredSilently()
   loadMenuOnlineNcc()
-  loadPendingOrders()
+
+  // Realtime Firebase listener cho đơn hàng chờ duyệt + đang xử lý
+  unsubDonHang = subscribeSheet('don_hang', (donHangList) => {
+    pendingOrderCount.value = (donHangList || []).filter(isActionableOrder).length
+  })
+
+  // Realtime Firebase listener cho logo / tên thương hiệu
+  unsubLogo = subscribeSheet('logo', (logoList) => {
+    const logo = logoList?.[0]
+    if (logo) {
+      const tenNcc = logo.Name || 'FBC'
+      const logoNcc = logo.URL || '/Logo/FBC ONLY LOGO NO TEXT.png'
+      nccInfo.value = { name: tenNcc, logo: logoNcc }
+      localStorage.setItem('NCC_NAME', tenNcc)
+      localStorage.setItem('NCC_LOGO', logoNcc)
+    }
+  })
+
   expiredTimer = setInterval(checkExpiredSilently, 120_000)
-  pendingTimer = setInterval(loadPendingOrders, 15_000) // Refresh mỗi 15s - gần realtime
-  
-  // Refresh ngay khi user quay lại tab
   document.addEventListener('visibilitychange', onVisibilityChange)
 })
 
 const onVisibilityChange = () => {
   if (document.visibilityState === 'visible') {
-    loadPendingOrders() // Refresh ngay khi quay lại tab
+    loadPendingOrders()
   }
 }
 
@@ -180,9 +167,13 @@ onUnmounted(() => {
     clearInterval(expiredTimer)
     expiredTimer = null
   }
-  if (pendingTimer) {
-    clearInterval(pendingTimer)
-    pendingTimer = null
+  if (unsubDonHang) {
+    unsubDonHang()
+    unsubDonHang = null
+  }
+  if (unsubLogo) {
+    unsubLogo()
+    unsubLogo = null
   }
   document.removeEventListener('visibilitychange', onVisibilityChange)
 })
@@ -221,7 +212,7 @@ onUnmounted(() => {
           <span>Nhập hàng ( WEB & KHO )</span>
         </RouterLink>
 
-        <RouterLink to="/crm/chi-phi-phat-sinh" class="menu-item">
+        <RouterLink to="/admin/chi-phi-phat-sinh" class="menu-item">
           <i class="ri-money-dollar-circle-line"></i>
           <span>Chi phí chi tiêu</span>
         </RouterLink>
@@ -274,17 +265,17 @@ onUnmounted(() => {
           <span>Menu Online</span>
         </RouterLink>
 
-        <RouterLink to="/crm/banner" class="menu-item">
+        <RouterLink to="/admin/banner" class="menu-item">
           <i class="ri-tv-2-fill"></i>
           <span>Banner</span>
         </RouterLink>
 
-        <RouterLink to="/crm/thong-bao" class="menu-item">
+        <RouterLink to="/admin/thong-bao" class="menu-item">
           <i class="ri-alert-fill"></i>
           <span>Thông báo</span>
         </RouterLink>
 
-        <RouterLink to="/crm/logo" class="menu-item">
+        <RouterLink to="/admin/logo" class="menu-item">
           <i class="ri-image-line"></i>
           <span>Logo</span>
         </RouterLink>
@@ -405,7 +396,7 @@ onUnmounted(() => {
           <span>Nhập hàng ( WEB & KHO )</span>
         </RouterLink>
 
-        <RouterLink to="/crm/chi-phi-phat-sinh" class="mobile-menu-item" @click="closeMobileSidebar">
+        <RouterLink to="/admin/chi-phi-phat-sinh" class="mobile-menu-item" @click="closeMobileSidebar">
           <i class="ri-money-dollar-circle-line"></i>
           <span>Chi phí phát sinh</span>
         </RouterLink>
@@ -454,17 +445,17 @@ onUnmounted(() => {
           <span>Menu Online</span>
         </RouterLink>
 
-        <RouterLink to="/crm/banner" class="mobile-menu-item" @click="closeMobileSidebar">
+        <RouterLink to="/admin/banner" class="mobile-menu-item" @click="closeMobileSidebar">
           <i class="ri-tv-2-fill"></i>
           <span>Banner</span>
         </RouterLink>
 
-        <RouterLink to="/crm/thong-bao" class="mobile-menu-item" @click="closeMobileSidebar">
+        <RouterLink to="/admin/thong-bao" class="mobile-menu-item" @click="closeMobileSidebar">
           <i class="ri-alert-fill"></i>
           <span>Thông báo</span>
         </RouterLink>
 
-        <RouterLink to="/crm/logo" class="mobile-menu-item" @click="closeMobileSidebar">
+        <RouterLink to="/admin/logo" class="mobile-menu-item" @click="closeMobileSidebar">
           <i class="ri-image-line"></i>
           <span>Logo</span>
         </RouterLink>

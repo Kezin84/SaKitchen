@@ -39,9 +39,9 @@
 <div class="filter-grid-rows">
   <!-- ROW 1 -->
   <div class="f-row">
-    <!-- 1. Language Dropdown -->
+    <!-- 1. Language Dropdown (Display & Export Language) -->
     <div class="dropdown-wrapper">
-      <button class="btn-filter btn-dropdown" :class="{ active: selectedLanguage, 'menu-open': showLanguageMenu }" @click.stop="showLanguageMenu = !showLanguageMenu">
+      <button class="btn-filter btn-dropdown" :class="{ active: selectedLanguage !== 'vi', 'menu-open': showLanguageMenu }" @click.stop="showLanguageMenu = !showLanguageMenu">
         <span class="btn-icon"><i class="ri-global-line"></i></span>
         <span class="btn-text">{{ getLanguageLabel() }}</span>
         <span class="arrow-icon"><i class="ri-arrow-down-s-line"></i></span>
@@ -49,23 +49,15 @@
 
       <transition name="slide-down">
         <div v-if="showLanguageMenu" class="dropdown-menu">
-          <button class="menu-item" :class="{ active: selectedLanguage === 'vi' }" @click="selectLanguage('vi')">
-            <i class="ri-flag-fill"></i> Tiếng Việt
-          </button>
-          <button class="menu-item" :class="{ active: selectedLanguage === 'en' }" @click="selectLanguage('en')">
-            <i class="ri-english-input"></i> English
-          </button>
-          <button class="menu-item" :class="{ active: selectedLanguage === 'zh-CN' }" @click="selectLanguage('zh-CN')">
-             <i class="ri-translate-2"></i> Tiếng Trung
-          </button>
-           <button class="menu-item" :class="{ active: selectedLanguage === 'fil' }" @click="selectLanguage('fil')">
-             <i class="ri-earth-line"></i> Phillipines
-          </button>
-           <button class="menu-item" :class="{ active: selectedLanguage === 'ko' }" @click="selectLanguage('ko')">
-             <i class="ri-font-size"></i> Hàn Quốc
-          </button>
-          <button class="menu-item" :class="{ active: selectedLanguage === '' }" @click="selectLanguage('')">
-            <i class="ri-apps-line"></i> Tất cả
+          <button
+            v-for="lang in SUPPORTED_DATA_LANGS"
+            :key="lang.code"
+            class="menu-item"
+            :class="{ active: selectedLanguage === lang.code }"
+            @click="selectLanguage(lang.code)"
+          >
+            <img :src="lang.flagImg" :alt="lang.short" class="dropdown-flag-img" />
+            <span>{{ lang.label }} ({{ lang.short }})</span>
           </button>
         </div>
       </transition>
@@ -108,9 +100,6 @@
         <div v-if="showStatusMenu" class="dropdown-menu">
           <button class="menu-item" :class="{ active: filterStatus === 'available' }" @click="selectStatus('available')">
             <i class="ri-verified-badge-fill text-success"></i> Còn hàng
-          </button>
-          <button class="menu-item" :class="{ active: filterStatus === 'low' }" @click="selectStatus('low')">
-            <i class="ri-history-fill text-warning"></i> Sắp hết
           </button>
           <button class="menu-item" :class="{ active: filterStatus === 'out' }" @click="selectStatus('out')">
             <i class="ri-close-circle-fill text-danger"></i> Hết hàng
@@ -243,9 +232,8 @@
               <th style="width: 100px" class="text-center">Giá gốc</th>
               <th style="width: 100px" class="text-center">Giá bán</th>
               <th style="width: 100px" class="text-center">Giá giảm</th>
-              <th style="width: 90px" class="text-center">Số lượng kho</th>
               <th style="width: 80px" class="text-center">Tiền tệ</th>
-              <th style="width: 70px" class="text-center">Ngôn Ngữ</th>
+              <th style="width: 150px" class="text-center">Ngôn ngữ</th>
               <th style="width: 120px" class="text-center">Trạng thái</th>
               <th style="width: 120px" class="text-center">Thao tác</th>
             </tr>
@@ -312,21 +300,29 @@
                 </span>
                 <span v-else class="text-muted">—</span>
               </td>
-              <td class="text-center text-number stock-cell" @click.stop="openEdit(item, { focusField: 'So_luong_kho' })">
-  <span class="stock-value">{{ item.So_luong_kho || 0 }}</span>
-</td>
               <td class="text-center" @click.stop="openEdit(item, { focusField: 'Don_vi_tien_te' })">
-                <span class="badge badge-currency">{{ item.Don_vi_tien_te || 'VND' }}</span>
+                <span class="badge badge-currency">{{ item.Don_vi_tien_te || 'P' }}</span>
               </td>
-              <td class="text-center" @click.stop="openEdit(item, { focusField: 'Lang' })">
-               <span class="badge badge-lang">{{ getLanguageDisplayName(item.Lang) }}</span>
+              <td class="text-center" @click.stop="openEdit(item, { focusField: 'Ten_hang' })">
+                <div class="lang-badges-cell">
+                  <span
+                    v-for="l in SUPPORTED_DATA_LANGS"
+                    :key="l.code"
+                    class="lang-mini-pill"
+                    :class="{ active: hasItemLang(item, l.code) }"
+                    :title="l.label"
+                  >
+                    {{ l.short }}
+                  </span>
+                </div>
               </td>
-              <td class="text-center" @click.stop="openEdit(item, { focusField: 'Trang_thai' })">
+              <td class="text-center" @click.stop="quickToggleStatus(item)" title="Bấm để đổi nhanh Còn hàng / Hết hàng">
                 <span 
                   class="badge" 
-                  :class="item.Trang_thai === 'Còn hàng' ? 'badge-success' : 'badge-danger'"
+                  style="cursor: pointer; user-select: none;"
+                  :class="item.Trang_thai === 'Hết hàng' ? 'badge-danger' : 'badge-success'"
                 >
-                  {{ item.Trang_thai }}
+                  {{ item.Trang_thai === 'Hết hàng' ? 'Hết hàng' : 'Còn hàng' }}
                 </span>
               </td>
               <td @click.stop class="text-center">
@@ -428,8 +424,13 @@
                 <div class="card-info">
                   <h3 class="card-title">{{ item.Ten_hang }}</h3>
                   <div class="card-meta">
-                    <span class="badge" :class="item.Trang_thai === 'Còn hàng' ? 'badge-success' : 'badge-danger'">
-                      {{ item.Trang_thai }}
+                    <span
+                      class="badge"
+                      style="cursor: pointer;"
+                      :class="item.Trang_thai === 'Hết hàng' ? 'badge-danger' : 'badge-success'"
+                      @click.stop="quickToggleStatus(item)"
+                    >
+                      {{ item.Trang_thai === 'Hết hàng' ? 'Hết hàng' : 'Còn hàng' }}
                     </span>
                     <span class="card-code">{{ item.Ma_hang }}</span>
                   </div>
@@ -447,25 +448,28 @@
                 <div class="price-row">
                   <span class="price-label">Giá bán</span>
                   <span class="price-value primary">
-                    {{ formatNumber(item.Gia_ban) }} {{ item.Don_vi_tien_te || 'VND' }}
+                    {{ formatNumber(item.Gia_ban) }} {{ item.Don_vi_tien_te || 'P' }}
                   </span>
                 </div>
                 <div v-if="item.Gia_Giam && item.Gia_Giam > 0" class="price-row">
                   <span class="price-label">Giá giảm</span>
                   <span class="price-value sale">
-                    {{ formatNumber(item.Gia_Giam) }} {{ item.Don_vi_tien_te || 'VND' }}
+                    {{ formatNumber(item.Gia_Giam) }} {{ item.Don_vi_tien_te || 'P' }}
                   </span>
                 </div>
-                  <!-- ✅ THÊM DÒNG NÀY -->
-  <div class="price-row">
-    <span class="price-label">Tồn kho</span>
-    <span class="price-value stock">{{ item.So_luong_kho || 0 }}</span>
-  </div>
                 <div class="price-row">
                   <span class="price-label">Ngôn ngữ</span>
-                  <span class="price-value lang">{{ getLanguageDisplayName(item.Lang) }}</span>
+                  <div class="lang-badges-cell">
+                    <span
+                      v-for="l in SUPPORTED_DATA_LANGS"
+                      :key="l.code"
+                      class="lang-mini-pill"
+                      :class="{ active: hasItemLang(item, l.code) }"
+                    >
+                      {{ l.short }}
+                    </span>
+                  </div>
                 </div>
-              
               </div>
             </div>
           </div>
@@ -475,9 +479,9 @@
               <span class="btn-icon"><i class="ri-edit-box-line"></i></span>
               <span class="btn-text">Sửa</span>
             </button>
-            <button class="card-action-btn btn-status" @click.stop="openEdit(item, { focusField: 'Trang_thai' })">
+            <button class="card-action-btn btn-status" @click.stop="quickToggleStatus(item)">
               <span class="btn-icon"><i class="ri-refresh-line"></i></span>
-              <span class="btn-text">Trạng thái</span>
+              <span class="btn-text">{{ item.Trang_thai === 'Hết hàng' ? 'Bật Còn' : 'Báo Hết' }}</span>
             </button>
             <button class="card-action-btn btn-discount" @click.stop="openDiscount(item)">
               <span class="btn-icon"><i class="ri-price-tag-3-line"></i></span>
@@ -574,23 +578,28 @@
 
 
           <div class="sidebar-body">
-            <div class="edit-content">
-              <!-- Lang -->
+            <div class="edit-content" v-if="edit.i18n">
+              <!-- 5-Language Tabs -->
               <div class="form-section">
                 <div class="form-group">
-                  <label class="form-label">Ngôn ngữ</label>
-                  <select
-                    data-field="Lang"
-                    v-model="edit.Lang"
-                    class="form-control"
-                    @change="markAsEdited"
-                  >
-                    <option value="vi">Tiếng Việt</option>
-                    <option value="en">Tiếng Anh</option>
-                    <option value="zh-CN">Trung Quốc</option>
-                    <option value="fil">Phillipines</option>
-                    <option value="ko">Hàn Quốc</option>
-                  </select>
+                  <label class="form-label">Ngôn ngữ nội dung món (gộp 5 ngôn ngữ)</label>
+                  <div class="lang-tabs-bar">
+                    <button
+                      v-for="l in SUPPORTED_DATA_LANGS"
+                      :key="l.code"
+                      type="button"
+                      class="lang-tab-btn"
+                      :class="{ active: activeEditLang === l.code }"
+                      @click="activeEditLang = l.code"
+                    >
+                      <img :src="l.flagImg" :alt="l.short" class="lang-tab-flag" />
+                      <span>{{ l.short }}</span>
+                      <span
+                        class="lang-tab-dot"
+                        :class="{ filled: hasEditLangContent(l.code) }"
+                      ></span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -683,12 +692,13 @@
                     <input data-field="Ma_hang" v-model="edit.Ma_hang" disabled class="form-control" />
                   </div>
                   <div class="form-group">
-                    <label class="form-label">Tên sản phẩm</label>
+                    <label class="form-label">Tên sản phẩm ({{ getLangShort(activeEditLang) }})</label>
                     <input
                       data-field="Ten_hang"
-                      v-model="edit.Ten_hang"
+                      v-model="edit.i18n[activeEditLang].Ten_hang"
+                      :placeholder="activeEditLang === 'vi' ? 'Tên sản phẩm...' : (edit.i18n.vi.Ten_hang ? `Dịch từ: ${edit.i18n.vi.Ten_hang}` : 'Tên sản phẩm...')"
                       class="form-control"
-                      @input="markAsEdited"
+                      @input="onEditI18nChange"
                     />
                   </div>
                 </div>
@@ -727,16 +737,28 @@
                   </div>
                 </div>
                   <div class="form-group">
-                    <label class="form-label">Danh mục</label>
-                    <input data-field="Danh_muc" v-model="edit.Danh_muc" class="form-control" @input="markAsEdited" />
+                    <label class="form-label">Danh mục ({{ getLangShort(activeEditLang) }})</label>
+                    <input
+                      data-field="Danh_muc"
+                      v-model="edit.i18n[activeEditLang].Danh_muc"
+                      :placeholder="activeEditLang === 'vi' ? 'Danh mục...' : (edit.i18n.vi.Danh_muc ? `Dịch từ: ${edit.i18n.vi.Danh_muc}` : 'Danh mục...')"
+                      class="form-control"
+                      @input="onEditI18nChange"
+                    />
                   </div>
                   <div class="form-group">
                     <label class="form-label">Size</label>
                     <input data-field="Size" v-model="edit.Size" class="form-control" @input="markAsEdited" />
                   </div>
                   <div class="form-group">
-                    <label class="form-label">ĐVT</label>
-                    <input data-field="Dvt" v-model="edit.Dvt" class="form-control" @input="markAsEdited" />
+                    <label class="form-label">ĐVT ({{ getLangShort(activeEditLang) }})</label>
+                    <input
+                      data-field="Dvt"
+                      v-model="edit.i18n[activeEditLang].Dvt"
+                      :placeholder="activeEditLang === 'vi' ? 'ĐVT...' : (edit.i18n.vi.Dvt ? `Dịch từ: ${edit.i18n.vi.Dvt}` : 'ĐVT...')"
+                      class="form-control"
+                      @input="onEditI18nChange"
+                    />
                   </div>
                 </div>
               </div>
@@ -749,7 +771,7 @@
       <input
         data-field="Don_vi_tien_te"
         v-model="edit.Don_vi_tien_te"
-        placeholder="VND"
+        placeholder="P"
         class="form-control"
         @input="markAsEdited"
       />
@@ -791,33 +813,20 @@
         @input="onMoneyInput($event, 'Gia_Giam')"
       />
     </div>
-    
-    <!-- ✅ THÊM DÒNG NÀY -->
-    <div class="form-group">
-      <label class="form-label">Số lượng kho</label>
-      <input
-        data-field="So_luong_kho"
-        type="number"
-        v-model.number="edit.So_luong_kho"
-        class="form-control"
-        min="0"
-        placeholder="0"
-        @input="markAsEdited"
-      />
-    </div>
   </div>
 </div>
 
               <!-- Mo ta -->
               <div class="form-section">
                 <div class="form-group">
-                  <label class="form-label">Mô tả sản phẩm</label>
+                  <label class="form-label">Mô tả sản phẩm ({{ getLangShort(activeEditLang) }})</label>
                   <textarea
                     data-field="Mo_ta"
-                    v-model="edit.Mo_ta"
+                    v-model="edit.i18n[activeEditLang].Mo_ta"
+                    :placeholder="activeEditLang === 'vi' ? 'Mô tả sản phẩm...' : (edit.i18n.vi.Mo_ta ? `Dịch từ: ${edit.i18n.vi.Mo_ta}` : 'Mô tả...')"
                     class="form-control form-textarea"
                     rows="3"
-                    @input="markAsEdited"
+                    @input="onEditI18nChange"
                   ></textarea>
                 </div>
               </div>
@@ -941,25 +950,34 @@
                   </div>
                 </div>
               </div>
-              <div class="modal-details-column">
+              <div class="modal-details-column" v-if="edit.i18n">
+                <div class="modal-section-card modal-section-card--wide" style="margin-bottom: 14px;">
+                  <div class="modal-section-title">Ngôn ngữ nội dung món (gộp 5 ngôn ngữ)</div>
+                  <div class="lang-tabs-bar">
+                    <button
+                      v-for="l in SUPPORTED_DATA_LANGS"
+                      :key="l.code"
+                      type="button"
+                      class="lang-tab-btn"
+                      :class="{ active: activeEditLang === l.code }"
+                      @click="activeEditLang = l.code"
+                    >
+                      <img :src="l.flagImg" :alt="l.short" class="lang-tab-flag" />
+                      <span>{{ l.label }} ({{ l.short }})</span>
+                      <span
+                        class="lang-tab-dot"
+                        :class="{ filled: hasEditLangContent(l.code) }"
+                      ></span>
+                    </button>
+                  </div>
+                </div>
                 <div class="modal-details-grid">
                   <div class="modal-section-card">
                     <div class="modal-section-title">Thông tin chung</div>
                     <div class="modal-section-grid modal-section-grid-2">
                       <div class="form-group">
-                        <label class="form-label">Ngôn ngữ</label>
-                        <select
-                          data-field="Lang"
-                          v-model="edit.Lang"
-                          class="form-control"
-                          @change="markAsEdited"
-                        >
-                          <option value="vi">Tiếng Việt</option>
-                          <option value="en">Tiếng Anh</option>
-                          <option value="zh-CN">Trung Quốc</option>
-                          <option value="fil">Philippines</option>
-                          <option value="ko">Hàn Quốc</option>
-                        </select>
+                        <label class="form-label">Mã hàng</label>
+                        <input data-field="Ma_hang" v-model="edit.Ma_hang" disabled class="form-control" />
                       </div>
                       <div class="form-group">
                         <label class="form-label">Trạng thái</label>
@@ -991,45 +1009,52 @@
                         </div>
                       </div>
                     </div>
-                    <div class="modal-section-grid modal-section-grid-2">
-                      <div class="form-group">
-                        <label class="form-label">Mã hàng</label>
-                        <input data-field="Ma_hang" v-model="edit.Ma_hang" disabled class="form-control" />
-                      </div>
-                      <div class="form-group">
-                        <label class="form-label">Tên sản phẩm</label>
-                        <input
-                          data-field="Ten_hang"
-                          v-model="edit.Ten_hang"
-                          class="form-control"
-                          @input="markAsEdited"
-                        />
-                      </div>
+                    <div class="form-group" style="margin-bottom: 12px;">
+                      <label class="form-label">Tên sản phẩm ({{ getLangShort(activeEditLang) }})</label>
+                      <input
+                        data-field="Ten_hang"
+                        v-model="edit.i18n[activeEditLang].Ten_hang"
+                        :placeholder="activeEditLang === 'vi' ? 'Tên sản phẩm...' : (edit.i18n.vi.Ten_hang ? `Dịch từ: ${edit.i18n.vi.Ten_hang}` : 'Tên sản phẩm...')"
+                        class="form-control"
+                        @input="onEditI18nChange"
+                      />
                     </div>
                     <div class="modal-section-grid modal-section-grid-3">
                       <div class="form-group">
-                        <label class="form-label">Danh mục</label>
-                        <input data-field="Danh_muc" v-model="edit.Danh_muc" class="form-control" @input="markAsEdited" />
+                        <label class="form-label">Danh mục ({{ getLangShort(activeEditLang) }})</label>
+                        <input
+                          data-field="Danh_muc"
+                          v-model="edit.i18n[activeEditLang].Danh_muc"
+                          :placeholder="activeEditLang === 'vi' ? 'Danh mục...' : (edit.i18n.vi.Danh_muc ? `Dịch từ: ${edit.i18n.vi.Danh_muc}` : 'Danh mục...')"
+                          class="form-control"
+                          @input="onEditI18nChange"
+                        />
                       </div>
                       <div class="form-group">
                         <label class="form-label">Size</label>
                         <input data-field="Size" v-model="edit.Size" class="form-control" @input="markAsEdited" />
                       </div>
                       <div class="form-group">
-                        <label class="form-label">ĐVT</label>
-                        <input data-field="Dvt" v-model="edit.Dvt" class="form-control" @input="markAsEdited" />
+                        <label class="form-label">ĐVT ({{ getLangShort(activeEditLang) }})</label>
+                        <input
+                          data-field="Dvt"
+                          v-model="edit.i18n[activeEditLang].Dvt"
+                          :placeholder="activeEditLang === 'vi' ? 'ĐVT...' : (edit.i18n.vi.Dvt ? `Dịch từ: ${edit.i18n.vi.Dvt}` : 'ĐVT...')"
+                          class="form-control"
+                          @input="onEditI18nChange"
+                        />
                       </div>
                     </div>
                   </div>
                 <div class="modal-section-card">
-  <div class="modal-section-title">Giá & Tồn kho</div>
+  <div class="modal-section-title">Giá bán & Khuyến mãi</div>
   <div class="modal-section-grid modal-section-grid-2">
     <div class="form-group">
       <label class="form-label">Tiền tệ</label>
       <input
         data-field="Don_vi_tien_te"
         v-model="edit.Don_vi_tien_te"
-        placeholder="VND"
+        placeholder="P"
         class="form-control"
         @input="markAsEdited"
       />
@@ -1073,32 +1098,19 @@
         @input="onMoneyInput($event, 'Gia_Giam')"
       />
     </div>
-    
-    <!-- ✅ THÊM DÒNG NÀY -->
-    <div class="form-group">
-      <label class="form-label">Số lượng kho</label>
-      <input
-        data-field="So_luong_kho"
-        type="number"
-        v-model.number="edit.So_luong_kho"
-        class="form-control"
-        min="0"
-        placeholder="0"
-        @input="markAsEdited"
-      />
-    </div>
   </div>
 </div>
                 </div>
                 <div class="modal-section-card modal-section-card--wide">
-                  <div class="modal-section-title">Mô tả sản phẩm</div>
+                  <div class="modal-section-title">Mô tả sản phẩm ({{ getLangShort(activeEditLang) }})</div>
                   <div class="form-group">
                     <textarea
                       data-field="Mo_ta"
-                      v-model="edit.Mo_ta"
+                      v-model="edit.i18n[activeEditLang].Mo_ta"
+                      :placeholder="activeEditLang === 'vi' ? 'Mô tả sản phẩm...' : (edit.i18n.vi.Mo_ta ? `Dịch từ: ${edit.i18n.vi.Mo_ta}` : 'Mô tả...')"
                       class="form-control form-textarea"
                       rows="3"
-                      @input="markAsEdited"
+                      @input="onEditI18nChange"
                     ></textarea>
                   </div>
                 </div>
@@ -1203,8 +1215,17 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick, onUnmounted, watch } from 'vue'
-import { API_URL, IMGBB_KEY } from '@/config/api'
-const IMGBB_UPLOAD_URL = 'https://api.imgbb.com/1/upload'
+import { getOneSheet, dispatchAction } from '@/config/api'
+import { uploadImageToImgBB } from '@/utils/imageUpload.js'
+import {
+  SUPPORTED_DATA_LANGS,
+  normalizeProductI18n,
+  syncProductWithI18n,
+  localizeProduct,
+  getProductTranslatedLangs,
+  productMatchesKeyword,
+} from '@/utils/i18nData'
+
 const supplementaryImageKeys = ['img_1', 'img_2', 'img_3', 'img_4', 'img_5', 'img_6']
 const modalSupplementaryUploading = ref(supplementaryImageKeys.map(() => false))
 
@@ -1212,7 +1233,8 @@ const list = ref([])
 const keyword = ref('')
 const selected = ref([])
 const sortOrder = ref('desc') // 'desc' = mới → cũ, 'asc' = cũ → mới
-const selectedLanguage = ref('vi') // Default to 'vi'
+const selectedLanguage = ref('vi') // Ngôn ngữ hiển thị & xuất dữ liệu
+const activeEditLang = ref('vi') // Tab ngôn ngữ trong modal chỉnh sửa
 // Filter states
 const selectedCategory = ref('')
 const filterPromotion = ref(false)
@@ -1269,8 +1291,7 @@ const tableLoading = ref(true)
 async function loadData() {
   tableLoading.value = true // ✅ dùng tableLoading
   try {
-    const res = await fetch(`${API_URL}?action=sheet&sheet=hang_hoa`)
-    const json = await res.json()
+    const json = await getOneSheet('hang_hoa')
     list.value = json.data || []
   } catch (error) {
     console.error('Load data error:', error)
@@ -1404,10 +1425,16 @@ function isScrolledPastTrigger(scroller, targetEl) {
   return getScrollOffset(scroller) >= getElementScrollOffset(targetEl, scroller)
 }
 
-/* ===== CATEGORIES ===== */
+/* ===== LOCALIZED LIST & CATEGORIES ===== */
+const displayLang = computed(() => selectedLanguage.value || 'vi')
+
+const localizedList = computed(() =>
+  list.value.map((item) => localizeProduct(item, displayLang.value))
+)
+
 const categories = computed(() => {
   const catMap = {}
-  list.value.forEach(item => {
+  localizedList.value.forEach(item => {
     const cat = item.Danh_muc || 'Khác'
     catMap[cat] = (catMap[cat] || 0) + 1
   })
@@ -1432,12 +1459,17 @@ function setStatusFilter(status) {
 }
 
 const hasActiveFilters = computed(() => {
-  return selectedCategory.value || selectedLanguage.value || filterPromotion.value || filterStatus.value !== 'all'
+  return Boolean(
+    selectedCategory.value ||
+    (selectedLanguage.value && selectedLanguage.value !== 'vi') ||
+    filterPromotion.value ||
+    filterStatus.value !== 'all'
+  )
 })
 
 function clearAllFilters() {
   selectedCategory.value = ''
-  selectedLanguage.value = ''
+  selectedLanguage.value = 'vi'
   filterPromotion.value = false
   filterStatus.value = 'all'
   currentPage.value = 1
@@ -1449,34 +1481,39 @@ function toggleSortOrder() {
 }
 
 function selectLanguage(lang) {
-  selectedLanguage.value = lang
+  selectedLanguage.value = lang || 'vi'
+  selectedCategory.value = ''
   showLanguageMenu.value = false
   currentPage.value = 1
 }
 
 function getLanguageLabel() {
-  const labels = {
-    '': 'Ngôn ngữ',
-   'vi': 'Tiếng Việt',
-    'en': 'English',
-    'zh-CN': 'Tiếng Trung',
-    'fil': 'Phillipines',
-    'ko': 'Hàn Quốc'
-  }
-  return labels[selectedLanguage.value] || 'Ngôn ngữ'
+  return SUPPORTED_DATA_LANGS.find((l) => l.code === selectedLanguage.value)?.label || 'Tiếng Việt'
 }
 
+function getLangShort(code) {
+  return SUPPORTED_DATA_LANGS.find((l) => l.code === code)?.short || String(code || 'vi').toUpperCase()
+}
 
+function hasItemLang(item, code) {
+  return getProductTranslatedLangs(item).includes(code)
+}
 
-function getLanguageDisplayName(lang) {
-  const names = {
-    'vi': 'Tiếng Việt',
-    'en': 'English',
-    'zh-CN': 'Tiếng Trung',
-    'fil': 'Phillipines',
-    'ko': 'Hàn Quốc'
+function hasEditLangContent(code) {
+  return Boolean(String(edit.value?.i18n?.[code]?.Ten_hang || '').trim())
+}
+
+function onEditI18nChange() {
+  if (edit.value?.i18n) {
+    edit.value.Ten_hang =
+      String(edit.value.i18n.vi?.Ten_hang || '').trim() ||
+      String(edit.value.i18n.en?.Ten_hang || '').trim() ||
+      String(edit.value.Ten_hang || '').trim()
+    edit.value.Danh_muc = String(edit.value.i18n.vi?.Danh_muc || '').trim()
+    edit.value.Dvt = String(edit.value.i18n.vi?.Dvt || '').trim()
+    edit.value.Mo_ta = String(edit.value.i18n.vi?.Mo_ta || '').trim()
   }
-  return names[lang] || (lang || 'vi').toUpperCase()
+  markAsEdited()
 }
 
 // ===== DROPDOWN STATE =====
@@ -1486,7 +1523,6 @@ const showLanguageMenu = ref(false)
 
 function getStatusLabel() {
   if (filterStatus.value === 'available') return 'Còn hàng'
-  if (filterStatus.value === 'low') return 'Sắp hết'
   if (filterStatus.value === 'out') return 'Hết hàng'
   return 'Trạng thái'
 }
@@ -1526,8 +1562,8 @@ async function handleImageUpload(targetKey = 'Main_img', event) {
     return
   }
 
-  if (file.size > 5 * 1024 * 1024) {
-    showAlert('Kích thước ảnh tối đa 5MB', 'error')
+  if (file.size > 25 * 1024 * 1024) {
+    showAlert('Kích thước ảnh tối đa 25MB', 'error')
     return
   }
 
@@ -1543,23 +1579,15 @@ async function handleImageUpload(targetKey = 'Main_img', event) {
   }
 
   try {
-    const formData = new FormData()
-    formData.append('image', file)
-
-    const response = await fetch(`${IMGBB_UPLOAD_URL}?key=${IMGBB_KEY}`, {
-      method: 'POST',
-      body: formData
+    const uploadedUrl = await uploadImageToImgBB(file, {
+      targetKB: 100,
+      maxWidth: 1200,
+      maxHeight: 1200,
     })
 
-    const result = await response.json()
-
-    if (result.success) {
-      const key = targetKey || 'Main_img'
-      edit.value[key] = result.data.url
-      markAsEdited()
-    } else {
-      throw new Error('Upload failed')
-    }
+    const key = targetKey || 'Main_img'
+    edit.value[key] = uploadedUrl
+    markAsEdited()
   } catch (error) {
     console.error('Upload error:', error)
     showAlert('Upload ảnh thất bại', 'error')
@@ -1630,20 +1658,12 @@ function removeSupplementaryImage(key) {
 /* ===== COMPUTED ===== */
 /* ===== FILTER HELPERS ===== */
 function matchesKeyword(item) {
-  if (!keyword.value) return true
-  const searchTerm = keyword.value.toLowerCase()
-  return (item.Ma_hang || '').toLowerCase().includes(searchTerm) ||
-         (item.Ten_hang || '').toLowerCase().includes(searchTerm)
+  return productMatchesKeyword(item, keyword.value)
 }
 
 function matchesCategory(item) {
   if (!selectedCategory.value) return true
   return (item.Danh_muc || 'Khác') === selectedCategory.value
-}
-
-function matchesLanguage(item) {
-  if (!selectedLanguage.value) return true
-  return (item.Lang || 'vi') === selectedLanguage.value
 }
 
 function matchesPromo(item) {
@@ -1652,17 +1672,16 @@ function matchesPromo(item) {
 
 function matchesStatus(item, status) {
   if (status === 'all') return true
-  const qty = Number(item.So_luong_kho || 0)
-  if (status === 'out') return qty === 0
-  if (status === 'low') return qty >= 1 && qty <= 10
-  if (status === 'available') return qty > 0
+  const isOut = String(item.Trang_thai || '').trim() === 'Hết hàng'
+  if (status === 'out') return isOut
+  if (status === 'available') return !isOut
   return true
 }
 
 /* ===== COMPUTED ===== */
-// List after Search + Category + Language (Base for other counts)
-const baseList = computed(() => list.value.filter(item => 
-  matchesKeyword(item) && matchesCategory(item) && matchesLanguage(item)
+// List after Search + Category (localized to selectedLanguage)
+const baseList = computed(() => localizedList.value.filter(item => 
+  matchesKeyword(item) && matchesCategory(item)
 ))
 
 // Count Promo items (within current base list + current status)
@@ -1809,6 +1828,16 @@ function normalizeString(val) {
 }
 
 function valuesEqual(key, originalValue, currentValue) {
+  if (key.startsWith('_')) return true
+  if (key === 'i18n') {
+    return JSON.stringify(originalValue || {}) === JSON.stringify(currentValue || {})
+  }
+  if (key === 'Gia_Giam') {
+    const oEmpty = originalValue === '' || originalValue === null || originalValue === undefined
+    const cEmpty = currentValue === '' || currentValue === null || currentValue === undefined
+    if (oEmpty && cEmpty) return true
+    return Number(originalValue || 0) === Number(currentValue || 0)
+  }
   if (numericFields.has(key)) {
     return Number(originalValue || 0) === Number(currentValue || 0)
   }
@@ -1859,7 +1888,7 @@ function exportText() {
     return
   }
 
-  const text = list.value
+  const text = localizedList.value
     .filter(item => selected.value.includes(item.Ma_hang))
     .map(item => `${item.Ten_hang} : ${formatNumber(item.Gia_ban)}`)
     .join('\n')
@@ -1874,7 +1903,7 @@ function exportFull() {
     return
   }
 
-  const text = list.value
+  const text = localizedList.value
     .filter(item => selected.value.includes(item.Ma_hang))
     .map(item => `${item.Ten_hang} : ${formatNumber(item.Gia_ban)}${item.Don_vi_tien_te ? ' ' + item.Don_vi_tien_te : ''}${item.Dvt ? ' / ' + item.Dvt : ''}`)
     .join('\n')
@@ -1889,7 +1918,7 @@ function exportTen() {
     return
   }
 
-  const text = list.value
+  const text = localizedList.value
     .filter(item => selected.value.includes(item.Ma_hang))
     .map(item => item.Ten_hang)
     .join('\n')
@@ -1904,7 +1933,7 @@ function exportGia() {
     return
   }
 
-  const text = list.value
+  const text = localizedList.value
     .filter(item => selected.value.includes(item.Ma_hang))
     .map(item => formatNumber(item.Gia_ban))
     .join('\n')
@@ -1919,7 +1948,7 @@ function exportGiaBanDvt() {
     return
   }
 
-  const text = list.value
+  const text = localizedList.value
     .filter(item => selected.value.includes(item.Ma_hang))
     .map(item => `${formatNumber(item.Gia_ban)}${item.Don_vi_tien_te ? item.Don_vi_tien_te : ''}${item.Dvt ? ' / ' + item.Dvt : ''}`)
     .join('\n')
@@ -1928,12 +1957,31 @@ function exportGiaBanDvt() {
   showAlert(`Đã sao chép ${selected.value.length} giá bán Tiền tệ / ĐVT`, 'success')
 }
 
+function prepareEditState(item) {
+  const rawItem = list.value.find((r) => r.Ma_hang === item.Ma_hang) || item
+  const i18n = normalizeProductI18n(rawItem)
+  const cloned = {
+    ...rawItem,
+    Ten_hang: i18n.vi.Ten_hang || rawItem.Ten_hang || '',
+    Danh_muc: i18n.vi.Danh_muc || rawItem.Danh_muc || '',
+    Dvt: i18n.vi.Dvt || rawItem.Dvt || '',
+    Mo_ta: i18n.vi.Mo_ta || rawItem.Mo_ta || '',
+    i18n: JSON.parse(JSON.stringify(i18n)),
+  }
+  delete cloned.Lang
+  delete cloned._tenVi
+  delete cloned._danhMucVi
+
+  activeEditLang.value = selectedLanguage.value || 'vi'
+  hasUnsavedChanges.value = false
+  edit.value = cloned
+  originalEdit.value = JSON.parse(JSON.stringify(cloned))
+}
+
 function openEdit(item, options = {}) {
   const { focusField = null } = options
-  edit.value = { ...item }
-  originalEdit.value = { ...item }
+  prepareEditState(item)
   isDiscountMode.value = false
-  resetEditTracking()
   
   if (isMobile.value) {
     showSidebar.value = true
@@ -1993,7 +2041,6 @@ function focusFieldInput(field) {
 
 function openSelectDropdown(el) {
   if (!el) return
-  // Trigger native select dropdown on mobile after render/transition
   requestAnimationFrame(() => {
     el.focus()
     el.click()
@@ -2008,10 +2055,8 @@ function openSelectDropdown(el) {
 }
 
 function openDiscount(item) {
-  edit.value = { ...item }
-  originalEdit.value = { ...item }
+  prepareEditState(item)
   isDiscountMode.value = true
-  resetEditTracking()
   
   if (isMobile.value) {
     showSidebar.value = true
@@ -2068,24 +2113,50 @@ function closeSidebar() {
   previewImageUrl.value = ''
 }
 
+async function quickToggleStatus(item) {
+  if (!item?.Ma_hang) return
+  const rawItem = list.value.find((r) => r.Ma_hang === item.Ma_hang)
+  const prevStatus = String((rawItem || item).Trang_thai || 'Còn hàng')
+  const nextStatus = prevStatus === 'Hết hàng' ? 'Còn hàng' : 'Hết hàng'
+
+  if (rawItem) rawItem.Trang_thai = nextStatus
+  item.Trang_thai = nextStatus
+
+  try {
+    const res = await dispatchAction({
+      action: 'updateHangHoa',
+      data: {
+        Ma_hang: item.Ma_hang,
+        Trang_thai: nextStatus,
+      },
+    })
+    if (!res.success) throw new Error(res.message || 'Không thể đổi trạng thái')
+    showAlert(`Đã đổi "${item.Ten_hang}" → ${nextStatus}`, 'success')
+  } catch (err) {
+    console.error(err)
+    if (rawItem) rawItem.Trang_thai = prevStatus
+    item.Trang_thai = prevStatus
+    showAlert('Đổi trạng thái thất bại', 'error')
+  }
+}
+
 async function saveEdit() {
-  if (saving.value) return // chặn spam click
+  if (saving.value) return
 
   saving.value = true
   try {
-    await fetch(API_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      body: JSON.stringify({
-        action: 'updateHangHoa',
-        data: edit.value,
-      }),
+    const payload = syncProductWithI18n(edit.value)
+    const res = await dispatchAction({
+      action: 'updateHangHoa',
+      data: payload,
     })
+    if (!res.success) {
+      throw new Error(res.message || 'Cập nhật thất bại')
+    }
 
     showAlert('Cập nhật thành công', 'success')
     resetEditTracking()
 
-    // đóng UI
     closeModal()
     closeSidebar()
 
@@ -2107,14 +2178,13 @@ function deleteHang() {
     loadingText: 'Đang xóa...',
     action: async () => {
       try {
-        await fetch(API_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          body: JSON.stringify({
-            action: 'deleteHangHoa',
-            Ma_hang: edit.value.Ma_hang,
-          }),
+        const res = await dispatchAction({
+          action: 'deleteHangHoa',
+          Ma_hang: edit.value.Ma_hang,
         })
+        if (!res.success) {
+          throw new Error(res.message || 'Xóa thất bại')
+        }
 
         showAlert('Đã xóa sản phẩm', 'success')
         resetEditTracking()
@@ -2138,14 +2208,13 @@ function confirmDelete(item) {
     loadingText: 'Đang xóa...',
     action: async () => {
       try {
-        await fetch(API_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          body: JSON.stringify({
-            action: 'deleteHangHoa',
-            Ma_hang: item.Ma_hang,
-          }),
+        const res = await dispatchAction({
+          action: 'deleteHangHoa',
+          Ma_hang: item.Ma_hang,
         })
+        if (!res.success) {
+          throw new Error(res.message || 'Xóa thất bại')
+        }
 
         showAlert('Đã xóa sản phẩm', 'success')
         await loadData()
@@ -4478,6 +4547,93 @@ function onMoneyInput(e, key) {
 .slide-down-leave-to {
   opacity: 0;
   transform: translateY(-8px);
+}
+
+/* ===== 5-LANGUAGE BADGES & EDIT TABS ===== */
+.dropdown-flag-img {
+  width: 20px;
+  height: 14px;
+  object-fit: cover;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.lang-badges-cell {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.lang-mini-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 5px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(51, 65, 85, 0.4);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  color: #64748b;
+}
+
+.lang-mini-pill.active {
+  background: rgba(16, 185, 129, 0.16);
+  border-color: rgba(16, 185, 129, 0.45);
+  color: #6ee7b7;
+}
+
+.lang-tabs-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lang-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.65);
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.lang-tab-btn:hover {
+  border-color: rgba(16, 185, 129, 0.5);
+  color: #ffffff;
+}
+
+.lang-tab-btn.active {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: #10b981;
+  color: #6ee7b7;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.22);
+}
+
+.lang-tab-flag {
+  width: 18px;
+  height: 13px;
+  object-fit: cover;
+  border-radius: 2px;
+}
+
+.lang-tab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(148, 163, 184, 0.35);
+}
+
+.lang-tab-dot.filled {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.8);
 }
 </style>
 

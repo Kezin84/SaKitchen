@@ -4,7 +4,12 @@
 
     <div class="layout-grid">
 
-      <!-- MOBILE TABS -->
+      <!-- MOBILE SUB-DOCK (ABOVE BOTTOM BAR) -->
+      <div
+        v-if="isMobile && showMobileEntryMenu"
+        class="mobile-entry-backdrop"
+        @click="showMobileEntryMenu = false"
+      ></div>
       <div v-if="isMobile" class="mobile-tabs-header">
         <div class="m-tab-item-wrapper" style="position: relative; flex: 1;">
           <button 
@@ -14,11 +19,17 @@
             style="width: 100%;"
           >
             <i class="ri-add-circle-line"></i> 
-            <span style="font-weight: bold;">Nhập</span>
-            <i v-if="activeMobileTab === 'entry'" class="ri-arrow-down-s-fill" style="font-size: 14px; margin-left: -2px;"></i>
+            <span class="m-tab-label" style="font-weight: bold;">
+              Nhập
+              <i
+                v-if="activeMobileTab === 'entry'"
+                :class="showMobileEntryMenu ? 'ri-arrow-down-s-fill' : 'ri-arrow-up-s-fill'"
+                class="m-tab-caret"
+              ></i>
+            </span>
           </button>
           
-          <!-- New Dropdown for Entry Mode -->
+          <!-- Drop-up Menu for Entry Mode -->
           <div v-if="showMobileEntryMenu" class="mobile-entry-dropdown">
             <div 
               class="me-dropdown-item" 
@@ -41,7 +52,8 @@
           :class="{ active: activeMobileTab === 'order' }"
           @click="setMobileTab('order')"
         >
-          <i class="ri-file-list-3-line"></i> giỏ hàng
+          <i class="ri-file-list-3-line"></i>
+          <span class="m-tab-label">Giỏ hàng</span>
           <span v-if="totalItemQty > 0" class="m-badge">{{ totalItemQty }}</span>
         </button>
         <button 
@@ -49,14 +61,16 @@
           :class="{ active: activeMobileTab === 'customer' }"
           @click="setMobileTab('customer')"
         >
-          <i class="ri-user-heart-line"></i> Khách
+          <i class="ri-user-heart-line"></i>
+          <span class="m-tab-label">Khách</span>
         </button>
         <button 
           class="m-tab-item" 
           :class="{ active: activeMobileTab === 'payment' }"
           @click="setMobileTab('payment')"
         >
-          <i class="ri-wallet-3-line"></i> Thanh Toán
+          <i class="ri-wallet-3-line"></i>
+          <span class="m-tab-label">Thanh Toán</span>
         </button>
       </div>
 
@@ -222,6 +236,33 @@
           </div>
 
           <div class="entry-body" :class="{ 'entry-body-manual': entryMode === 'manual' }">
+            <div v-if="showMemberTargetBar" class="entry-member-target-bar">
+              <span class="emtb-label">
+                <i class="app-ico ri-user-shared-line"></i>
+                Đang thêm cho:
+              </span>
+              <div class="emtb-pills">
+                <button
+                  v-for="m in invoiceOrderMembers"
+                  :key="m.groupKey"
+                  type="button"
+                  class="emtb-pill"
+                  :class="[
+                    { active: activeTargetMemberKey === m.groupKey },
+                    `role-${m.role}`,
+                  ]"
+                  @click="selectTargetMember(m.groupKey)"
+                >
+                  <i
+                    class="app-ico"
+                    :class="m.role === 'admin' ? 'ri-store-2-line' : 'ri-user-3-line'"
+                  ></i>
+                  <span>{{ m.name }}</span>
+                  <em v-if="m.badge" class="emtb-badge">{{ m.badge }}</em>
+                </button>
+              </div>
+            </div>
+
             <template v-if="entryMode === 'catalog'">
               <!-- Filters moved to header -->
 
@@ -244,7 +285,7 @@
                   v-for="product in filteredProducts"
                   :key="product.Ma_hang"
                   class="product-card product-card-horizontal"
-                  :class="[{ 'is-out': product.So_luong_kho === 0 }, { 'is-flash': cardHighlight[product.Ma_hang] }]"
+                  :class="[{ 'is-out': isOutOfStock(product) }, { 'is-flash': cardHighlight[product.Ma_hang] }]"
                   @click="openProductDetail(product)"
                 >
                   <!-- Area 1: Product Image (Left) -->
@@ -261,7 +302,7 @@
                     </div>
                     
                     <div v-if="product.Gia_Giam > 0" class="badge-sale">SALE</div>
-                    <div v-if="product.So_luong_kho === 0" class="badge-out">Hết hàng</div>
+                    <div v-if="isOutOfStock(product)" class="badge-out">Hết hàng</div>
                   </div>
 
                   <!-- Right Content Wrapper (Areas 2-4) -->
@@ -271,9 +312,9 @@
                       {{ product.Ten_hang }}
                     </div>
 
-                    <!-- Area 3: Price, Stock, Quantity Row -->
+                    <!-- Area 3: Price, Status, Quantity Row -->
                     <div class="pc-info-group">
-                      <!-- Row 1: Price + Stock -->
+                      <!-- Row 1: Price + Status -->
                       <div class="pc-price-stock-row">
                         <div class="pc-price-box-horizontal">
                           <span v-if="product.Gia_Giam > 0" class="price-sale">
@@ -283,11 +324,10 @@
                             {{ formatWithCurrency(product.Gia_ban, product.Don_vi_tien_te) }}
                           </span>
                         </div>
-                        <div class="pc-stock-pill-horizontal" :class="getStockClass(product.So_luong_kho)">
+                        <div class="pc-stock-pill-horizontal" :class="getStockClass(product)">
                           <span class="stock-text">
-                            {{ product.So_luong_kho === 0 ? 'Hết' : product.So_luong_kho <= 5 ? 'Sắp hết' : 'Còn' }}
+                            {{ isOutOfStock(product) ? 'Hết hàng' : 'Còn hàng' }}
                           </span>
-                          <span class="stock-qty">{{ product.So_luong_kho }}</span>
                         </div>
                       </div>
 
@@ -297,7 +337,7 @@
                           <button 
                             class="qty-btn-circle" 
                             @click="decreaseQty(product)"
-                            :disabled="productQty[product.Ma_hang] <= 1"
+                            :disabled="productQty[product.Ma_hang] <= 1 || isOutOfStock(product)"
                           >
                             <i class="ri-subtract-line"></i>
                           </button>
@@ -305,13 +345,13 @@
                             type="number" 
                             v-model.number="productQty[product.Ma_hang]"
                             min="1"
-                            :max="product.So_luong_kho"
+                            :disabled="isOutOfStock(product)"
                             class="qty-input-box"
                           />
                           <button 
                             class="qty-btn-circle" 
                             @click="increaseQty(product)"
-                            :disabled="productQty[product.Ma_hang] >= product.So_luong_kho"
+                            :disabled="isOutOfStock(product)"
                           >
                             <i class="ri-add-line"></i>
                           </button>
@@ -348,7 +388,7 @@
                         class="btn-add-green" 
                         :class="{ 'btn-added-success': addedSuccess[product.Ma_hang] }"
                         @click="addProductToCart(product)"
-                        :disabled="product.So_luong_kho === 0"
+                        :disabled="isOutOfStock(product)"
                       >
                         <template v-if="addedSuccess[product.Ma_hang]">
                            <i class="app-ico ri-check-line"></i>
@@ -413,8 +453,6 @@
                 <div class="manual-content premium-mode-v4">
                   <!-- HIDDEN BINDINGS (Keep for logic) -->
                   <div style="display:none">
-                    <input v-model="form.maNCC" />
-                    <input v-model="form.tenNCC" />
                     <input v-model="form.maHang" />
                   </div>
 
@@ -538,8 +576,8 @@
                           </div>
                        </div>
                        <div class="mv4-stock-badge" :class="stockColorClass">
-                          <i class="ri-inbox-line"></i>
-                          <span>Tồn kho: <strong>{{ tonKhoHienTai }}</strong></span>
+                          <i :class="isManualOutOfStock ? 'ri-close-circle-line' : 'ri-checkbox-circle-line'"></i>
+                          <span><strong>{{ isManualOutOfStock ? 'Hết hàng' : 'Còn hàng' }}</strong></span>
                        </div>
                     </div>
                     <!-- Action Button (Inside Card) -->
@@ -548,16 +586,16 @@
                         class="mv4-btn-add-simple" 
                         :class="{ 
                           'success': addedSuccessManual,
-                          'is-disabled-stock': hasProductData && tonKhoHienTai === 0
+                          'is-disabled-stock': hasProductData && isManualOutOfStock
                         }"
-                        :disabled="hasProductData && tonKhoHienTai === 0"
+                        :disabled="hasProductData && isManualOutOfStock"
                         @click="addItem"
                       >
                         <template v-if="addedSuccessManual">
                           <i class="ri-check-line"></i>
                           <span>ĐÃ THÊM</span>
                         </template>
-                        <template v-else-if="hasProductData && tonKhoHienTai === 0">
+                        <template v-else-if="hasProductData && isManualOutOfStock">
                           <i class="ri-prohibited-line"></i>
                           <span>HẾT HÀNG</span>
                         </template>
@@ -736,18 +774,112 @@
       <div class="right-stack" v-show="!isMobile || ['order', 'payment'].includes(activeMobileTab)">
         <div class="box order-box" v-show="!isMobile || activeMobileTab === 'order'">
 
+          <!-- MULTI-ORDER TABS BAR -->
+          <div class="invoice-tabs-bar">
+            <div class="invoice-tabs-scroll">
+              <button
+                v-for="(tab, idx) in invoiceTabs"
+                :key="tab.id"
+                type="button"
+                class="invoice-tab-pill"
+                :class="[
+                  {
+                    active: tab.id === activeInvoiceTabId,
+                    'is-approved': Boolean(tab.sourceOrderId),
+                  },
+                  tab.sourceOrderId ? getTabStatusClass(getTabLiveStatus(tab)) : '',
+                ]"
+                @click="switchInvoiceTab(tab.id)"
+              >
+                <span class="itp-dot"></span>
+                <span class="itp-title">{{ getTabDisplayTitle(tab, idx) }}</span>
+                <span
+                  v-if="tab.sourceOrderId"
+                  class="itp-status-tag"
+                  :class="getTabStatusClass(getTabLiveStatus(tab))"
+                >
+                  {{ getTabStatusLabel(getTabLiveStatus(tab)) }}
+                </span>
+                <span v-if="getTabItemQty(tab) > 0" class="itp-count">{{ getTabItemQty(tab) }}</span>
+                <span
+                  v-if="
+                    invoiceTabs.length > 1 ||
+                    getTabItemQty(tab) > 0 ||
+                    tab.sourceOrderId ||
+                    tab.customer?.tenKhachHang
+                  "
+                  class="itp-close"
+                  title="Đóng tab"
+                  @click.stop="closeInvoiceTab(tab.id)"
+                >
+                  <i class="ri-close-line"></i>
+                </span>
+              </button>
+            </div>
+            <button
+              type="button"
+              class="invoice-tab-add-btn"
+              title="Mở thêm tab đơn hàng mới"
+              @click="addNewInvoiceTab"
+            >
+              <i class="ri-add-line"></i>
+              <span>Mở tab</span>
+            </button>
+          </div>
+
           <div
             class="order-header"
-            style="display: flex; align-items: center; justify-content: space-between; position: relative; margin-bottom: 10px;"
+            style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; position: relative; margin-bottom: 10px;"
           >
-            <h3 class="text-success" style="margin: 0; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px;">
-              Đơn hàng của {{ form.tenKhachHang || '...' }}
-            </h3>
-            <div class="order-codes">
-              <span class="code-item" style="display: flex; align-items: center; font-size: 13px; color: #64748b;">
-                <span class="status-dot-green"></span>
-                <strong>Mã: {{ maHoaDon }}</strong>
+            <div class="order-title-group">
+              <h3 class="text-success" style="margin: 0; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px;">
+                Đơn hàng của {{ form.tenKhachHang || '...' }}
+              </h3>
+              <span
+                v-if="isLinkedOnlineOrder"
+                class="order-live-status-pill"
+                :class="getTabStatusClass(activeOrderStatus)"
+              >
+                {{ getTabStatusLabel(activeOrderStatus) }}
               </span>
+              <button
+                v-if="isLinkedOnlineOrder"
+                type="button"
+                class="order-back-donhang-btn"
+                title="Quay lại danh sách Đơn hàng"
+                @click="goBackToOrdersPage"
+              >
+                <i class="ri-arrow-left-line"></i>
+                <span>Đơn hàng</span>
+              </button>
+            </div>
+            <div class="order-header-right">
+              <div class="order-view-switch" role="group" aria-label="Chế độ xem bảng đơn hàng">
+                <button
+                  type="button"
+                  class="ov-btn"
+                  :class="{ active: orderTableViewMode === 'by_member' }"
+                  @click="setOrderTableViewMode('by_member')"
+                >
+                  <i class="ri-team-line"></i>
+                  <span>Theo từng người</span>
+                </button>
+                <button
+                  type="button"
+                  class="ov-btn"
+                  :class="{ active: orderTableViewMode === 'grouped' }"
+                  @click="setOrderTableViewMode('grouped')"
+                >
+                  <i class="ri-stack-line"></i>
+                  <span>Dạng gộp</span>
+                </button>
+              </div>
+              <div class="order-codes">
+                <span class="code-item" style="display: flex; align-items: center; font-size: 13px; color: #64748b;">
+                  <span class="status-dot-green"></span>
+                  <strong>Mã: {{ maHoaDon }}</strong>
+                </span>
+              </div>
             </div>
           </div>
 
@@ -757,61 +889,167 @@
               <div v-if="!items.length" class="order-empty">
                 Chưa có sản phẩm trong đơn.
               </div>
-              <div
-                v-for="(i, idx) in items"
-                :key="idx"
-                class="order-card"
-                :class="{ 'is-highlight': idx === highlightedIndex }"
-                @click="openEditItem(i, idx)"
-              >
-                <button
-                  class="order-card-delete"
-                  @click.stop="deleteItem(idx)"
-                  title="Xoa hang"
+
+              <!-- MOBILE: XEM THEO TỪNG NGƯỜI -->
+              <template v-else-if="orderTableViewMode === 'by_member'">
+                <div
+                  v-for="grp in invoiceMemberGroups"
+                  :key="grp.groupKey"
+                  class="order-member-section"
                 >
-                  <i class="app-ico ri-close-line"></i>
-                </button>
-
-                <div class="order-card-title">
-                  <div class="order-card-name">{{ i.tenHang }}</div>
-                  <div v-if="i.dvt || i.size" class="order-card-meta">
-                    <span v-if="i.dvt">DVT: {{ i.dvt }}</span>
-                    <span v-if="i.size">Size: {{ i.size }}</span>
+                  <div class="order-member-group-header">
+                    <div class="omg-left">
+                      <i
+                        class="app-ico"
+                        :class="grp.role === 'admin' ? 'ri-store-2-line' : 'ri-user-3-line'"
+                      ></i>
+                      <span class="omg-name">{{ grp.name }}</span>
+                      <span v-if="grp.badge" class="omg-badge" :class="`role-${grp.role}`">
+                        {{ grp.badge }}
+                      </span>
+                    </div>
+                    <div class="omg-right">
+                      <button
+                        v-if="showMemberTargetBar"
+                        type="button"
+                        class="omg-add-for-btn"
+                        :class="{ active: activeTargetMemberKey === grp.groupKey }"
+                        @click.stop="selectTargetMember(grp.groupKey, { goToEntry: true })"
+                        :title="`Thêm món cho ${grp.name}`"
+                      >
+                        <i :class="activeTargetMemberKey === grp.groupKey ? 'ri-check-line' : 'ri-add-line'"></i>
+                        <span>{{ activeTargetMemberKey === grp.groupKey ? 'Đang chọn' : 'Thêm món' }}</span>
+                      </button>
+                      <span class="omg-qty">{{ grp.totalQty }} món</span>
+                      <span class="omg-total">{{ formatWithCurrency(grp.subtotal, donViTienTeChung) }}</span>
+                    </div>
                   </div>
-                </div>
 
-                <div class="order-card-discount" :class="{ 'item-card-discount-red': hasItemDiscount(i) }">
-                  <span v-if="Number(i.chietKhau || 0) > 0">
-                    CK {{ i.chietKhau || 0 }}%: -{{ formatWithCurrency(getItemChietKhauTien(i), i.donViTienTe) }}
-                  </span>
-                  <span v-if="Number(i.giamGia || 0) > 0">
-                    Giảm: -{{ formatWithCurrency(getItemGiamGiaTien(i), i.donViTienTe) }}
-                  </span>
-                </div>
-
-                <div class="order-card-pricing">
-                  <div class="order-card-price-left">
-                    <span
-                      class="price-main"
-                      :class="{ 'price-discounted': hasItemDiscount(i) }"
+                  <div
+                    v-for="entry in grp.entries"
+                    :key="entry.idx"
+                    class="order-card"
+                    :class="{ 'is-highlight': entry.idx === highlightedIndex }"
+                    @click="openEditItem(entry.item, entry.idx)"
+                  >
+                    <button
+                      class="order-card-delete"
+                      @click.stop="deleteItem(entry.idx)"
+                      title="Xóa hàng"
                     >
-                      {{ formatWithCurrency(
-                        hasItemDiscount(i) ? getItemUnitPriceAfterDiscount(i) : i.giaBan,
-                        i.donViTienTe
-                      ) }}
-                    </span>
-                    <span class="price-qty">x {{ i.soLuong }}</span>
-                  </div>
-                  <div class="order-card-price-total">
-                    {{ formatWithCurrency(i.thanhTien - (i.tongGiamTru || 0), i.donViTienTe) }}
-                  </div>
-                </div>
+                      <i class="app-ico ri-close-line"></i>
+                    </button>
 
-                <div v-if="i.ghiChuHang" class="order-card-note">
-                  <i class="app-ico ri-file-text-line"></i>
-                  <span>{{ i.ghiChuHang }}</span>
+                    <div class="order-card-title">
+                      <div class="order-card-name">{{ entry.item.tenHang }}</div>
+                      <div v-if="entry.item.dvt || entry.item.size" class="order-card-meta">
+                        <span v-if="entry.item.dvt">ĐVT: {{ entry.item.dvt }}</span>
+                        <span v-if="entry.item.size">Size: {{ entry.item.size }}</span>
+                      </div>
+                    </div>
+
+                    <div class="order-card-discount" :class="{ 'item-card-discount-red': hasItemDiscount(entry.item) }">
+                      <span v-if="Number(entry.item.chietKhau || 0) > 0">
+                        CK {{ entry.item.chietKhau || 0 }}%: -{{ formatWithCurrency(getItemChietKhauTien(entry.item), entry.item.donViTienTe) }}
+                      </span>
+                      <span v-if="Number(entry.item.giamGia || 0) > 0">
+                        Giảm: -{{ formatWithCurrency(getItemGiamGiaTien(entry.item), entry.item.donViTienTe) }}
+                      </span>
+                    </div>
+
+                    <div class="order-card-pricing">
+                      <div class="order-card-price-left">
+                        <span
+                          class="price-main"
+                          :class="{ 'price-discounted': hasItemDiscount(entry.item) }"
+                        >
+                          {{ formatWithCurrency(
+                            hasItemDiscount(entry.item) ? getItemUnitPriceAfterDiscount(entry.item) : entry.item.giaBan,
+                            entry.item.donViTienTe
+                          ) }}
+                        </span>
+                        <span class="price-qty">x {{ entry.item.soLuong }}</span>
+                      </div>
+                      <div class="order-card-price-total">
+                        {{ formatWithCurrency(entry.item.thanhTien - (entry.item.tongGiamTru || 0), entry.item.donViTienTe) }}
+                      </div>
+                    </div>
+
+                    <div v-if="entry.item.ghiChuHang" class="order-card-note">
+                      <i class="app-ico ri-file-text-line"></i>
+                      <span>{{ entry.item.ghiChuHang }}</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </template>
+
+              <!-- MOBILE: XEM DẠNG GỘP -->
+              <template v-else>
+                <div
+                  v-for="grp in groupedOrderDisplayItems"
+                  :key="grp.groupKey"
+                  class="order-card"
+                  :class="{ 'is-highlight': grp.entries.some((e) => e.idx === highlightedIndex) }"
+                  @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)"
+                >
+                  <button
+                    class="order-card-delete"
+                    @click.stop="deleteGroupedOrderItem(grp)"
+                    title="Xóa hàng"
+                  >
+                    <i class="app-ico ri-close-line"></i>
+                  </button>
+
+                  <div class="order-card-title">
+                    <div class="order-card-name">{{ grp.tenHang }}</div>
+                    <div v-if="grp.dvt || grp.size" class="order-card-meta">
+                      <span v-if="grp.dvt">ĐVT: {{ grp.dvt }}</span>
+                      <span v-if="grp.size">Size: {{ grp.size }}</span>
+                    </div>
+                  </div>
+
+                  <div v-if="grp.showMemberBreakdown" class="order-member-chips">
+                    <button
+                      v-for="(entry, eIdx) in grp.entries"
+                      :key="eIdx"
+                      type="button"
+                      class="om-chip"
+                      :class="{ 'is-admin': entry.role === 'admin' }"
+                      @click.stop="openEditItem(entry.item, entry.idx)"
+                    >
+                      <span>{{ entry.personName }}</span>
+                      <strong>×{{ entry.item.soLuong }}</strong>
+                      <em v-if="entry.item.ghiChuHang">({{ entry.item.ghiChuHang }})</em>
+                    </button>
+                  </div>
+
+                  <div class="order-card-discount" :class="{ 'item-card-discount-red': grp.tongGiamTru > 0 }">
+                    <span v-if="grp.tongChietKhauTien > 0">
+                      CK: -{{ formatWithCurrency(grp.tongChietKhauTien, grp.donViTienTe) }}
+                    </span>
+                    <span v-if="grp.tongGiamGiaTien > 0">
+                      Giảm: -{{ formatWithCurrency(grp.tongGiamGiaTien, grp.donViTienTe) }}
+                    </span>
+                  </div>
+
+                  <div class="order-card-pricing">
+                    <div class="order-card-price-left">
+                      <span class="price-main">
+                        {{ formatWithCurrency(grp.giaBan, grp.donViTienTe) }}
+                      </span>
+                      <span class="price-qty">x {{ grp.totalQty }}</span>
+                    </div>
+                    <div class="order-card-price-total">
+                      {{ formatWithCurrency(grp.netTotal, grp.donViTienTe) }}
+                    </div>
+                  </div>
+
+                  <div v-if="!grp.showMemberBreakdown && grp.combinedNotes" class="order-card-note">
+                    <i class="app-ico ri-file-text-line"></i>
+                    <span>{{ grp.combinedNotes }}</span>
+                  </div>
+                </div>
+              </template>
             </div>
           </div>
 
@@ -841,48 +1079,151 @@
                 </tr>
               </thead>
 
-              <tbody>
+              <!-- DESKTOP: XEM THEO TỪNG NGƯỜI -->
+              <tbody v-if="orderTableViewMode === 'by_member'">
+                <tr v-if="!items.length">
+                  <td colspan="7" class="order-table-empty">Chưa có sản phẩm trong đơn.</td>
+                </tr>
+                <template v-for="grp in invoiceMemberGroups" :key="grp.groupKey">
+                  <tr class="order-group-row">
+                    <td colspan="7">
+                      <div class="ogr-inner">
+                        <div class="ogr-left">
+                          <i
+                            class="app-ico"
+                            :class="grp.role === 'admin' ? 'ri-store-2-line' : 'ri-user-3-line'"
+                          ></i>
+                          <span class="ogr-name">{{ grp.name }}</span>
+                          <span v-if="grp.badge" class="omg-badge" :class="`role-${grp.role}`">
+                            {{ grp.badge }}
+                          </span>
+                        </div>
+                        <div class="ogr-right">
+                          <button
+                            v-if="showMemberTargetBar"
+                            type="button"
+                            class="ogr-add-for-btn"
+                            :class="{ active: activeTargetMemberKey === grp.groupKey }"
+                            @click.stop="selectTargetMember(grp.groupKey)"
+                            :title="`Chọn ${grp.name} để thêm món`"
+                          >
+                            <i :class="activeTargetMemberKey === grp.groupKey ? 'ri-check-line' : 'ri-add-line'"></i>
+                            <span>{{ activeTargetMemberKey === grp.groupKey ? 'Đang thêm cho người này' : 'Thêm món' }}</span>
+                          </button>
+                          <span class="ogr-qty">{{ grp.totalQty }} món</span>
+                          <span class="ogr-total">{{ formatWithCurrency(grp.subtotal, donViTienTeChung) }}</span>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr
+                    v-for="(entry, mIdx) in grp.entries"
+                    :key="entry.idx"
+                    :class="{ 'row-highlight': entry.idx === highlightedIndex }"
+                  >
+                    <td>{{ mIdx + 1 }}</td>
+                    <td>
+                      <div class="prod-cell" @click="openEditItem(entry.item, entry.idx)">
+                        <div class="prod-name">{{ entry.item.tenHang }}</div>
+                        <div v-if="entry.item.size" class="prod-sub">Size: {{ entry.item.size }}</div>
+                        <div v-if="entry.item.dvt" class="prod-sub">ĐVT: {{ entry.item.dvt }}</div>
+                        <div v-if="entry.item.ghiChuHang" class="prod-note">{{ entry.item.ghiChuHang }}</div>
+                      </div>
+                    </td>
+                    <td @click="openEditItem(entry.item, entry.idx)" style="cursor:pointer">{{ entry.item.soLuong }}</td>
+                    <td @click="openEditItem(entry.item, entry.idx)" style="cursor:pointer">
+                      {{ formatWithCurrency(entry.item.giaBan, entry.item.donViTienTe) }}
+                    </td>
+                    <td @click="openEditItem(entry.item, entry.idx)" style="cursor:pointer">
+                      <div class="disc-cell">
+                        <span class="disc-ck">
+                          CK ({{ entry.item.chietKhau || 0 }}%): -{{ formatWithCurrency(entry.item.tongChietKhauTien || 0, entry.item.donViTienTe) }}
+                        </span>
+                        <span class="disc-giam">
+                          Giảm: -{{ formatWithCurrency(entry.item.tongGiamGiaTien || 0, entry.item.donViTienTe) }}
+                        </span>
+                      </div>
+                    </td>
+                    <td @click="openEditItem(entry.item, entry.idx)" class="total-cell" style="cursor:pointer">
+                      <span class="total-amount">
+                        {{ formatWithCurrency(entry.item.thanhTien - (entry.item.tongGiamTru || 0), entry.item.donViTienTe) }}
+                      </span>
+                      <div class="profit-inline">
+                        <span class="profit-arrow"><i class="app-ico ri-arrow-up-s-line"></i></span>
+                        <span class="profit-value">
+                          +{{ formatWithCurrency(entry.item.loiNhuan, entry.item.donViTienTe) }}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <button class="btn-delete" @click="deleteItem(entry.idx)" title="Xóa hàng">
+                        <i class="app-ico ri-close-line"></i>
+                      </button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+
+              <!-- DESKTOP: XEM DẠNG GỘP -->
+              <tbody v-else>
+                <tr v-if="!items.length">
+                  <td colspan="7" class="order-table-empty">Chưa có sản phẩm trong đơn.</td>
+                </tr>
                 <tr
-                  v-for="(i, idx) in items"
-                  :key="idx"
-                  :class="{ 'row-highlight': idx === highlightedIndex }"
+                  v-for="(grp, gIdx) in groupedOrderDisplayItems"
+                  :key="grp.groupKey"
+                  :class="{ 'row-highlight': grp.entries.some((e) => e.idx === highlightedIndex) }"
                 >
-                  <td>{{ idx + 1 }}</td>
+                  <td>{{ gIdx + 1 }}</td>
                   <td>
-                    <div class="prod-cell" @click="openEditItem(i, idx)">
-                      <div class="prod-name">{{ i.tenHang }}</div>
-                      <div v-if="i.size" class="prod-sub">Size: {{ i.size }}</div>
-                      <div v-if="i.dvt" class="prod-sub">DVT: {{ i.dvt }}</div>
-                      <div v-if="i.ghiChuHang" class="prod-note">{{ i.ghiChuHang }}</div>
+                    <div class="prod-cell" @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)">
+                      <div class="prod-name">{{ grp.tenHang }}</div>
+                      <div v-if="grp.size" class="prod-sub">Size: {{ grp.size }}</div>
+                      <div v-if="grp.dvt" class="prod-sub">ĐVT: {{ grp.dvt }}</div>
+                      <div v-if="grp.showMemberBreakdown" class="order-member-chips">
+                        <button
+                          v-for="(entry, eIdx) in grp.entries"
+                          :key="eIdx"
+                          type="button"
+                          class="om-chip"
+                          :class="{ 'is-admin': entry.role === 'admin' }"
+                          @click.stop="openEditItem(entry.item, entry.idx)"
+                        >
+                          <span>{{ entry.personName }}</span>
+                          <strong>×{{ entry.item.soLuong }}</strong>
+                          <em v-if="entry.item.ghiChuHang">({{ entry.item.ghiChuHang }})</em>
+                        </button>
+                      </div>
+                      <div v-else-if="grp.combinedNotes" class="prod-note">{{ grp.combinedNotes }}</div>
                     </div>
                   </td>
-                  <td @click="openEditItem(i, idx)" style="cursor:pointer">{{ i.soLuong }}</td>
-                  <td @click="openEditItem(i, idx)" style="cursor:pointer">
-                    {{ formatWithCurrency(i.giaBan, i.donViTienTe) }}
+                  <td @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" style="cursor:pointer">{{ grp.totalQty }}</td>
+                  <td @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" style="cursor:pointer">
+                    {{ formatWithCurrency(grp.giaBan, grp.donViTienTe) }}
                   </td>
-                  <td @click="openEditItem(i, idx)" style="cursor:pointer">
+                  <td @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" style="cursor:pointer">
                     <div class="disc-cell">
                       <span class="disc-ck">
-                        CK ({{ i.chietKhau || 0 }}%): -{{ formatWithCurrency(i.tongChietKhauTien || 0, i.donViTienTe) }}
+                        CK: -{{ formatWithCurrency(grp.tongChietKhauTien, grp.donViTienTe) }}
                       </span>
                       <span class="disc-giam">
-                        Giam: -{{ formatWithCurrency(i.tongGiamGiaTien || 0, i.donViTienTe) }}
+                        Giảm: -{{ formatWithCurrency(grp.tongGiamGiaTien, grp.donViTienTe) }}
                       </span>
                     </div>
                   </td>
-                  <td @click="openEditItem(i, idx)" class="total-cell" style="cursor:pointer">
+                  <td @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" class="total-cell" style="cursor:pointer">
                     <span class="total-amount">
-                      {{ formatWithCurrency(i.thanhTien - (i.tongGiamTru || 0), i.donViTienTe) }}
+                      {{ formatWithCurrency(grp.netTotal, grp.donViTienTe) }}
                     </span>
                     <div class="profit-inline">
                       <span class="profit-arrow"><i class="app-ico ri-arrow-up-s-line"></i></span>
                       <span class="profit-value">
-                        +{{ formatWithCurrency(i.loiNhuan, i.donViTienTe) }}
+                        +{{ formatWithCurrency(grp.loiNhuan, grp.donViTienTe) }}
                       </span>
                     </div>
                   </td>
                   <td>
-                    <button class="btn-delete" @click="deleteItem(idx)" title="Xoa hang">
+                    <button class="btn-delete" @click="deleteGroupedOrderItem(grp)" title="Xóa hàng">
                       <i class="app-ico ri-close-line"></i>
                     </button>
                   </td>
@@ -986,22 +1327,120 @@
           </div>
           </div>
 
-          <div class="submit-stack" :class="{ 'mobile-fixed-bottom': isMobile }">
+          <div class="submit-stack" :class="{ 'mobile-scroll-submit': isMobile }">
             <button class="btn btn-preview" :disabled="isPreviewing" @click="previewHoaDon">
 
               <span v-if="isPreviewing" class="btn-spinner" aria-hidden="true"></span>
-              <i v-else class="app-ico ri-eye-line"></i> 
-              <span>{{ isPreviewing ? 'ĐANG TẠO...' : 'XEM ẢNH HÓA ĐƠN' }}</span>
+              <i v-else class="app-ico ri-image-line"></i> 
+              <span>{{ isPreviewing ? 'ĐANG XUẤT...' : 'XUẤT ẢNH HÓA ĐƠN' }}</span>
             </button>
             <button class="btn btn-text" @click="openTextInvoice">
               <i class="app-ico ri-file-text-line"></i> 
               <span>XUẤT HÓA ĐƠN (CHỮ)</span>
             </button>
-            <button class="btn btn-complete" :disabled="isSubmitting" @click="hoanThanhDon">
+
+            <!-- ĐƠN TẠI QUẦY / TẠO MỚI -->
+            <button
+              v-if="!isLinkedOnlineOrder"
+              class="btn btn-complete"
+              :disabled="isSubmitting"
+              @click="hoanThanhDon"
+            >
               <span v-if="isSubmitting" class="btn-spinner" aria-hidden="true"></span>
               <i v-else class="app-ico ri-checkbox-circle-line"></i>
               <span>{{ isSubmitting ? 'ĐANG XỬ LÝ...' : 'CHỐT ĐƠN' }}</span>
             </button>
+
+            <!-- ĐƠN ONLINE ĐỒNG BỘ TIẾN TRÌNH VỚI TRANG ĐƠN HÀNG -->
+            <template v-else>
+              <template v-if="activeOrderStatus === 'Chờ duyệt'">
+                <button
+                  class="btn btn-order-draft"
+                  :disabled="isSubmitting || isOrderActionLoading"
+                  @click="saveOrderDraftFromInvoice"
+                >
+                  <i class="app-ico ri-save-3-line"></i>
+                  <span>LƯU NHÁP (XÁC NHẬN)</span>
+                </button>
+                <button
+                  class="btn btn-order-approve"
+                  :disabled="isSubmitting || isOrderActionLoading"
+                  @click="approveOrderFromInvoice"
+                >
+                  <span v-if="isSubmitting || isOrderActionLoading" class="btn-spinner" aria-hidden="true"></span>
+                  <i v-else class="app-ico ri-shield-check-line"></i>
+                  <span>DUYỆT ĐƠN (XỬ LÝ)</span>
+                </button>
+              </template>
+
+              <template v-else-if="activeOrderStatus === 'Đang xử lý'">
+                <button
+                  class="btn btn-order-draft"
+                  :disabled="isSubmitting || isOrderActionLoading"
+                  @click="saveApprovedOrderEdits"
+                >
+                  <i class="app-ico ri-save-3-line"></i>
+                  <span>LƯU CẬP NHẬT</span>
+                </button>
+                <button
+                  class="btn btn-order-ship"
+                  :disabled="isSubmitting || isOrderActionLoading"
+                  @click="shipOrderFromInvoice"
+                >
+                  <i class="app-ico ri-e-bike-2-line"></i>
+                  <span>SHIP ĐƠN</span>
+                </button>
+                <button
+                  class="btn btn-complete"
+                  :disabled="isSubmitting || isOrderActionLoading"
+                  @click="completeOrderFromInvoice"
+                >
+                  <span v-if="isSubmitting || isOrderActionLoading" class="btn-spinner" aria-hidden="true"></span>
+                  <i v-else class="app-ico ri-checkbox-circle-line"></i>
+                  <span>HOÀN THÀNH</span>
+                </button>
+              </template>
+
+              <template v-else-if="activeOrderStatus === 'Đang ship'">
+                <button
+                  class="btn btn-order-draft"
+                  :disabled="isSubmitting || isOrderActionLoading"
+                  @click="saveApprovedOrderEdits"
+                >
+                  <i class="app-ico ri-save-3-line"></i>
+                  <span>LƯU CẬP NHẬT</span>
+                </button>
+                <button
+                  class="btn btn-complete"
+                  :disabled="isSubmitting || isOrderActionLoading"
+                  @click="completeOrderFromInvoice"
+                >
+                  <span v-if="isSubmitting || isOrderActionLoading" class="btn-spinner" aria-hidden="true"></span>
+                  <i v-else class="app-ico ri-checkbox-circle-line"></i>
+                  <span>HOÀN THÀNH</span>
+                </button>
+              </template>
+
+              <template v-else>
+                <button
+                  class="btn btn-order-draft"
+                  @click="closeInvoiceTab(activeInvoiceTabId)"
+                >
+                  <i class="app-ico ri-close-circle-line"></i>
+                  <span>ĐÓNG TAB ĐƠN NÀY</span>
+                </button>
+              </template>
+
+              <button
+                v-if="activeOrderStatus !== 'Hoàn thành' && activeOrderStatus !== 'Đã hủy'"
+                class="btn btn-order-cancel"
+                :disabled="isSubmitting || isOrderActionLoading"
+                @click="cancelOrderFromInvoice"
+              >
+                <i class="app-ico ri-close-circle-line"></i>
+                <span>HỦY ĐƠN</span>
+              </button>
+            </template>
           </div>
         </div>
       </div>
@@ -1022,14 +1461,14 @@
       <div class="hd-left-group">
         <div class="hd-logo-circle">
           <img
-            v-if="logoInfo && logoInfo.base64"
-            :src="logoInfo.base64"
+            v-if="logoInfo && (logoInfo.base64 || logoInfo.URL)"
+            :src="logoInfo.base64 || logoInfo.URL"
             alt="Logo"
           />
         </div>
 
         <div class="hd-shop-info-box">
-          <div class="hd-shop-name">{{ form.tenNCC }}</div>
+          <div class="hd-shop-name">{{ logoInfo?.Name || 'SA KITCHEN' }}</div>
           <div v-if="thoiGianHoatDongShop" class="hd-shop-time">
             {{ thoiGianHoatDongShop }}
           </div>
@@ -1044,8 +1483,8 @@
           class="contact-row"
         >
           <img 
-            v-if="c.URL_img_base64" 
-            :src="c.URL_img_base64" 
+            v-if="c.URL_img_base64 || c.URL_img" 
+            :src="c.URL_img_base64 || c.URL_img" 
             class="contact-img"
             alt=""
           />
@@ -1230,9 +1669,15 @@
   </div>
 
   <!-- ================= POPUP HÓA ĐƠN TEXT ================= -->
-  <div v-if="showTextInvoice" class="text-invoice-overlay">
-    <div class="text-invoice-box">
-      <h3>📄 Hóa đơn (văn bản)</h3>
+  <div v-if="showTextInvoice" class="text-invoice-overlay grab-modal-overlay" @click.self="showTextInvoice = false">
+    <div class="text-invoice-box grab-sheet">
+      <div class="grab-sheet-handle" @click="showTextInvoice = false"></div>
+      <div class="text-invoice-header">
+        <h3>📄 Hóa đơn (văn bản)</h3>
+        <button class="grab-sheet-close" @click="showTextInvoice = false" aria-label="Đóng">
+          <i class="ri-close-line"></i>
+        </button>
+      </div>
 
       <textarea readonly rows="14" ref="textInvoiceRef">
 {{ textInvoice }}
@@ -1252,9 +1697,16 @@
   </div>
 
   <!-- ================= MODAL CHI TIẾT SẢN PHẨM ================= -->
-  <div v-if="showProductDetail" class="modal" @click="showProductDetail = false">
-    <div class="product-detail-box" @click.stop>
-      <button class="close-btn" @click="showProductDetail = false"><i class="app-ico ri-close-line"></i></button>
+  <div v-if="showProductDetail" class="modal modal-overlay-blur grab-modal-overlay" @click="showProductDetail = false">
+    <div class="product-detail-box grab-sheet" @click.stop>
+      <div class="grab-sheet-handle" @click="showProductDetail = false"></div>
+      <div class="grab-detail-topbar">
+        <span class="grab-detail-topbar-title">{{ selectedProduct.Ten_hang }}</span>
+        <button class="grab-sheet-close" @click="showProductDetail = false" aria-label="Đóng">
+          <i class="ri-close-line"></i>
+        </button>
+      </div>
+      <button class="close-btn desktop-detail-close" @click="showProductDetail = false"><i class="app-ico ri-close-line"></i></button>
 
       <div class="detail-grid">
         <!-- HÌNH ẢNH -->
@@ -1298,15 +1750,9 @@
               <i class="ri-inbox-line"></i>
               {{ selectedProduct.Dvt }}
             </span>
-            <span class="meta-tag" :class="`meta-status-${selectedProduct.Trang_thai?.toLowerCase()}`">
-              <i class="ri-checkbox-circle-line"></i>
-              {{ selectedProduct.Trang_thai }}
-            </span>
-            
-            <!-- Stock Inline -->
-            <span class="meta-tag meta-stock" :class="getStockClass(selectedProduct.So_luong_kho)">
-              <i class="ri-archive-line"></i>
-              <b>Tồn: {{ selectedProduct.So_luong_kho }}</b>
+            <span class="meta-tag meta-stock" :class="getStockClass(selectedProduct)">
+              <i :class="isOutOfStock(selectedProduct) ? 'ri-close-circle-line' : 'ri-checkbox-circle-line'"></i>
+              <b>{{ isOutOfStock(selectedProduct) ? 'Hết hàng' : 'Còn hàng' }}</b>
             </span>
           </div>
 
@@ -1395,7 +1841,7 @@
                 <button 
                   class="qty-btn-circle" 
                   @click="decreaseQty(selectedProduct)"
-                  :disabled="productQty[selectedProduct.Ma_hang] <= 1"
+                  :disabled="productQty[selectedProduct.Ma_hang] <= 1 || isOutOfStock(selectedProduct)"
                 >
                   <i class="ri-subtract-line"></i>
                 </button>
@@ -1403,13 +1849,13 @@
                   type="number" 
                   v-model.number="productQty[selectedProduct.Ma_hang]"
                   min="1"
-                  :max="selectedProduct.So_luong_kho"
+                  :disabled="isOutOfStock(selectedProduct)"
                   class="qty-input-box"
                 />
                 <button 
                   class="qty-btn-circle" 
                   @click="increaseQty(selectedProduct)"
-                  :disabled="productQty[selectedProduct.Ma_hang] >= selectedProduct.So_luong_kho"
+                  :disabled="isOutOfStock(selectedProduct)"
                 >
                   <i class="ri-add-line"></i>
                 </button>
@@ -1420,10 +1866,10 @@
             <button 
               class="btn-add-large" 
               @click="addProductToCart(selectedProduct); showProductDetail = false"
-              :disabled="selectedProduct.So_luong_kho === 0"
+              :disabled="isOutOfStock(selectedProduct)"
             >
-              <i class="app-ico" :class="selectedProduct.So_luong_kho === 0 ? 'ri-close-circle-line' : 'ri-shopping-cart-line'"></i>
-              {{ selectedProduct.So_luong_kho === 0 ? 'Hết hàng' : 'Thêm vào đơn' }}
+              <i class="app-ico" :class="isOutOfStock(selectedProduct) ? 'ri-close-circle-line' : 'ri-shopping-cart-line'"></i>
+              {{ isOutOfStock(selectedProduct) ? 'Hết hàng' : 'Thêm vào đơn' }}
             </button>
           </div>
         </div>
@@ -1431,8 +1877,9 @@
     </div>
   </div>
 
-  <div v-if="showEditModal" class="modal modal-overlay-blur">
-    <div class="modal-box premium-modal-v4">
+  <div v-if="showEditModal" class="modal modal-overlay-blur grab-modal-overlay" @click.self="showEditModal = false">
+    <div class="modal-box premium-modal-v4 grab-sheet">
+      <div class="grab-sheet-handle" @click="showEditModal = false"></div>
       <!-- HEADER -->
       <div class="pmv4-header">
         <div class="pmv4-header-info">
@@ -1451,11 +1898,11 @@
 
       <!-- BODY -->
       <div class="pmv4-body">
-        <!-- STOCK INFO BANNER (Clean Strip) -->
-        <div class="pmv4-stock-strip" :class="tonKhoInModal === 0 ? 'strip-danger' : tonKhoInModal < 10 ? 'strip-warning' : 'strip-success'">
+        <!-- STATUS INFO BANNER -->
+        <div class="pmv4-stock-strip" :class="isEditModalOutOfStock ? 'strip-danger' : 'strip-success'">
           <div class="strip-item">
-            <i :class="tonKhoInModal === 0 ? 'ri-close-circle-fill' : tonKhoInModal < 10 ? 'ri-alert-fill' : 'ri-checkbox-circle-fill'"></i>
-            <span class="strip-text">Tồn kho: <b>{{ tonKhoInModal }}</b></span>
+            <i :class="isEditModalOutOfStock ? 'ri-close-circle-fill' : 'ri-checkbox-circle-fill'"></i>
+            <span class="strip-text">Trạng thái: <b>{{ isEditModalOutOfStock ? 'Hết hàng' : 'Còn hàng' }}</b></span>
           </div>
           <div class="strip-item">
             <i class="ri-shopping-cart-2-fill"></i>
@@ -1465,7 +1912,46 @@
 
         <!-- MAIN FORM GRID -->
         <div class="pmv4-form-grid">
-          
+          <div v-if="editModalSiblings.length > 1" class="pmv4-field-group span-full">
+            <label class="pmv4-label">Chọn người để sửa món này</label>
+            <div class="pmv4-member-pills">
+              <button
+                v-for="sib in editModalSiblings"
+                :key="sib.idx"
+                type="button"
+                class="pmv4-member-pill"
+                :class="{ active: editIndex === sib.idx }"
+                @click="switchEditModalSibling(sib)"
+              >
+                <i
+                  class="app-ico"
+                  :class="sib.role === 'admin' ? 'ri-store-2-line' : 'ri-user-3-line'"
+                ></i>
+                <span>{{ sib.personName }}</span>
+                <strong>×{{ sib.item.soLuong }}</strong>
+              </button>
+            </div>
+          </div>
+          <div v-else-if="showMemberTargetBar" class="pmv4-field-group span-full">
+            <label class="pmv4-label">Thuộc về người đặt</label>
+            <div class="pmv4-member-pills">
+              <button
+                v-for="m in invoiceOrderMembers"
+                :key="m.groupKey"
+                type="button"
+                class="pmv4-member-pill"
+                :class="{ active: editItemMemberKey === m.groupKey }"
+                @click="editItemMemberKey = m.groupKey"
+              >
+                <i
+                  class="app-ico"
+                  :class="m.role === 'admin' ? 'ri-store-2-line' : 'ri-user-3-line'"
+                ></i>
+                <span>{{ m.name }}</span>
+              </button>
+            </div>
+          </div>
+
           <!-- Row 1: Quantity (Prominent) -->
           <div class="pmv4-field-group span-full">
             <label class="pmv4-label">Số lượng mua</label>
@@ -1482,15 +1968,13 @@
                   type="number" 
                   v-model.number="editItem.soLuong" 
                   min="1"
-                  :max="tonKhoInModal || 9999"
                   class="pmv4-step-input"
                 />
                 <span class="pmv4-input-unit">{{ editItem.dvt }}</span>
               </div>
               <button 
                 class="pmv4-step-btn" 
-                @click="editItem.soLuong < (tonKhoInModal || 9999) ? editItem.soLuong++ : null"
-                :disabled="editItem.soLuong >= (tonKhoInModal || 9999)"
+                @click="editItem.soLuong++"
               >
                 <i class="ri-add-line"></i>
               </button>
@@ -1548,8 +2032,9 @@
     </div>
   </div>
 
-  <div v-if="showSuccessModal" class="vip-modal-overlay">
-     <div class="vip-success-card">
+  <div v-if="showSuccessModal" class="vip-modal-overlay grab-modal-overlay" @click.self="confirmSuccessReload">
+     <div class="vip-success-card grab-sheet">
+        <div class="grab-sheet-handle" @click="confirmSuccessReload"></div>
         <div class="vip-icon-box">
            <div class="vip-success-ring"></div>
            <i class="ri-check-line vip-check-icon"></i>
@@ -1560,8 +2045,9 @@
      </div>
   </div>
 
-  <div v-if="showDiscountModal" class="modal modal-overlay-blur">
-    <div class="modal-box premium-modal-v4" style="max-width: 400px">
+  <div v-if="showDiscountModal" class="modal modal-overlay-blur grab-modal-overlay" @click.self="showDiscountModal = false">
+    <div class="modal-box premium-modal-v4 grab-sheet" style="max-width: 400px">
+      <div class="grab-sheet-handle" @click="showDiscountModal = false"></div>
       <div class="pmv4-header">
         <div class="pmv4-header-info">
           <div class="pmv4-icon-box">
@@ -1626,12 +2112,35 @@
 
 
 <script setup>
-import { reactive, ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import {
+  reactive,
+  ref,
+  computed,
+  onMounted,
+  onActivated,
+  onUnmounted,
+  watch,
+  nextTick,
+} from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import QrcodeVue from 'qrcode.vue'
 import html2canvas from 'html2canvas'
-import { API_URL, IMGBB_KEY } from '@/config/api'
+import {
+  getSheets,
+  getOneSheet,
+  subscribeSheet,
+  getOrderForInvoice,
+  adminSyncOrderItems,
+  dispatchAction,
+  IMGBB_KEY,
+} from '@/config/api'
+import {
+  localizeProduct,
+  productMatchesKeyword,
+  resolveNoticeText,
+} from '@/utils/i18nData'
 const router = useRouter() // Initialize router
+const route = useRoute()
 
 
 
@@ -1664,14 +2173,15 @@ const selectMobileEntryMode = (mode) => {
 
 function setMobileTab(tab) {
   activeMobileTab.value = tab
-  if(tab !== 'entry') showMobileEntryMenu.value = false
+  if (tab !== 'entry') showMobileEntryMenu.value = false
   window.scrollTo({ top: 0, behavior: 'instant' })
+  const crmMain = document.querySelector('.crm-main')
+  if (crmMain) crmMain.scrollTo({ top: 0, behavior: 'instant' })
 }
 
 /* ================= MASTER DATA ================= */
 const khachHangList = ref([])
 const hangHoaList = ref([])
-const nccList = ref([])
 const donHangList = ref([])
 const logoInfo = ref(null)
 const shopContactList = ref([])
@@ -1697,6 +2207,7 @@ const langOptions = [
   { value: 'en', label: 'English', flagUrl: 'https://flagcdn.com/w40/gb.png' },
   { value: 'zh-CN', label: 'Trung Quốc', flagUrl: 'https://flagcdn.com/w40/cn.png' },
   { value: 'fil', label: 'Philippines', flagUrl: 'https://flagcdn.com/w40/ph.png' },
+  { value: 'ko', label: 'Hàn Quốc', flagUrl: 'https://flagcdn.com/w40/kr.png' },
 ]
 const currentLangFlagUrl = computed(() => {
   const lang = langOptions.find(o => o.value === selectedLang.value)
@@ -1709,16 +2220,14 @@ const currentLangLabel = computed(() => {
 })
 const selectedStockStatus = ref('all') // 'all' | 'in' | 'out'
 
+const localizedHangHoaList = computed(() =>
+  hangHoaList.value.map((p) => localizeProduct(p, selectedLang.value || 'vi'))
+)
+
 const filteredCategories = computed(() => {
-  if (!selectedLang.value) return []
-  // Get unique categories for selected language
   const cats = new Set()
-  hangHoaList.value.forEach(p => {
-    // Check various language fields just in case: Lang, Ngon_ngu
-    const pLang = p.Lang || p.Ngon_ngu || 'vi'
-    if (pLang.toLowerCase() === selectedLang.value.toLowerCase() && p.Danh_muc) {
-      cats.add(p.Danh_muc)
-    }
+  localizedHangHoaList.value.forEach((p) => {
+    if (p.Danh_muc) cats.add(p.Danh_muc)
   })
   return Array.from(cats).sort().map(c => ({ value: c, label: c }))
 })
@@ -1757,10 +2266,192 @@ const phutNhanHang = ref('')
 const gioList = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
 const phutList = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
 
+const INVOICE_TABS_STORAGE_KEY = 'sa_admin_invoice_tabs_v1'
+const invoiceTabs = ref([])
+const activeInvoiceTabId = ref('')
+const orderTableViewMode = ref('grouped')
+const selectedTargetMemberKey = ref('')
+const editItemMemberKey = ref('')
+const editModalSiblings = ref([])
+const hasLoadedDonHang = ref(false)
+const isOrderActionLoading = ref(false)
+let unsubDonHangRealtime = null
+let isSwitchingTab = false
+let tabSeq = 0
+let maHoaDonSeq = 0
+
+const activeTabObj = computed(
+  () => invoiceTabs.value.find((t) => t.id === activeInvoiceTabId.value) || null,
+)
+const isLinkedOnlineOrder = computed(() => Boolean(activeTabObj.value?.sourceOrderId))
+
+function getTabLiveStatus(tab) {
+  if (!tab?.sourceOrderId) return ''
+  if (hasLoadedDonHang.value) {
+    const dh = donHangList.value.find(
+      (d) => String(d?.Ma_hoa_don || '').trim() === String(tab.sourceOrderId).trim(),
+    )
+    if (dh) {
+      return String(dh.Trang_thai || '').trim() || 'Chờ duyệt'
+    }
+    return tab.sourceOrderStatus || 'Đã hủy'
+  }
+  return tab.sourceOrderStatus || 'Chờ duyệt'
+}
+
+const activeOrderStatus = computed(() => getTabLiveStatus(activeTabObj.value))
+
+function getTabStatusLabel(status) {
+  const st = String(status || '').trim()
+  if (st === 'Chờ duyệt') return 'Đang xác nhận'
+  if (st === 'Đang xử lý') return 'Đang xử lý'
+  if (st === 'Đang ship') return 'Đang ship'
+  if (st === 'Hoàn thành') return 'Hoàn thành'
+  if (st === 'Đã hủy') return 'Đã hủy'
+  return st || 'Đang xác nhận'
+}
+
+function getTabStatusClass(status) {
+  const st = String(status || '').trim()
+  if (st === 'Chờ duyệt') return 'status-waiting'
+  if (st === 'Đang xử lý') return 'status-processing'
+  if (st === 'Đang ship') return 'status-shipping'
+  if (st === 'Hoàn thành') return 'status-done'
+  if (st === 'Đã hủy') return 'status-cancelled'
+  return 'status-waiting'
+}
+
+function syncTabsStatusFromDonHang() {
+  if (!hasLoadedDonHang.value) return
+  let changed = false
+  for (const tab of invoiceTabs.value) {
+    if (!tab?.sourceOrderId) continue
+    const dh = donHangList.value.find(
+      (d) => String(d?.Ma_hoa_don || '').trim() === String(tab.sourceOrderId).trim(),
+    )
+    const nextSt = dh ? String(dh.Trang_thai || '').trim() || 'Chờ duyệt' : 'Đã hủy'
+    if (tab.sourceOrderStatus !== nextSt) {
+      tab.sourceOrderStatus = nextSt
+      changed = true
+    }
+  }
+  if (changed) saveTabsToStorage()
+}
+
+function goBackToOrdersPage() {
+  router.push({ name: 'admin-don-hang' })
+}
+
+function detectHasMultipleOrderMembers(list = []) {
+  const ids = new Set()
+  const namesWithId = new Set()
+  const namesWithoutId = new Set()
+  let hasGuest = false
+  let hasAdmin = false
+
+  for (const it of list) {
+    if (!it) continue
+    if (it.Added_by_role === 'admin' || it.Nguoi_dat === 'Quán thêm') {
+      hasAdmin = true
+      continue
+    }
+    if (it.Added_by_role === 'guest') {
+      hasGuest = true
+    }
+    const id = String(it.Nguoi_dat_id || '').trim()
+    const name = String(it.Nguoi_dat || '').trim().toLowerCase()
+    if (id) {
+      ids.add(id)
+      if (name) namesWithId.add(name)
+    } else if (name) {
+      namesWithoutId.add(name)
+    }
+  }
+
+  let extraNameCount = 0
+  for (const name of namesWithoutId) {
+    if (!namesWithId.has(name)) extraNameCount += 1
+  }
+
+  const totalDistinctCustomers = ids.size + extraNameCount
+  return totalDistinctCustomers > 1 || hasGuest || (hasAdmin && totalDistinctCustomers >= 1)
+}
+
+function genTabId() {
+  tabSeq += 1
+  return `TAB_${Date.now()}_${tabSeq}_${Math.random().toString(36).slice(2, 6)}`
+}
+
+function getDefaultDeliveryParts() {
+  const now = new Date()
+  now.setMinutes(now.getMinutes() + 10)
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  const gio = String(now.getHours()).padStart(2, '0')
+  const phut = String(now.getMinutes()).padStart(2, '0')
+  const ngay = `${y}-${m}-${d}`
+  return {
+    ngayNhanHang: ngay,
+    gioNhanHang: gio,
+    phutNhanHang: phut,
+    thoiGianNhanHang: `${ngay}T${gio}:${phut}`,
+  }
+}
+
+function parseDeliveryToInputs(rawStr) {
+  const fallback = getDefaultDeliveryParts()
+  const str = String(rawStr || '').trim()
+  if (!str) return fallback
+
+  // Match "HH:mm[:ss] DD/MM/YYYY"
+  const vnMatch = str.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+  if (vnMatch) {
+    const gio = String(vnMatch[1]).padStart(2, '0')
+    const phut = String(vnMatch[2]).padStart(2, '0')
+    const dd = String(vnMatch[3]).padStart(2, '0')
+    const mm = String(vnMatch[4]).padStart(2, '0')
+    const yyyy = vnMatch[5]
+    const ngay = `${yyyy}-${mm}-${dd}`
+    return {
+      ngayNhanHang: ngay,
+      gioNhanHang: gio,
+      phutNhanHang: phut,
+      thoiGianNhanHang: `${ngay}T${gio}:${phut}`,
+    }
+  }
+
+  // Match ISO-like "YYYY-MM-DDTHH:mm"
+  const isoMatch = str.match(/(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/)
+  if (isoMatch) {
+    return {
+      ngayNhanHang: isoMatch[1],
+      gioNhanHang: isoMatch[2],
+      phutNhanHang: isoMatch[3],
+      thoiGianNhanHang: `${isoMatch[1]}T${isoMatch[2]}:${isoMatch[3]}`,
+    }
+  }
+
+  // Match free hour like "18h30" or "18:30"
+  const timeOnly = str.match(/(\d{1,2})[:hH](\d{2})/)
+  if (timeOnly) {
+    const gio = String(Math.min(23, Math.max(0, Number(timeOnly[1])))).padStart(2, '0')
+    const phut = String(Math.min(59, Math.max(0, Number(timeOnly[2])))).padStart(2, '0')
+    return {
+      ngayNhanHang: fallback.ngayNhanHang,
+      gioNhanHang: gio,
+      phutNhanHang: phut,
+      thoiGianNhanHang: `${fallback.ngayNhanHang}T${gio}:${phut}`,
+    }
+  }
+
+  return fallback
+}
+
 function genMaHoaDon() {
   const d = new Date()
   const p = (n) => String(n).padStart(2, '0')
-  return (
+  const base =
     'HD' +
     p(d.getDate()) +
     p(d.getMonth() + 1) +
@@ -1768,7 +2459,380 @@ function genMaHoaDon() {
     p(d.getHours()) +
     p(d.getMinutes()) +
     p(d.getSeconds())
-  )
+  const exists = invoiceTabs.value.some((t) => t.maHoaDon === base)
+  if (!exists) return base
+  maHoaDonSeq += 1
+  return `${base}_${maHoaDonSeq}`
+}
+
+function createBlankTabSnapshot(overrides = {}) {
+  const delivery = getDefaultDeliveryParts()
+  return {
+    id: overrides.id || genTabId(),
+    sourceOrderId: overrides.sourceOrderId || '',
+    sourceOrderStatus: overrides.sourceOrderStatus || '',
+    maHoaDon: overrides.maHoaDon || genMaHoaDon(),
+    soHoaDon: overrides.soHoaDon || genSoHoaDon(),
+    ngayNhanHang: overrides.ngayNhanHang || delivery.ngayNhanHang,
+    gioNhanHang: overrides.gioNhanHang || delivery.gioNhanHang,
+    phutNhanHang: overrides.phutNhanHang || delivery.phutNhanHang,
+    thoiGianNhanHang: overrides.thoiGianNhanHang || delivery.thoiGianNhanHang,
+    hinhThucThanhToan: overrides.hinhThucThanhToan || 'TIEN_MAT',
+    orderTableViewMode: overrides.orderTableViewMode || 'grouped',
+    globalGiamGia: Number(overrides.globalGiamGia || 0),
+    globalChietKhauPercent: Number(overrides.globalChietKhauPercent || 0),
+    items: Array.isArray(overrides.items) ? JSON.parse(JSON.stringify(overrides.items)) : [],
+    customer: {
+      maKhachHang: overrides.customer?.maKhachHang || '',
+      tenKhachHang: overrides.customer?.tenKhachHang || '',
+      soDienThoai: overrides.customer?.soDienThoai || '',
+      diaChi: overrides.customer?.diaChi || '',
+      ghiChu: overrides.customer?.ghiChu || '',
+      ghiChuDonHang: overrides.customer?.ghiChuDonHang || '',
+      isExistingCustomer: Boolean(overrides.customer?.isExistingCustomer),
+    },
+  }
+}
+
+function saveTabsToStorage() {
+  try {
+    localStorage.setItem(
+      INVOICE_TABS_STORAGE_KEY,
+      JSON.stringify({
+        activeId: activeInvoiceTabId.value,
+        tabs: invoiceTabs.value,
+      }),
+    )
+  } catch {}
+}
+
+function captureCurrentEditorSnapshot(existingTab = {}) {
+  return {
+    id: existingTab.id || activeInvoiceTabId.value || genTabId(),
+    sourceOrderId: existingTab.sourceOrderId || '',
+    sourceOrderStatus: existingTab.sourceOrderStatus || '',
+    maHoaDon: maHoaDon.value,
+    soHoaDon: soHoaDon.value,
+    ngayNhanHang: ngayNhanHang.value,
+    gioNhanHang: gioNhanHang.value,
+    phutNhanHang: phutNhanHang.value,
+    thoiGianNhanHang: thoiGianNhanHang.value,
+    hinhThucThanhToan: hinhThucThanhToan.value,
+    orderTableViewMode: orderTableViewMode.value,
+    globalGiamGia: Number(globalGiamGia.value || 0),
+    globalChietKhauPercent: Number(globalChietKhauPercent.value || 0),
+    items: JSON.parse(JSON.stringify(items.value || [])),
+    customer: {
+      maKhachHang: form.maKhachHang || '',
+      tenKhachHang: form.tenKhachHang || '',
+      soDienThoai: form.soDienThoai || '',
+      diaChi: form.diaChi || '',
+      ghiChu: form.ghiChu || '',
+      ghiChuDonHang: form.ghiChuDonHang || '',
+      isExistingCustomer: Boolean(isExistingCustomer),
+    },
+  }
+}
+
+function syncActiveTabSnapshot() {
+  if (isSwitchingTab || !activeInvoiceTabId.value) return
+  const idx = invoiceTabs.value.findIndex((t) => t.id === activeInvoiceTabId.value)
+  if (idx === -1) return
+  invoiceTabs.value[idx] = captureCurrentEditorSnapshot(invoiceTabs.value[idx])
+  saveTabsToStorage()
+}
+
+function applyTabToEditor(tab) {
+  if (!tab) return
+  isSwitchingTab = true
+  activeInvoiceTabId.value = tab.id
+  maHoaDon.value = tab.maHoaDon || genMaHoaDon()
+  soHoaDon.value = tab.soHoaDon || genSoHoaDon()
+
+  const delivery =
+    tab.ngayNhanHang && tab.gioNhanHang && tab.phutNhanHang
+      ? tab
+      : getDefaultDeliveryParts()
+  ngayNhanHang.value = delivery.ngayNhanHang
+  gioNhanHang.value = delivery.gioNhanHang
+  phutNhanHang.value = delivery.phutNhanHang
+  thoiGianNhanHang.value =
+    tab.thoiGianNhanHang || `${delivery.ngayNhanHang}T${delivery.gioNhanHang}:${delivery.phutNhanHang}`
+
+  hinhThucThanhToan.value = tab.hinhThucThanhToan || 'TIEN_MAT'
+  globalGiamGia.value = Number(tab.globalGiamGia || 0)
+  globalChietKhauPercent.value = Number(tab.globalChietKhauPercent || 0)
+  const loadedItems = Array.isArray(tab.items) ? JSON.parse(JSON.stringify(tab.items)) : []
+  items.value = loadedItems
+  orderTableViewMode.value =
+    tab.orderTableViewMode ||
+    (detectHasMultipleOrderMembers(loadedItems) ? 'by_member' : 'grouped')
+
+  const cust = tab.customer || {}
+  isExistingCustomer = Boolean(cust.isExistingCustomer || cust.maKhachHang)
+  form.maKhachHang = cust.maKhachHang || ''
+  form.tenKhachHang = cust.tenKhachHang || ''
+  form.soDienThoai = cust.soDienThoai || ''
+  form.diaChi = cust.diaChi || ''
+  form.ghiChu = cust.ghiChu || ''
+  form.ghiChuDonHang = cust.ghiChuDonHang || ''
+  lastCheckedName = form.tenKhachHang || ''
+  selectedTargetMemberKey.value = ''
+  highlightedIndex.value = -1
+  saveTabsToStorage()
+  nextTick(() => {
+    isSwitchingTab = false
+  })
+}
+
+function switchInvoiceTab(tabId) {
+  if (!tabId || tabId === activeInvoiceTabId.value) return
+  syncActiveTabSnapshot()
+  const target = invoiceTabs.value.find((t) => t.id === tabId)
+  if (target) applyTabToEditor(target)
+}
+
+function addNewInvoiceTab() {
+  syncActiveTabSnapshot()
+  const newTab = createBlankTabSnapshot()
+  invoiceTabs.value.push(newTab)
+  applyTabToEditor(newTab)
+}
+
+function closeInvoiceTab(tabId) {
+  syncActiveTabSnapshot()
+  const idx = invoiceTabs.value.findIndex((t) => t.id === tabId)
+  if (idx === -1) return
+
+  if (invoiceTabs.value.length === 1) {
+    const freshTab = createBlankTabSnapshot()
+    invoiceTabs.value = [freshTab]
+    applyTabToEditor(freshTab)
+    return
+  }
+
+  const wasActive = tabId === activeInvoiceTabId.value
+  invoiceTabs.value.splice(idx, 1)
+  if (wasActive) {
+    const nextTab = invoiceTabs.value[Math.min(idx, invoiceTabs.value.length - 1)]
+    applyTabToEditor(nextTab)
+  } else {
+    saveTabsToStorage()
+  }
+}
+
+function isTabUntouchedDraft(tab) {
+  if (!tab) return false
+  if (tab.sourceOrderId) return false
+  if (Array.isArray(tab.items) && tab.items.length > 0) return false
+  const cust = tab.customer || {}
+  return !cust.tenKhachHang && !cust.soDienThoai && !cust.diaChi && !cust.ghiChuDonHang
+}
+
+function getTabItemQty(tab) {
+  const list = tab?.id === activeInvoiceTabId.value ? items.value : tab?.items || []
+  return list.reduce((sum, it) => sum + Number(it?.soLuong ?? it?.So_luong ?? 0), 0)
+}
+
+function getTabDisplayTitle(tab, idx) {
+  const isActive = tab?.id === activeInvoiceTabId.value
+  const custName = String(
+    isActive ? form.tenKhachHang : tab?.customer?.tenKhachHang || '',
+  ).trim()
+  const shortCode = tab?.sourceOrderId
+    ? `#${String(tab.sourceOrderId).slice(-6)}`
+    : `Đơn ${idx + 1}`
+  if (custName) return `${shortCode} · ${custName}`
+  return shortCode
+}
+
+function mapServerOrderItemToPosRow(raw, maHD, soHD, ngayTaoStr) {
+  const giaGoc = Number(raw?.Gia_goc ?? 0) || 0
+  const giaBan = Number(raw?.Gia_ban ?? 0) || 0
+  const qty = Math.max(1, Number(raw?.So_luong ?? 1) || 1)
+  const giamGia = Number(raw?.Giam_gia ?? 0) || 0
+  const chietKhau = Number(raw?.Chiet_khau ?? 0) || 0
+  const d = calcDiscount(giaBan, qty, giamGia, chietKhau)
+  const thanhTien = Number(raw?.Thanh_tien) || giaBan * qty
+  const loiNhuan =
+    raw?.Loi_nhuan !== undefined
+      ? Number(raw.Loi_nhuan)
+      : (giaBan - d.ck1sp - giaGoc - giamGia) * qty
+  const currency = raw?.Don_vi_tien_te || 'P'
+  return {
+    Ma_hoa_don: maHD,
+    So_hoa_don: soHD,
+    Ngay_tao_duong_lich: ngayTaoStr || formatDateTimeVN(),
+    Ma_hang: raw?.Ma_hang || '',
+    Ten_hang: raw?.Ten_hang || '',
+    Trang_thai: raw?.Trang_thai || 'Còn hàng',
+    Danh_muc: raw?.Danh_muc || '',
+    Size: raw?.Size || '',
+    Dvt: raw?.Dvt || '',
+    Don_vi_tien_te: currency,
+    donViTienTe: currency,
+    So_luong: qty,
+    Gia_goc: giaGoc,
+    Gia_ban: giaBan,
+    Giam_gia: giamGia,
+    Tien_chiet_khau: Number(raw?.Tien_chiet_khau ?? d.chietKhauTien) || 0,
+    Thanh_tien: thanhTien,
+    Loi_nhuan: loiNhuan,
+    Ghi_chu: raw?.Ghi_chu || '',
+    ghiChuHang: raw?.Ghi_chu || '',
+    Nguoi_dat: raw?.Nguoi_dat || '',
+    Nguoi_dat_id: raw?.Nguoi_dat_id || '',
+    Added_by_role: raw?.Added_by_role || '',
+    soLuong: qty,
+    giaGoc,
+    giaBan,
+    chietKhau,
+    giamGia,
+    thanhTien,
+    loiNhuan,
+    tongGiamGiaTien: d.giamGiaTien,
+    tongChietKhauTien: Number(raw?.Tien_chiet_khau ?? d.chietKhauTien) || 0,
+    tongGiamTru: d.tongGiamTru,
+    tongGiamGiaDong: d.tongGiamTru,
+    maHang: raw?.Ma_hang || '',
+    tenHang: raw?.Ten_hang || '',
+    size: raw?.Size || '',
+    dvt: raw?.Dvt || '',
+    danhMuc: raw?.Danh_muc || '',
+    trangThai: raw?.Trang_thai || 'Còn hàng',
+  }
+}
+
+function initTabsFromStorage() {
+  let restoredTabs = []
+  let restoredActiveId = ''
+  try {
+    const raw = localStorage.getItem(INVOICE_TABS_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed?.tabs) && parsed.tabs.length > 0) {
+        restoredTabs = parsed.tabs
+        restoredActiveId = String(parsed.activeId || '')
+      }
+    }
+  } catch {}
+
+  if (restoredTabs.length > 0) {
+    invoiceTabs.value = restoredTabs
+    const found =
+      restoredTabs.find((t) => t.id === restoredActiveId) || restoredTabs[0]
+    applyTabToEditor(found)
+  } else {
+    const initialTab = createBlankTabSnapshot()
+    invoiceTabs.value = [initialTab]
+    applyTabToEditor(initialTab)
+  }
+}
+
+let isImportingOrderQuery = false
+async function openApprovedOrdersFromQuery() {
+  const singleId = String(route.query?.orderId || '').trim()
+  const multiIds = String(route.query?.orderIds || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const targetIds = [...new Set([...(singleId ? [singleId] : []), ...multiIds])]
+  if (!targetIds.length || isImportingOrderQuery) return
+
+  isImportingOrderQuery = true
+  try {
+    syncActiveTabSnapshot()
+    let lastActivatedId = ''
+    let importedCount = 0
+
+    for (const orderId of targetIds) {
+      const existingTab = invoiceTabs.value.find(
+        (t) => t.sourceOrderId === orderId || t.maHoaDon === orderId,
+      )
+      if (existingTab) {
+        lastActivatedId = existingTab.id
+        continue
+      }
+
+      const res = await getOrderForInvoice(orderId)
+      if (!res?.success || !res.order) {
+        toast('warn', `Không tải được đơn #${orderId}`)
+        continue
+      }
+
+      const ord = res.order
+      const delivery = parseDeliveryToInputs(ord.Thoi_gian_nhan_hang)
+      const maHD = ord.Ma_hoa_don || orderId
+      const soHD = ord.So_hoa_don || genSoHoaDon()
+      const nowStr = formatDateTimeVN()
+      const mappedItems = (res.items || []).map((it) =>
+        mapServerOrderItemToPosRow(it, maHD, soHD, nowStr),
+      )
+
+      const itemGiamGiaSum = mappedItems.reduce((s, it) => s + (it.tongGiamGiaTien || 0), 0)
+      const globalMoneyDiscount = Math.max(0, Number(ord.Tong_giam_gia || 0) - itemGiamGiaSum)
+
+      const tabData = createBlankTabSnapshot({
+        sourceOrderId: maHD,
+        sourceOrderStatus: ord.Trang_thai || 'Chờ duyệt',
+        maHoaDon: maHD,
+        soHoaDon: soHD,
+        ngayNhanHang: delivery.ngayNhanHang,
+        gioNhanHang: delivery.gioNhanHang,
+        phutNhanHang: delivery.phutNhanHang,
+        thoiGianNhanHang: delivery.thoiGianNhanHang,
+        hinhThucThanhToan:
+          ord.Hinh_thuc_thanh_toan === 'CHUYEN_KHOAN' ? 'CHUYEN_KHOAN' : 'TIEN_MAT',
+        orderTableViewMode: detectHasMultipleOrderMembers(mappedItems) ? 'by_member' : 'grouped',
+        globalGiamGia: globalMoneyDiscount,
+        globalChietKhauPercent: 0,
+        items: mappedItems,
+        customer: {
+          maKhachHang: ord.Ma_khach_hang || '',
+          tenKhachHang: ord.Ten_khach_hang || '',
+          soDienThoai: ord.So_dien_thoai || '',
+          diaChi: ord.Dia_chi || '',
+          ghiChu: '',
+          ghiChuDonHang: ord.Ghi_chu || '',
+          isExistingCustomer: Boolean(ord.Ma_khach_hang),
+        },
+      })
+
+      const currentTab = invoiceTabs.value.find((t) => t.id === activeInvoiceTabId.value)
+      if (importedCount === 0 && isTabUntouchedDraft(currentTab)) {
+        const currentIdx = invoiceTabs.value.findIndex((t) => t.id === currentTab.id)
+        tabData.id = currentTab.id
+        invoiceTabs.value[currentIdx] = tabData
+      } else {
+        invoiceTabs.value.push(tabData)
+      }
+      lastActivatedId = tabData.id
+      importedCount += 1
+    }
+
+    if (lastActivatedId) {
+      const targetTab = invoiceTabs.value.find((t) => t.id === lastActivatedId)
+      if (targetTab) applyTabToEditor(targetTab)
+      if (isMobile.value) {
+        activeMobileTab.value = 'order'
+      }
+      if (importedCount > 0) {
+        toast(
+          'success',
+          importedCount === 1
+            ? `Đã nạp đơn #${targetIds[targetIds.length - 1]} vào tab hóa đơn`
+            : `Đã mở ${importedCount} tab đơn hàng`,
+        )
+      }
+    }
+
+    await router.replace({ name: 'nhap-hoa-don' })
+  } catch (err) {
+    console.error('openApprovedOrdersFromQuery failed:', err)
+    toast('error', 'Không thể mở đơn hàng sang Nhập hóa đơn')
+  } finally {
+    isImportingOrderQuery = false
+  }
 }
 
 function removeToast(id) {
@@ -1804,11 +2868,41 @@ function openSuccessModal(message) {
   showSuccessModal.value = true
 }
 
-function confirmSuccessReload() {
+async function confirmSuccessReload() {
   showSuccessModal.value = false
-  const route = router.resolve({ name: 'admin-don-hang' })
-  window.location.assign(route.href)
+  if (activeInvoiceTabId.value) {
+    closeInvoiceTab(activeInvoiceTabId.value)
+  }
+  try {
+    const res = await getOneSheet('don_hang')
+    if (Array.isArray(res?.data)) {
+      donHangList.value = res.data
+    }
+  } catch {}
 }
+
+watch(
+  () => [route.query?.orderId, route.query?.orderIds],
+  ([orderId, orderIds]) => {
+    if (orderId || orderIds) {
+      openApprovedOrdersFromQuery()
+    }
+  },
+)
+
+onActivated(() => {
+  if (route.query?.orderId || route.query?.orderIds) {
+    openApprovedOrdersFromQuery()
+  }
+})
+
+watch(
+  donHangList,
+  () => {
+    syncTabsStatusFromDonHang()
+  },
+  { deep: true },
+)
 
 onMounted(async () => {
   checkMobile()
@@ -1816,149 +2910,163 @@ onMounted(async () => {
 
   isLoadingProducts.value = true
   isLoadingCustomer.value = true // Start loading customer data
-  maHoaDon.value = genMaHoaDon()
-  thoiGianNhanHang.value = formatDateTimeLocal()
-  const split = splitDateTimeLocal(thoiGianNhanHang.value)
-  ngayNhanHang.value = split.date
-  const timeParts = (split.time || '00:00').split(':')
-  gioNhanHang.value = timeParts[0] || '00'
-  phutNhanHang.value = timeParts[1] || '00'
+  initTabsFromStorage()
 
   try {
-    const res = await fetch(`${API_URL}?action=all&_=${Date.now()}`)
-    const json = await res.json()
+    const json = await getSheets([
+      'khach_hang',
+      'hang_hoa',
+      'don_hang',
+      'khuyenmai_info',
+      'so_thu_chi',
+      'thong_tin_chuyen_khoan',
+      'logo',
+      'shop_contact',
+      'time',
+    ])
 
     khachHangList.value = json.data.khach_hang || []
     hangHoaList.value = json.data.hang_hoa || []
-    nccList.value = json.data.nha_cung_cap || []
     donHangList.value = json.data.don_hang || []
+    hasLoadedDonHang.value = true
+    syncTabsStatusFromDonHang()
     khuyenMaiList.value = json.data.khuyenmai_info || []
     soThuChiList.value = json.data.so_thu_chi || []
     thongTinChuyenKhoanList.value = json.data.thong_tin_chuyen_khoan || []
 
-    if (nccList.value.length > 0) {
-      const defaultNCC = nccList.value[0]
-      form.maNCC = defaultNCC.Ma_nha_cung_cap
-      form.tenNCC = defaultNCC.Ten_nha_cung_cap
+    const firstCK = thongTinChuyenKhoanList.value[0]
+    if (firstCK) {
+      tiGia.value = Number(firstCK.Ti_gia || 1)
+      donViTienTeCK.value = firstCK.Don_vi_tien_te || 'VND'
     }
 
-    soHoaDon.value = genSoHoaDon()
-    logoInfo.value = (json.data.logo || []).find(
-      l => l.Ma_nha_cung_cap === form.maNCC
-    ) || null
-
-    if (logoInfo.value?.URL) {
-      try {
-        logoInfo.value.base64 = await imageToBase64(logoInfo.value.URL)
-      } catch (e) {
-        logoInfo.value.base64 = null
-      }
+    // Nếu tab khởi tạo chưa có đơn nào và chưa có số hóa đơn theo donHangList mới nhất -> cập nhật số hóa đơn sạch
+    const activeTab = invoiceTabs.value.find((t) => t.id === activeInvoiceTabId.value)
+    if (activeTab && !activeTab.sourceOrderId && (!activeTab.items || activeTab.items.length === 0)) {
+      soHoaDon.value = genSoHoaDon()
+      syncActiveTabSnapshot()
     }
 
-    shopContactList.value = (json.data.shop_contact || []).filter(
-      c => c.Ma_nha_cung_cap === form.maNCC
-    )
-
-    // Convert Shop Contact Images
-    for (const contact of shopContactList.value) {
-      if (contact.URL_img) {
-        try {
-          contact.URL_img_base64 = await imageToBase64(contact.URL_img)
-        } catch (e) {
-          contact.URL_img_base64 = null
-        }
-      }
-    }
-
-    // Convert Chuyen Khoan QR Images
-    for (const r of thongTinChuyenKhoanList.value) {
-      if (r.QR_IMG) {
-        try {
-          r.QR_IMG_base64 = await imageToBase64(r.QR_IMG)
-        } catch (e) {
-          r.QR_IMG_base64 = null
-        }
-      }
-    }
+    logoInfo.value = (json.data.logo || [])[0] || null
+    shopContactList.value = json.data.shop_contact || []
 
     // Time Data
-    const timeData = (json.data.time || []).find(
-      t => t.Ma_nha_cung_cap === form.maNCC
-    )
+    const timeData = (json.data.time || [])[0] || null
     thoiGianHoatDongShop.value = timeData?.thoi_gian_hoat_dong_shop || ''
 
-    // Convert Product Images & Init Data
+    // Init Product Qty & UI Maps immediately (no blocking image downloads)
     for (const product of hangHoaList.value) {
       productQty[product.Ma_hang] = 1
       productNotes[product.Ma_hang] = ''
       notePopoverOpen[product.Ma_hang] = false
       cardHighlight[product.Ma_hang] = false
-
-      if (product.Main_img) {
-        try {
-          product.Main_img_base64 = await imageToBase64(product.Main_img)
-        } catch (e) {
-          product.Main_img_base64 = null
-        }
-      }
-
-      for (let i = 1; i <= 6; i++) {
-        const imgKey = `img_${i}`
-        if (product[imgKey]) {
-          try {
-            product[`${imgKey}_base64`] = await imageToBase64(product[imgKey])
-          } catch (e) {
-            product[`${imgKey}_base64`] = null
-          }
-        }
-      }
     }
 
-    // Init Delivery Time (Now + 10 mins)
-    const now = new Date()
-    now.setMinutes(now.getMinutes() + 10)
-    
-    const y = now.getFullYear()
-    const m = String(now.getMonth() + 1).padStart(2, '0')
-    const d = String(now.getDate()).padStart(2, '0')
-    ngayNhanHang.value = `${y}-${m}-${d}`
-    
-    gioNhanHang.value = String(now.getHours()).padStart(2, '0')
-    phutNhanHang.value = String(now.getMinutes()).padStart(2, '0')
+    await openApprovedOrdersFromQuery()
 
+    unsubDonHangRealtime = subscribeSheet('don_hang', (rows) => {
+      donHangList.value = rows || []
+      hasLoadedDonHang.value = true
+      syncTabsStatusFromDonHang()
+    })
   } catch (error) {
     console.error('Error fetching data:', error)
     toast('error', 'Lỗi tải dữ liệu')
   } finally {
     isLoadingProducts.value = false
-    isLoadingCustomer.value = false // Data fetch complete
+    isLoadingCustomer.value = false
+  }
+
+  // Tải ngầm base64 cho riêng 5 ảnh xuất bill (Logo, Contact icons, QR) — không chặn giao diện
+  warmBillAssetsBase64()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkMobile)
+  if (typeof unsubDonHangRealtime === 'function') {
+    unsubDonHangRealtime()
+    unsubDonHangRealtime = null
   }
 })
 
-async function imageToBase64(url) {
-  const res = await fetch(url)
-  const blob = await res.blob()
+function warmBillAssetsBase64() {
+  const tasks = []
 
-  return await new Promise((resolve) => {
-    const reader = new FileReader()
-    reader.onloadend = () => resolve(reader.result)
-    reader.readAsDataURL(blob)
-  })
+  if (logoInfo.value?.URL) {
+    tasks.push(
+      imageToBase64(logoInfo.value.URL)
+        .then((b64) => {
+          if (logoInfo.value) logoInfo.value.base64 = b64
+        })
+        .catch(() => {
+          if (logoInfo.value) logoInfo.value.base64 = null
+        }),
+    )
+  }
+
+  for (const contact of shopContactList.value) {
+    if (contact.URL_img) {
+      tasks.push(
+        imageToBase64(contact.URL_img)
+          .then((b64) => {
+            contact.URL_img_base64 = b64
+          })
+          .catch(() => {
+            contact.URL_img_base64 = null
+          }),
+      )
+    }
+  }
+
+  for (const r of thongTinChuyenKhoanList.value) {
+    if (r.QR_IMG) {
+      tasks.push(
+        imageToBase64(r.QR_IMG)
+          .then((b64) => {
+            r.QR_IMG_base64 = b64
+          })
+          .catch(() => {
+            r.QR_IMG_base64 = null
+          }),
+      )
+    }
+  }
+
+  Promise.allSettled(tasks)
+}
+
+async function imageToBase64(url) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 4000)
+  try {
+    const res = await fetch(url, { signal: controller.signal })
+    const blob = await res.blob()
+
+    return await new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result)
+      reader.readAsDataURL(blob)
+    })
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 
 
 function genSoHoaDon() {
-  if (!donHangList.value.length) return 'OD-0001'
+  const candidates = [
+    ...donHangList.value.map((d) => d?.So_hoa_don),
+    ...invoiceTabs.value.map((t) => t?.soHoaDon),
+  ]
+  if (!candidates.length) return 'OD-0001'
 
-  const max = Math.max(
-    ...donHangList.value
-      .map((d) => {
-        if (!d.So_hoa_don) return 0
-        const num = parseInt(d.So_hoa_don.replace('OD-', ''))
-        return isNaN(num) ? 0 : num
-      })
-  )
+  const nums = candidates.map((s) => {
+    if (!s) return 0
+    const num = parseInt(String(s).replace('OD-', ''), 10)
+    return isNaN(num) ? 0 : num
+  })
+  const max = Math.max(0, ...nums)
 
   return 'OD-' + String(max + 1).padStart(4, '0')
 }
@@ -1976,50 +3084,24 @@ function genMaKhachHang(ten, sdt, diaChi) {
   return `${partTen}_${partSdt}_${partDc}`
 }
 
-const tonKhoHienTai = computed(() => {
-  if (!form.maHang) return 999 // ✅ Mặc định 999 cho hàng mới
-  
-  const hang = hangHoaList.value.find(h => h.Ma_hang === form.maHang)
-  return hang ? Number(hang.So_luong_kho || 0) : 999 // ✅ Trả về 999 nếu không tìm thấy
-})
+function isOutOfStock(product) {
+  return String(product?.Trang_thai || '').trim() === 'Hết hàng'
+}
 
-const tonKhoStatus = computed(() => {
-  if (!form.maHang) return { color: '#16a34a', text: '✅ Hàng mới (999)' }
-  
-  const ton = tonKhoHienTai.value
-  
-  if (ton === 0) {
-    return { color: '#dc2626', text: '❌ Hết hàng' }
-  }
-  
-  if (ton < 10) {
-    return { color: '#f59e0b', text: `⚠️ Sắp hết (${ton})` }
-  }
-  
-  return { color: '#16a34a', text: `✅ Còn ${ton}` }
+const isManualOutOfStock = computed(() => {
+  if (!form.maHang) return false
+  const hang = hangHoaList.value.find(h => h.Ma_hang === form.maHang)
+  return hang ? isOutOfStock(hang) : false
 })
 
 const stockColorClass = computed(() => {
-  const ton = tonKhoHienTai.value
-  
-  if (ton === 0) return 'text-danger' // Đỏ - Hết hàng
-  if (ton < 10) return 'text-warning' // Vàng - Sắp hết
-  return 'text-success' // Xanh - Còn hàng
+  return isManualOutOfStock.value ? 'text-danger' : 'text-success'
 })
 
-const tonKhoInModal = computed(() => {
-  if (!editItem.maHang) return 0
-  
+const isEditModalOutOfStock = computed(() => {
+  if (!editItem.maHang) return false
   const hang = hangHoaList.value.find(h => h.Ma_hang === editItem.maHang)
-  return hang ? Number(hang.So_luong_kho || 0) : 0
-})
-
-const stockColorInModal = computed(() => {
-  const ton = tonKhoInModal.value
-  
-  if (ton === 0) return '#dc2626'
-  if (ton < 10) return '#f59e0b'
-  return '#16a34a'
+  return hang ? isOutOfStock(hang) : false
 })
 
 /* ================= FORM ================= */
@@ -2030,15 +3112,12 @@ const form = reactive({
   diaChi: '',
   ghiChu: '',
   ghiChuDonHang: '',
-  maNCC: '',
-  tenNCC: '',
   maHang: '',
   tenHang: '',
   danhMuc: '',
   size: '',
   dvt: '',
-  lang: 'vi',
-  donViTienTe: 'VND',
+  donViTienTe: 'P',
   giaGoc: 0,
   chietKhau: 0,
   giamGia: 0,
@@ -2049,15 +3128,7 @@ const form = reactive({
 })
 
 /* ================= TỈ GIÁ & CHUYỂN KHOẢN (AUTO) ================= */
-const ckInfoList = computed(() => {
-  return thongTinChuyenKhoanList.value.filter(x => x.Ma_nha_cung_cap === form.maNCC)
-})
-
-watch(() => form.maNCC, (newMa) => {
-  const info = thongTinChuyenKhoanList.value.find(x => x.Ma_nha_cung_cap === newMa)
-  tiGia.value = Number(info?.Ti_gia || 1)
-  donViTienTeCK.value = info?.Don_vi_tien_te || 'VND'
-}, { immediate: true })
+const ckInfoList = computed(() => thongTinChuyenKhoanList.value)
 
 const tongChuyenKhoan = computed(() => {
   const rate = Number(tiGia.value || 1)
@@ -2083,6 +3154,7 @@ let isExistingCustomer = false
 watch(
   () => [form.tenKhachHang, form.soDienThoai, form.diaChi],
   () => {
+    if (isSwitchingTab) return
     if (!isExistingCustomer) {
       form.maKhachHang = genMaKhachHang(
         form.tenKhachHang,
@@ -2136,13 +3208,11 @@ function handleTenKhachChange(event) {
 watch(
   () => form.tenHang,
   () => {
-    const h = hangHoaList.value.find((x) => x.Ten_hang === form.tenHang)
+    const h = localizedHangHoaList.value.find((x) => x.Ten_hang === form.tenHang)
 
     if (!h) return
 
     form.maHang = h.Ma_hang
-    form.maNCC = h.Ma_nha_cung_cap
-    form.tenNCC = nccList.value.find(n => n.Ma_nha_cung_cap === h.Ma_nha_cung_cap)?.Ten_nha_cung_cap || ''
     form.danhMuc = h.Danh_muc
     form.size = h.Size
     form.dvt = h.Dvt
@@ -2155,8 +3225,7 @@ watch(
     }
     
     form.trangThai = h.Trang_thai
-    form.lang = h.Lang || 'vi'
-    form.donViTienTe = h.Don_vi_tien_te || 'VND'
+    form.donViTienTe = h.Don_vi_tien_te || 'P'
   }
 )
 
@@ -2171,20 +3240,264 @@ const trangThaiList = computed(() => {
 const items = ref([])
 const highlightedIndex = ref(-1)
 
+function setOrderTableViewMode(mode) {
+  orderTableViewMode.value = mode === 'by_member' ? 'by_member' : 'grouped'
+}
+
+function getOrderPrimaryMemberHint(list = items.value) {
+  const formName = String(form.tenKhachHang || '').trim()
+  const nonAdminItems = (Array.isArray(list) ? list : []).filter(
+    (it) => it && it.Added_by_role !== 'admin' && it.Nguoi_dat !== 'Quán thêm',
+  )
+  const hostItem =
+    nonAdminItems.find((it) => it.Added_by_role === 'host') ||
+    nonAdminItems.find(
+      (it) => formName && String(it.Nguoi_dat || '').trim().toLowerCase() === formName.toLowerCase(),
+    ) ||
+    nonAdminItems[0]
+
+  const primaryId = String(hostItem?.Nguoi_dat_id || '').trim()
+  const primaryName =
+    String(hostItem?.Nguoi_dat || '').trim() ||
+    formName ||
+    (detectHasMultipleOrderMembers(list) ? 'Trưởng nhóm' : 'Khách lẻ')
+  const primaryKey = primaryId ? `m:${primaryId}` : `name:${primaryName.toLowerCase()}`
+
+  return {
+    primaryId,
+    primaryName,
+    primaryKey,
+    formName,
+  }
+}
+
+function resolveMemberGroupKeyForItem(item, hint = getOrderPrimaryMemberHint()) {
+  if (item?.Added_by_role === 'admin' || item?.Nguoi_dat === 'Quán thêm') {
+    return '__admin__'
+  }
+  const mId = String(item?.Nguoi_dat_id || '').trim()
+  if (mId) return `m:${mId}`
+
+  const rawName = String(item?.Nguoi_dat || '').trim()
+  if (!rawName || rawName.toLowerCase() === hint.primaryName.toLowerCase()) {
+    return hint.primaryKey
+  }
+  return `name:${rawName.toLowerCase()}`
+}
+
+const invoiceMemberGroups = computed(() => {
+  const hasMultiplePeople = detectHasMultipleOrderMembers(items.value)
+  const hint = getOrderPrimaryMemberHint(items.value)
+  const groupsMap = new Map()
+
+  items.value.forEach((item, idx) => {
+    const qty = Number(item?.soLuong ?? item?.So_luong ?? 0)
+    const net = Number(item?.thanhTien || 0) - Number(item?.tongGiamTru || 0)
+
+    if (item?.Added_by_role === 'admin' || item?.Nguoi_dat === 'Quán thêm') {
+      const adminKey = '__admin__'
+      if (!groupsMap.has(adminKey)) {
+        groupsMap.set(adminKey, {
+          groupKey: adminKey,
+          memberId: 'admin',
+          name: 'Quán thêm / Phụ phí',
+          role: 'admin',
+          badge: 'Quán thêm',
+          totalQty: 0,
+          subtotal: 0,
+          entries: [],
+        })
+      }
+      const grp = groupsMap.get(adminKey)
+      grp.entries.push({ item, idx })
+      grp.totalQty += qty
+      grp.subtotal += net
+      return
+    }
+
+    const mId = String(item?.Nguoi_dat_id || '').trim()
+    const rawName = String(item?.Nguoi_dat || '').trim()
+    const gKey = resolveMemberGroupKeyForItem(item, hint)
+
+    if (!groupsMap.has(gKey)) {
+      const isHostLine =
+        gKey === hint.primaryKey ||
+        item?.Added_by_role === 'host'
+      const role = isHostLine ? 'host' : 'guest'
+      groupsMap.set(gKey, {
+        groupKey: gKey,
+        memberId: mId || (isHostLine ? hint.primaryId : ''),
+        name: rawName || (isHostLine ? hint.primaryName : 'Thành viên'),
+        role,
+        badge: hasMultiplePeople ? (role === 'host' ? 'Trưởng nhóm' : 'Thành viên') : '',
+        totalQty: 0,
+        subtotal: 0,
+        entries: [],
+      })
+    }
+
+    const grp = groupsMap.get(gKey)
+    if (!grp.memberId && mId) grp.memberId = mId
+    if ((!grp.name || grp.name === 'Thành viên') && rawName) {
+      grp.name = rawName
+    }
+    grp.entries.push({ item, idx })
+    grp.totalQty += qty
+    grp.subtotal += net
+  })
+
+  const rank = { host: 0, guest: 1, admin: 2 }
+  return Array.from(groupsMap.values()).sort(
+    (a, b) => (rank[a.role] ?? 1) - (rank[b.role] ?? 1),
+  )
+})
+
+const invoiceOrderMembers = computed(() => invoiceMemberGroups.value)
+const showMemberTargetBar = computed(() => invoiceOrderMembers.value.length > 1)
+
+const activeTargetMemberKey = computed(() => {
+  const members = invoiceOrderMembers.value
+  if (!members.length) return ''
+  const matched = members.find((m) => m.groupKey === selectedTargetMemberKey.value)
+  return matched ? matched.groupKey : members[0].groupKey
+})
+
+function selectTargetMember(groupKey, options = {}) {
+  if (!groupKey) return
+  selectedTargetMemberKey.value = groupKey
+  if (options.goToEntry && isMobile.value) {
+    setMobileTab('entry')
+  }
+}
+
+function getTargetMemberPayload() {
+  const members = invoiceOrderMembers.value
+  if (members.length > 0) {
+    const chosen =
+      members.find((m) => m.groupKey === activeTargetMemberKey.value) || members[0]
+    return {
+      groupKey: chosen.groupKey,
+      Nguoi_dat: chosen.role === 'admin' ? 'Quán thêm' : chosen.name,
+      Nguoi_dat_id: chosen.memberId || '',
+      Added_by_role: chosen.role || 'host',
+    }
+  }
+  const primaryName = String(form.tenKhachHang || '').trim()
+  return {
+    groupKey: primaryName ? `name:${primaryName.toLowerCase()}` : '',
+    Nguoi_dat: primaryName,
+    Nguoi_dat_id: '',
+    Added_by_role: 'host',
+  }
+}
+
+function isSameItemOwner(item, target) {
+  if (!item || !target) return true
+  if (invoiceOrderMembers.value.length <= 1) return true
+  const hint = getOrderPrimaryMemberHint(items.value)
+  return resolveMemberGroupKeyForItem(item, hint) === target.groupKey
+}
+
+const groupedOrderDisplayItems = computed(() => {
+  const hasMultiplePeople = detectHasMultipleOrderMembers(items.value)
+  const fallbackPrimary = String(form.tenKhachHang || '').trim() || 'Khách lẻ'
+  const groups = new Map()
+
+  items.value.forEach((item, idx) => {
+    const codeKey = item?.maHang || item?.Ma_hang || item?.tenHang || ''
+    const sizeKey = item?.size || item?.Size || ''
+    const dvtKey = item?.dvt || item?.Dvt || ''
+    const currency = item?.donViTienTe || item?.Don_vi_tien_te || 'P'
+    const giaBan = Number(item?.giaBan ?? item?.Gia_ban ?? 0)
+    const gKey = `${codeKey}__${sizeKey}__${dvtKey}__${currency}__${giaBan}`
+
+    if (!groups.has(gKey)) {
+      groups.set(gKey, {
+        groupKey: gKey,
+        maHang: codeKey,
+        tenHang: item?.tenHang || item?.Ten_hang || '',
+        size: sizeKey,
+        dvt: dvtKey,
+        donViTienTe: currency,
+        giaBan,
+        totalQty: 0,
+        thanhTien: 0,
+        tongChietKhauTien: 0,
+        tongGiamGiaTien: 0,
+        tongGiamTru: 0,
+        netTotal: 0,
+        loiNhuan: 0,
+        notesSet: new Set(),
+        entries: [],
+      })
+    }
+
+    const grp = groups.get(gKey)
+    const qty = Number(item?.soLuong ?? item?.So_luong ?? 0)
+    const thanhTien = Number(item?.thanhTien ?? item?.Thanh_tien ?? 0)
+    const tongCK = Number(item?.tongChietKhauTien ?? item?.Tien_chiet_khau ?? 0)
+    const tongGiam = Number(item?.tongGiamGiaTien ?? 0)
+    const tongTru = Number(item?.tongGiamTru ?? item?.tongGiamGiaDong ?? 0)
+    const loiNhuan = Number(item?.loiNhuan ?? item?.Loi_nhuan ?? 0)
+
+    grp.totalQty += qty
+    grp.thanhTien += thanhTien
+    grp.tongChietKhauTien += tongCK
+    grp.tongGiamGiaTien += tongGiam
+    grp.tongGiamTru += tongTru
+    grp.netTotal += thanhTien - tongTru
+    grp.loiNhuan += loiNhuan
+
+    const noteStr = String(item?.ghiChuHang || item?.Ghi_chu || '').trim()
+    if (noteStr) grp.notesSet.add(noteStr)
+
+    const isAdminRow = item?.Added_by_role === 'admin' || item?.Nguoi_dat === 'Quán thêm'
+    const role = isAdminRow ? 'admin' : item?.Added_by_role || 'host'
+    const personName = isAdminRow
+      ? 'Quán thêm'
+      : String(item?.Nguoi_dat || '').trim() || fallbackPrimary
+
+    grp.entries.push({ item, idx, personName, role })
+  })
+
+  return Array.from(groups.values()).map((grp) => ({
+    ...grp,
+    combinedNotes: Array.from(grp.notesSet).join('; '),
+    showMemberBreakdown:
+      hasMultiplePeople ||
+      grp.entries.some((e) => Boolean(e.item?.Nguoi_dat || e.item?.Added_by_role)),
+  }))
+})
+
+function deleteGroupedOrderItem(grp) {
+  if (!grp || !Array.isArray(grp.entries) || !grp.entries.length) return
+  if (grp.entries.length === 1) {
+    deleteItem(grp.entries[0].idx)
+    return
+  }
+  if (
+    confirm(
+      `Xóa toàn bộ ${grp.totalQty} phần "${grp.tenHang}" (gồm ${grp.entries.length} dòng) khỏi đơn?`,
+    )
+  ) {
+    const indicesDesc = grp.entries.map((e) => e.idx).sort((a, b) => b - a)
+    for (const idx of indicesDesc) {
+      if (idx >= 0 && idx < items.value.length) {
+        items.value.splice(idx, 1)
+      }
+    }
+  }
+}
+
 function highlightRow(index) {
   if (index === -1) return
   highlightedIndex.value = index
   
   // Update scroll with nextTick
   nextTick(() => {
-    const tableWrap = document.querySelector('.order-table-wrap')
-    if (tableWrap) {
-      const rows = tableWrap.querySelectorAll('tbody tr')
-      const targetRow = rows[index]
-      if (targetRow) {
-        // Precise scroll within the overflow container
-        targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }
+    const targetRow = document.querySelector('.order-table-wrap tr.row-highlight, .order-card.is-highlight')
+    if (targetRow) {
+      targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
   })
 
@@ -2260,12 +3573,10 @@ const customerProfit = computed(() => {
 })
 
 const khuyenMaiText = computed(() => {
-  if (!form.maNCC) return ''
   const kms = khuyenMaiList.value
-    .filter(km => km.Ma_nha_cung_cap === form.maNCC)
-    .map(km => km.Noi_dung)
+    .map((km) => resolveNoticeText(km, selectedLang.value || 'vi'))
     .filter(Boolean)
-  
+
   return kms.map(k => `* ${k}`).join('\n')
 })
 
@@ -2280,44 +3591,34 @@ const hasActiveFilters = computed(() => {
 })
 
 const allFilteredProducts = computed(() => {
-  let products = hangHoaList.value
+  let products = localizedHangHoaList.value
 
-  // 1. Search
+  // 1. Search across all 5 languages + Ma_hang
   if (searchProduct.value) {
-    const search = searchProduct.value.toLowerCase()
-    products = products.filter(p => 
-      p.Ten_hang?.toLowerCase().includes(search) ||
-      p.Mo_ta?.toLowerCase().includes(search) ||
-      p.Ma_hang?.toLowerCase().includes(search)
-    )
+    products = products.filter((p) => productMatchesKeyword(p, searchProduct.value))
   }
 
-  // 2. Filter Language
-  if (selectedLang.value) {
-    products = products.filter(p => (p.Lang || 'vi') === selectedLang.value)
-  }
-
-  // 3. Filter Category
+  // 2. Filter Category
   if (selectedCategory.value) {
     products = products.filter(p => p.Danh_muc === selectedCategory.value)
   }
 
-  // 4. Filter Promotion
+  // 3. Filter Promotion
   if (onlyPromotion.value) {
     products = products.filter(p => Number(p.Gia_Giam || 0) > 0)
   }
 
-  // 5. Filter Size
+  // 4. Filter Size
   if (selectedSize.value) {
     products = products.filter(p => p.Size === selectedSize.value)
   }
 
-  // 6. Filter Stock Status
+  // 5. Filter Stock Status (Còn hàng / Hết hàng)
   if (selectedStockStatus.value !== 'all') {
     if (selectedStockStatus.value === 'in') {
-      products = products.filter(p => Number(p.So_luong_kho || 0) > 0)
+      products = products.filter(p => !isOutOfStock(p))
     } else if (selectedStockStatus.value === 'out') {
-      products = products.filter(p => Number(p.So_luong_kho || 0) === 0)
+      products = products.filter(p => isOutOfStock(p))
     }
   }
 
@@ -2325,11 +3626,14 @@ const allFilteredProducts = computed(() => {
 })
 
 const filteredProducts = computed(() => {
-  // Pagination based on filtered results
   return allFilteredProducts.value
 })
 
 const totalPages = computed(() => 1)
+
+watch(selectedLang, () => {
+  selectedCategory.value = ''
+})
 
 // Reset page when any filter changes
 watch([searchProduct, selectedLang, onlyPromotion, selectedSize], () => {
@@ -2460,37 +3764,26 @@ function addItem() {
   form.tenHang = tenHangTrim
 
   const hasMaHang = !!form.maHang
-  const tonKho = tonKhoHienTai.value
 
-  if (hasMaHang) {
-    if (tonKho === 0) {
-      toast('error', '? S?n ph?m n…y da H?T HANG trong kho!')
-      return
-    }
-
-    if (form.soLuong > tonKho) {
-      toast(
-        'error',
-        `? KHONG D? HANG TRONG KHO!\n\n` +
-        `T?n kho hi?n t?i: ${tonKho} ${form.dvt}\n` +
-        `B?n dang nh?p: ${form.soLuong} ${form.dvt}\n\n` +
-        `Vui l•ng gi?m s? lu?ng ho?c nh?p thˆm h…ng v…o kho.`
-      )
-      return
-    }
+  if (hasMaHang && isManualOutOfStock.value) {
+    toast('error', '❌ Sản phẩm này đang ở trạng thái HẾT HÀNG!')
+    return
   }
+
+  const targetMember = getTargetMemberPayload()
 
   /* ===== CHECK EXISTS & AGGREGATE ===== */
   let existingItemIndex = -1
   if (hasMaHang) {
     const maHangKey = form.maHang
-    const sizeKey = form.size
-    const dvtKey = form.dvt
+    const sizeKey = form.size || ''
+    const dvtKey = form.dvt || ''
     
     existingItemIndex = items.value.findIndex(i => 
       (i.Ma_hang || i.maHang) === maHangKey && 
-      i.Size === sizeKey && 
-      i.Dvt === dvtKey
+      (i.Size ?? i.size ?? '') === sizeKey && 
+      (i.Dvt ?? i.dvt ?? '') === dvtKey &&
+      isSameItemOwner(i, targetMember)
     )
   }
   if (existingItemIndex > -1) {
@@ -2500,19 +3793,6 @@ function addItem() {
     // Calculate new total quantity
     const qtyToAdd = form.soLuong || 1
     const newQty = existingItem.So_luong + qtyToAdd
-    
-    // Check stock limit
-    if (newQty > tonKho) {
-      toast(
-        'error',
-        `❌ KHÔNG ĐỦ HÀNG TRONG KHO!\n\n` +
-        `Tồn kho hiện tại: ${tonKho} ${form.dvt}\n` +
-        `Đã có trong đơn: ${existingItem.So_luong} ${form.dvt}\n` +
-        `Bạn thêm: ${qtyToAdd} ${form.dvt}\n` +
-        `Tổng cộng: ${newQty} ${form.dvt} (Vượt quá tồn kho)\n\n`
-      )
-      return
-    }
 
     // Recalculate financial fields
     const giaBan = form.giaBan
@@ -2536,6 +3816,9 @@ function addItem() {
     existingItem.tongGiamGiaDong = d.tongGiamTru
     existingItem.Loi_nhuan = Loi_nhuan
     existingItem.loiNhuan = Loi_nhuan
+    if (!existingItem.Nguoi_dat && targetMember.Nguoi_dat) existingItem.Nguoi_dat = targetMember.Nguoi_dat
+    if (!existingItem.Nguoi_dat_id && targetMember.Nguoi_dat_id) existingItem.Nguoi_dat_id = targetMember.Nguoi_dat_id
+    if (!existingItem.Added_by_role && targetMember.Added_by_role) existingItem.Added_by_role = targetMember.Added_by_role
     
     // Merge Notes
     if (form.ghiChuHang && form.ghiChuHang !== existingItem.Ghi_chu) {
@@ -2545,7 +3828,8 @@ function addItem() {
       existingItem.ghiChuHang = existingItem.Ghi_chu
     }
 
-    toast('success', `✅ Đã cộng dồn +${qtyToAdd} vào ${form.tenHang}`)
+    const ownerSuffix = showMemberTargetBar.value && targetMember.Nguoi_dat ? ` (${targetMember.Nguoi_dat})` : ''
+    toast('success', `✅ Đã cộng dồn +${qtyToAdd} vào ${form.tenHang}${ownerSuffix}`)
     highlightRow(existingItemIndex)
 
   } else {
@@ -2563,15 +3847,11 @@ function addItem() {
       Ngay_tao_duong_lich: formatDateTimeVN(),
       Ma_hang: form.maHang,
       Ten_hang: form.tenHang,
-      Ma_nha_cung_cap: form.maNCC,
-      Ten_nha_cung_cap: form.tenNCC,
       Trang_thai: form.trangThai,
       Danh_muc: form.danhMuc,
       Size: form.size,
       Dvt: form.dvt,
-      Lang: form.lang,
       Don_vi_tien_te: form.donViTienTe,
-      lang: form.lang,
       donViTienTe: form.donViTienTe,
       So_luong: form.soLuong,
       Gia_goc: form.giaGoc,
@@ -2582,6 +3862,9 @@ function addItem() {
       Loi_nhuan: loiNhuan,
       Ghi_chu: form.ghiChuHang || '',
       ghiChuHang: form.ghiChuHang,
+      Nguoi_dat: targetMember.Nguoi_dat,
+      Nguoi_dat_id: targetMember.Nguoi_dat_id,
+      Added_by_role: targetMember.Added_by_role,
       soLuong: form.soLuong,
       giaGoc: form.giaGoc,
       giaBan: form.giaBan,
@@ -2597,8 +3880,6 @@ function addItem() {
       tenHang: form.tenHang,
       size: form.size,
       dvt: form.dvt,
-      maNCC: form.maNCC,
-      tenNCC: form.tenNCC,
       danhMuc: form.danhMuc,
       trangThai: form.trangThai,
     })
@@ -2651,6 +3932,31 @@ const globalGiamGia = ref(0)
 const globalChietKhauPercent = ref(0)
 const tempGlobalGiamGia = ref(0)
 const tempGlobalChietKhauPercent = ref(0)
+
+watch(
+  [
+    maHoaDon,
+    soHoaDon,
+    ngayNhanHang,
+    gioNhanHang,
+    phutNhanHang,
+    hinhThucThanhToan,
+    orderTableViewMode,
+    globalGiamGia,
+    globalChietKhauPercent,
+    items,
+    () => form.maKhachHang,
+    () => form.tenKhachHang,
+    () => form.soDienThoai,
+    () => form.diaChi,
+    () => form.ghiChu,
+    () => form.ghiChuDonHang,
+  ],
+  () => {
+    syncActiveTabSnapshot()
+  },
+  { deep: true },
+)
 
 function openDiscountModal(type) {
   activeDiscountType.value = type
@@ -2754,16 +4060,8 @@ watch(
   }
 )
 
-async function hoanThanhDon() {
-  if (!items.value.length) {
-    toast('warn', 'Chưa có hàng trong đơn')
-    return
-  }
-
-  if (isSubmitting.value) return
-  isSubmitting.value = true
-
-  const payload = {
+function buildInvoicePayload(targetStatus = '') {
+  return {
     action: 'hoanThanhDon',
     hoa_don: {
       Ma_hoa_don: maHoaDon.value,
@@ -2772,8 +4070,6 @@ async function hoanThanhDon() {
       Thoi_gian_nhan_hang: formatDateTimeVN(new Date(thoiGianNhanHang.value)),
       Ma_khach_hang: form.maKhachHang,
       Ten_khach_hang: form.tenKhachHang,
-      Ma_nha_cung_cap: form.maNCC,
-      Ten_nha_cung_cap: form.tenNCC,
       Tra_tien: tongCong.value,
       Tam_tinh: tamTinh.value,
       Tong_giam_gia: tongGiamGia.value,
@@ -2786,6 +4082,7 @@ async function hoanThanhDon() {
       Ghi_chu_don_hang: form.ghiChuDonHang,
       Ti_gia: tiGia.value,
       Don_vi_tien_te_ck: donViTienTeCK.value,
+      ...(targetStatus ? { Trang_thai: targetStatus } : {}),
     },
     items: items.value,
     khach_hang: {
@@ -2796,44 +4093,656 @@ async function hoanThanhDon() {
       Tong_chi_tieu: tongCong.value,
       Ghi_chu: form.ghiChu,
     },
-    nha_cung_cap: {
-      Ma_nha_cung_cap: form.maNCC,
-      Tong_loi_nhuan: tongLoiNhuan.value,
-      Tong_cong: tongCong.value,
-      Hinh_thuc_thanh_toan: hinhThucThanhToan.value,
-    },
+  }
+}
+
+function updateActiveTabSourceStatus(nextStatus) {
+  const tab = activeTabObj.value
+  if (!tab) return
+  tab.sourceOrderStatus = nextStatus
+  saveTabsToStorage()
+}
+
+async function hoanThanhDon() {
+  if (!items.value.length) {
+    toast('warn', 'Chưa có hàng trong đơn')
+    return
   }
 
+  if (isSubmitting.value) return
+  isSubmitting.value = true
+
   try {
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-
-    if (res.type === 'opaque') {
-      openSuccessModal('Hoàn thành đơn ')
-      return
-    }
-
-    const json = await res.json()
+    const json = await dispatchAction(buildInvoicePayload())
 
     if (json.success) {
       openSuccessModal('✅ Hoàn thành đơn thành công')
     } else {
-      toast('error', '❌ Lỗi: ' + json.message)
+      toast('error', '❌ Lỗi: ' + (json.message || 'Không thể lưu đơn hàng'))
     }
   } catch (e) {
-    toast('error', '❌ Lỗi kết nối server')
+    console.error(e)
+    toast('error', '❌ Lỗi kết nối Firebase')
   } finally {
     isSubmitting.value = false
+  }
+}
+
+async function saveOrderDraftFromInvoice() {
+  if (!items.value.length) {
+    toast('warn', 'Chưa có hàng trong đơn')
+    return
+  }
+  if (isOrderActionLoading.value || isSubmitting.value) return
+  isOrderActionLoading.value = true
+  try {
+    const res = await adminSyncOrderItems({
+      Ma_hoa_don: maHoaDon.value,
+      items: items.value.map((it) => ({
+        ...it,
+        Ma_hang: it.Ma_hang || it.maHang || '',
+        Ten_hang: it.Ten_hang || it.tenHang || '',
+        Size: it.Size || it.size || '',
+        Dvt: it.Dvt || it.dvt || '',
+        So_luong: Number(it.So_luong ?? it.soLuong ?? 1),
+        Gia_goc: Number(it.Gia_goc ?? it.giaGoc ?? 0),
+        Gia_ban: Number(it.Gia_ban ?? it.giaBan ?? 0),
+        Thanh_tien: Number(it.Thanh_tien ?? it.thanhTien ?? 0),
+        Ghi_chu: it.Ghi_chu ?? it.ghiChuHang ?? '',
+      })),
+      meta: {
+        Ten_khach_hang: form.tenKhachHang || 'Khách lẻ',
+        So_dien_thoai: String(form.soDienThoai || ''),
+        Dia_chi: form.diaChi || '',
+        Thoi_gian_nhan_hang: formatDateTimeVN(new Date(thoiGianNhanHang.value)),
+        Hinh_thuc_thanh_toan: hinhThucThanhToan.value,
+        Ghi_chu: form.ghiChuDonHang || '',
+      },
+    })
+    if (res?.success) {
+      updateActiveTabSourceStatus('Chờ duyệt')
+      toast('success', '✅ Đã lưu nháp đơn (vẫn đang chờ duyệt / xác nhận)')
+    } else {
+      toast('error', '❌ ' + (res?.message || 'Không lưu được nháp đơn'))
+    }
+  } catch (e) {
+    console.error(e)
+    toast('error', '❌ Lỗi kết nối Firebase khi lưu nháp')
+  } finally {
+    isOrderActionLoading.value = false
+  }
+}
+
+async function runOnlineOrderTransition(targetStatus, confirmText, successText, openModalOnDone = false) {
+  if (!items.value.length) {
+    toast('warn', 'Chưa có hàng trong đơn')
+    return
+  }
+  if (isOrderActionLoading.value || isSubmitting.value) return
+  if (confirmText && !confirm(confirmText)) return
+
+  isOrderActionLoading.value = true
+  try {
+    const res = await dispatchAction(buildInvoicePayload(targetStatus))
+    if (res?.success) {
+      updateActiveTabSourceStatus(targetStatus)
+      const dh = donHangList.value.find(
+        (d) => String(d?.Ma_hoa_don || '').trim() === String(maHoaDon.value).trim(),
+      )
+      if (dh) dh.Trang_thai = targetStatus
+
+      if (openModalOnDone) {
+        openSuccessModal(successText)
+      } else {
+        toast('success', successText)
+      }
+    } else {
+      toast('error', '❌ Lỗi: ' + (res?.message || 'Không thể cập nhật đơn hàng'))
+    }
+  } catch (e) {
+    console.error(e)
+    toast('error', '❌ Lỗi kết nối Firebase')
+  } finally {
+    isOrderActionLoading.value = false
+  }
+}
+
+function approveOrderFromInvoice() {
+  return runOnlineOrderTransition(
+    'Đang xử lý',
+    `Xác nhận duyệt đơn #${maHoaDon.value} chuyển sang Đang xử lý và khóa chỉnh sửa món phía khách?`,
+    '✅ Đã duyệt đơn sang Đang xử lý!',
+  )
+}
+
+function saveApprovedOrderEdits() {
+  return runOnlineOrderTransition(
+    activeOrderStatus.value || 'Đang xử lý',
+    '',
+    '✅ Đã lưu cập nhật đơn hàng!',
+  )
+}
+
+function shipOrderFromInvoice() {
+  return runOnlineOrderTransition(
+    'Đang ship',
+    `Xác nhận chuyển đơn #${maHoaDon.value} sang trạng thái Đang ship?`,
+    '🛵 Đơn hàng đã chuyển sang Đang ship!',
+  )
+}
+
+function completeOrderFromInvoice() {
+  return runOnlineOrderTransition(
+    'Hoàn thành',
+    `Xác nhận hoàn thành đơn #${maHoaDon.value}? (Giỏ live của khách sẽ được đóng sạch)`,
+    '✅ Hoàn thành đơn hàng thành công!',
+    true,
+  )
+}
+
+async function cancelOrderFromInvoice() {
+  if (isOrderActionLoading.value || isSubmitting.value) return
+  if (
+    !confirm(
+      `Xác nhận HỦY đơn #${maHoaDon.value}? Đơn sẽ bị hủy đồng bộ cả ở trang Đơn hàng và phía khách!`,
+    )
+  ) {
+    return
+  }
+
+  isOrderActionLoading.value = true
+  try {
+    const res = await dispatchAction({
+      action: 'huyDonHang',
+      Ma_hoa_don: maHoaDon.value,
+    })
+    if (res?.success) {
+      updateActiveTabSourceStatus('Đã hủy')
+      toast('success', `Đã hủy đơn #${maHoaDon.value}`)
+      if (activeInvoiceTabId.value) {
+        closeInvoiceTab(activeInvoiceTabId.value)
+      }
+    } else {
+      toast('error', '❌ Lỗi: ' + (res?.message || 'Không thể hủy đơn'))
+    }
+  } catch (e) {
+    console.error(e)
+    toast('error', '❌ Lỗi kết nối Firebase khi hủy đơn')
+  } finally {
+    isOrderActionLoading.value = false
   }
 }
 
 function cleanPhoneInput(event) {
   const cleaned = event.target.value.replace(/\D/g, '')
   form.soDienThoai = cleaned
+}
+
+function buildIsolatedInvoiceStyles() {
+  return `
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #ffffff; font-family: 'Segoe UI', Arial, sans-serif; }
+    img { max-width: 100%; }
+    h2 { margin: 0; }
+    .hoa-don-print {
+      width: 800px;
+      padding: 32px;
+      background: #ffffff;
+      color: #1a1a1a;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 13px;
+      position: static !important;
+      top: auto !important;
+      left: auto !important;
+      margin: 0 !important;
+      line-height: 1.6;
+    }
+    .hd-header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 24px;
+      align-items: center;
+      padding-bottom: 18px;
+      margin-bottom: 18px;
+      border-bottom: 3px solid #1a1a1a;
+    }
+    .hd-left-group { display: flex; align-items: center; gap: 16px; }
+    .hd-logo-circle {
+      width: 90px; height: 90px; border: 2px solid #1a1a1a; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; background: #ffffff; flex-shrink: 0;
+    }
+    .hd-logo-circle img { width: 100%; height: 100%; object-fit: cover; }
+    .hd-shop-info-box { display: flex; flex-direction: column; gap: 4px; }
+    .hd-shop-name {
+      font-size: 24px; font-weight: 900; color: #1a1a1a;
+      letter-spacing: 0.8px; line-height: 1.2; text-transform: uppercase;
+    }
+    .hd-shop-time { font-size: 11px; font-weight: 600; color: #6b7280; font-style: italic; }
+    .hd-contact-right { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+    .contact-row { display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: center; font-size: 11px; }
+    .contact-img { width: 18px; height: 18px; object-fit: contain; flex-shrink: 0; border-radius: 2px; }
+    .contact-text { color: #374151; font-weight: 500; text-align: left; white-space: nowrap; display: flex; gap: 4px; }
+    .platform-name { font-weight: 700; text-transform: uppercase; color: #1f2937; }
+    .platform-info { font-weight: 500; color: #374151; }
+    .contact-placeholder { width: 18px; height: 18px; background: #e5e7eb; border-radius: 3px; flex-shrink: 0; }
+    .hd-title-section { text-align: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb; }
+    .hd-title { font-size: 28px; font-weight: 900; color: #1a1a1a; letter-spacing: 2px; margin: 0 0 8px 0; text-transform: uppercase; }
+    .hd-meta { display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 13px; color: #6b7280; font-weight: 600; }
+    .hd-code { letter-spacing: 0.5px; }
+    .hd-separator { color: #d1d5db; font-weight: 400; }
+    .hd-date { color: #9ca3af; }
+    .hd-info-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .info-card { background: #f9fafb; border: 2px solid #e5e7eb; border-radius: 10px; padding: 16px; }
+    .card-title {
+      font-size: 12px; font-weight: 800; color: #1a1a1a; margin-bottom: 12px;
+      text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 2px solid #1a1a1a; padding-bottom: 6px;
+    }
+    .card-row { display: flex; gap: 8px; margin-bottom: 8px; }
+    .card-row:last-child { margin-bottom: 0; }
+    .card-row .label { font-weight: 600; color: #6b7280; white-space: nowrap; font-size: 12px; flex-shrink: 0; }
+    .card-row .value { color: #1f2937; font-weight: 500; flex: 1; word-wrap: break-word; }
+    .hd-table {
+      width: 100%; border-collapse: collapse; margin-bottom: 20px;
+      border: 1px solid #d1d5db; border-radius: 6px; overflow: hidden;
+    }
+    .hd-table thead { background: linear-gradient(135deg, #1f2937 0%, #374151 100%); }
+    .hd-table th {
+      padding: 12px 10px; font-size: 12px; font-weight: 700; color: #ffffff;
+      text-transform: uppercase; letter-spacing: 0.5px; text-align: center;
+      border-right: 1px solid rgba(255,255,255,0.1);
+    }
+    .hd-table th:last-child { border-right: none; }
+    .hd-table tbody tr { border-bottom: 1px solid #e5e7eb; }
+    .hd-table tbody tr:last-child { border-bottom: none; }
+    .hd-table tbody tr:nth-child(even) { background: #f9fafb; }
+    .hd-table td { padding: 10px; font-size: 12px; color: #374151; border-right: 1px solid #e5e7eb; }
+    .hd-table td:last-child { border-right: none; }
+    .text-center { text-align: center; }
+    .text-left { text-align: left; }
+    .text-right { text-align: right; }
+    .product-name { font-weight: 600; color: #1f2937; margin-bottom: 2px; }
+    .product-note { font-size: 11px; color: #6b7280; font-style: italic; margin-top: 2px; }
+    .price-highlight { font-weight: 700; color: #1a1a1a; }
+    .col-stt { width: 50px; }
+    .col-name { min-width: 180px; }
+    .col-size { width: 70px; }
+    .col-dvt { width: 60px; }
+    .col-qty { width: 50px; }
+    .col-price { width: 100px; }
+    .col-total { width: 110px; }
+    .hd-summary-row {
+      display: grid; grid-template-columns: 1fr 420px; gap: 20px; align-items: stretch; margin-bottom: 16px;
+    }
+    .hd-bank-box {
+      background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 10px; padding: 16px;
+      display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .bank-title {
+      font-size: 13px; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase;
+      border-bottom: 2px solid #334155; padding-bottom: 8px; margin-bottom: 14px; color: #0f172a;
+    }
+    .bank-list-stack { display: flex; flex-direction: column; gap: 12px; }
+    .bank-minicard {
+      border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;
+      background: #ffffff; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .bank-body { display: flex; align-items: center; gap: 20px; margin-bottom: 0; }
+    .bank-qr {
+      width: 110px; height: 110px; flex-shrink: 0; border: 4px solid #fff;
+      outline: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background: #fff;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    .bank-qr img { width: 100%; height: 100%; object-fit: contain; }
+    .bank-text {
+      font-size: 13px; color: #0f172a; white-space: pre-line; line-height: 1.6; font-weight: 700;
+      display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical;
+      overflow: hidden; text-overflow: ellipsis; height: 4.8em;
+    }
+    .bank-divider { height: 1px; margin: 14px 0; width: 100%; border-top: 1px dashed #94a3b8; background: transparent; }
+    .bank-amount {
+      background: #fff; border: 2px solid #e2e8f0; border-radius: 10px; padding: 14px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+    }
+    .ba-label { font-size: 12px; font-weight: 800; color: #475569; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; }
+    .ba-value { font-size: 22px; font-weight: 900; color: #000000; letter-spacing: -0.5px; }
+    .ba-sub { font-size: 12px; color: #64748b; font-weight: 600; margin-top: 4px; }
+    .hd-summary {
+      display: flex; flex-direction: column; gap: 8px; margin-left: 0; max-width: 400px;
+      padding: 16px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 20px;
+    }
+    .summary-title {
+      font-size: 13px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase;
+      color: #111827; border-bottom: 1px dashed #94a3b8; padding-bottom: 8px; margin-bottom: 12px; text-align: center;
+    }
+    .summary-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+    .summary-label { font-size: 13px; color: #6b7280; font-weight: 600; }
+    .summary-value { font-size: 14px; color: #1f2937; font-weight: 700; }
+    .summary-row.discount .summary-label, .summary-row.discount .summary-value { color: #dc2626; }
+    .summary-row.total { border-top: 2px solid #1a1a1a; padding-top: 12px; margin-top: 8px; }
+    .summary-row.total .summary-label { font-size: 15px; color: #1a1a1a; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+    .summary-row.total .summary-value { font-size: 18px; color: #1a1a1a; font-weight: 900; }
+    .summary-row.subtotal .summary-label, .summary-row.subtotal .summary-value,
+    .summary-row.payment .summary-label, .summary-row.payment .summary-value { font-weight: 800; color: #111827; }
+    .summary-row.payment { border-top: 1px solid #d1d5db; padding-top: 8px; margin-top: 4px; }
+    .hd-promo { margin-top: 5px; padding: 4px 0; text-align: right; }
+    .hd-promo-text { font-size: 13px; color: #dc2626; font-weight: 700; white-space: pre-line; }
+    .hd-footer-note { text-align: center; padding-top: 20px; border-top: 2px solid #e5e7eb; }
+    .footer-line { font-size: 12px; color: #6b7280; font-weight: 500; margin: 4px 0; font-style: italic; }
+  `
+}
+
+function buildInvoiceViewerShellHtml(safeTitle, fileName) {
+  const escapedTitle = String(safeTitle || 'Ảnh hóa đơn').replace(/[<>&"]/g, '')
+  const escapedFile = String(fileName || 'hoa-don.png').replace(/[^a-zA-Z0-9._-]/g, '_')
+  return `<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapedTitle}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #0f172a;
+      color: #f8fafc;
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .bar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      width: 100%;
+      background: rgba(15, 23, 42, 0.94);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+      padding: 12px 16px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    }
+    .btn {
+      border: none;
+      padding: 10px 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 700;
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 14px;
+      transition: transform 0.12s ease, opacity 0.2s ease, background-color 0.2s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn:not(:disabled):hover { opacity: 0.92; transform: translateY(-1px); }
+    .btn:not(:disabled):active { transform: scale(0.97); }
+    .btn-download { background: linear-gradient(135deg, #16a34a, #22c55e); }
+    .btn-copy { background: linear-gradient(135deg, #d97706, #f59e0b); }
+    .btn-copy.copied { background: linear-gradient(135deg, #059669, #10b981); }
+    .btn-print { background: linear-gradient(135deg, #2563eb, #3b82f6); }
+    .stage {
+      width: 100%;
+      max-width: 860px;
+      padding: 18px 14px 36px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .status-note {
+      display: none;
+      width: 100%;
+      max-width: 680px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: rgba(245, 158, 11, 0.16);
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      color: #fde68a;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+    }
+    .status-note.error {
+      background: rgba(239, 68, 68, 0.16);
+      border-color: rgba(239, 68, 68, 0.45);
+      color: #fecaca;
+    }
+    .loader-box {
+      margin-top: 40px;
+      padding: 28px 32px;
+      border-radius: 14px;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      color: #e2e8f0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 3px solid rgba(148, 163, 184, 0.25);
+      border-top-color: #38bdf8;
+      animation: spin 0.75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #img {
+      display: none;
+      width: 100%;
+      max-width: 800px;
+      height: auto;
+      border-radius: 10px;
+      background: #ffffff;
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+    }
+    @media (max-width: 480px) {
+      .bar { padding: 10px; gap: 8px; }
+      .btn { flex: 1; min-width: 100px; padding: 10px 12px; font-size: 13px; }
+      .stage { padding: 12px 10px 28px; }
+    }
+    @media print {
+      body { background: #ffffff !important; }
+      .bar, .status-note, .loader-box { display: none !important; }
+      .stage { padding: 0 !important; max-width: none !important; }
+      #img { display: block !important; box-shadow: none !important; border-radius: 0 !important; max-width: 100% !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <button id="btn-download" class="btn btn-download" disabled onclick="handleDownload()">Tải ảnh PNG</button>
+    <button id="btn-copy" class="btn btn-copy" disabled onclick="handleCopy()">Copy ảnh</button>
+    <button id="btn-print" class="btn btn-print" disabled onclick="window.print()">In hóa đơn</button>
+  </div>
+  <div class="stage">
+    <div id="status-note" class="status-note"></div>
+    <div id="loader" class="loader-box">
+      <div class="spinner"></div>
+      <div>Đang tạo ảnh hóa đơn...</div>
+    </div>
+    <img id="img" alt="Hóa đơn bán hàng" />
+  </div>
+  <script>
+    window.__invoiceFileName = ${JSON.stringify(escapedFile)};
+    window.setInvoiceImage = function(dataUrl, fileName) {
+      if (fileName) window.__invoiceFileName = fileName;
+      var img = document.getElementById('img');
+      var loader = document.getElementById('loader');
+      img.onload = function() {
+        if (loader) loader.style.display = 'none';
+        img.style.display = 'block';
+        document.getElementById('btn-download').disabled = false;
+        document.getElementById('btn-copy').disabled = false;
+        document.getElementById('btn-print').disabled = false;
+      };
+      img.src = dataUrl;
+    };
+    window.setInvoiceError = function(msg) {
+      var loader = document.getElementById('loader');
+      var note = document.getElementById('status-note');
+      if (loader) loader.style.display = 'none';
+      if (note) {
+        note.textContent = msg || 'Không thể tạo ảnh hóa đơn.';
+        note.className = 'status-note error';
+        note.style.display = 'block';
+      }
+    };
+    function showNote(msg) {
+      var note = document.getElementById('status-note');
+      if (!note) return;
+      note.textContent = msg;
+      note.className = 'status-note';
+      note.style.display = 'block';
+    }
+    function handleDownload() {
+      var img = document.getElementById('img');
+      if (!img || !img.src) return;
+      var a = document.createElement('a');
+      a.href = img.src;
+      a.download = window.__invoiceFileName || 'hoa-don.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+    async function toPngBlob(imgEl) {
+      try {
+        var r = await fetch(imgEl.src);
+        var b = await r.blob();
+        if (b && b.type === 'image/png') return b;
+      } catch (e) {}
+      var c = document.createElement('canvas');
+      c.width = imgEl.naturalWidth || 800;
+      c.height = imgEl.naturalHeight || 1000;
+      c.getContext('2d').drawImage(imgEl, 0, 0);
+      return await new Promise(function(resolve) { c.toBlob(resolve, 'image/png'); });
+    }
+    async function handleCopy() {
+      var btn = document.getElementById('btn-copy');
+      var img = document.getElementById('img');
+      if (!img || !img.src) return;
+      try {
+        var pngBlob = await toPngBlob(img);
+        if (!pngBlob) throw new Error('Không tạo được PNG blob');
+        var item = new ClipboardItem({ 'image/png': pngBlob });
+        if (navigator.clipboard && navigator.clipboard.write) {
+          await navigator.clipboard.write([item]);
+        } else if (window.opener && window.opener.navigator && window.opener.navigator.clipboard && window.opener.navigator.clipboard.write) {
+          await window.opener.navigator.clipboard.write([item]);
+        } else {
+          throw new Error('Clipboard API unsupported');
+        }
+        btn.textContent = '✓ Đã copy ảnh!';
+        btn.classList.add('copied');
+        setTimeout(function() {
+          btn.textContent = 'Copy ảnh';
+          btn.classList.remove('copied');
+        }, 2000);
+      } catch (err) {
+        console.error('Copy image error:', err);
+        showNote('Trình duyệt không cho phép copy tự động ở chế độ này. Bạn hãy nhấn chuột phải vào ảnh chọn "Sao chép hình ảnh" (hoặc nhấn giữ ảnh trên điện thoại) hoặc bấm "Tải ảnh PNG".');
+      }
+    }
+  <${'/'}script>
+</body>
+</html>`
+}
+
+async function renderInvoiceCanvasIsolated() {
+  const srcEl = hoaDonRef.value
+  if (!srcEl) throw new Error('Không tìm thấy mẫu hóa đơn')
+
+  const iframe = document.createElement('iframe')
+  iframe.setAttribute('aria-hidden', 'true')
+  iframe.style.cssText =
+    'position:fixed;left:-12000px;top:0;width:820px;height:2000px;border:0;opacity:0;pointer-events:none;'
+  document.body.appendChild(iframe)
+
+  try {
+    const idoc = iframe.contentDocument
+    if (!idoc) throw new Error('Không khởi tạo được vùng render hóa đơn')
+
+    idoc.open()
+    idoc.write(
+      `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${buildIsolatedInvoiceStyles()}</style></head><body>${srcEl.outerHTML}</body></html>`,
+    )
+    idoc.close()
+
+    const imgs = Array.from(idoc.querySelectorAll('img'))
+    await Promise.race([
+      Promise.all(
+        imgs.map((imgEl) => {
+          const rawSrc = imgEl.getAttribute('src') || ''
+          if (rawSrc.startsWith('data:')) {
+            return imgEl.complete
+              ? Promise.resolve()
+              : new Promise((res) => {
+                  imgEl.onload = res
+                  imgEl.onerror = res
+                })
+          }
+          // Với ảnh URL ngoài: dùng CORS để không làm tainted canvas; lỗi CORS thì ẩn ảnh đó
+          return new Promise((res) => {
+            imgEl.crossOrigin = 'anonymous'
+            imgEl.onload = () => res()
+            imgEl.onerror = () => {
+              imgEl.remove()
+              res()
+            }
+            imgEl.src = rawSrc
+          })
+        }),
+      ),
+      new Promise((res) => setTimeout(res, 1800)),
+    ])
+
+    // Gỡ mọi ảnh http còn dang dở để chắc chắn không taint canvas khi toDataURL
+    for (const imgEl of Array.from(idoc.querySelectorAll('img'))) {
+      const s = imgEl.getAttribute('src') || ''
+      if (!s.startsWith('data:') && !imgEl.complete) {
+        imgEl.remove()
+      }
+    }
+
+    const captureEl = idoc.querySelector('.hoa-don-print')
+    if (!captureEl) throw new Error('Không tìm thấy vùng hóa đơn cô lập')
+
+    const isMobileDevice =
+      window.innerWidth < 768 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+
+    return await html2canvas(captureEl, {
+      scale: isMobileDevice ? 1.5 : 2,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      allowTaint: false,
+      logging: false,
+      imageTimeout: 2000,
+      removeContainer: true,
+      width: 800,
+      windowWidth: 800,
+      windowHeight: Math.max(captureEl.scrollHeight || 900, 900),
+    })
+  } finally {
+    if (iframe.parentNode) {
+      iframe.parentNode.removeChild(iframe)
+    }
+  }
 }
 
 const hoaDonRef = ref(null)
@@ -2846,168 +4755,41 @@ async function previewHoaDon() {
 
   if (isPreviewing.value) return
   isPreviewing.value = true
-  
-  // Give UI time to update before heavy computation
+
+  const fileName = `hoa-don-${maHoaDon.value || 'export'}.png`
+  // Mở tab mới ngay khi bấm để 0ms trễ và không bị trình duyệt chặn popup
+  const win = window.open('', '_blank')
+  if (win && !win.closed) {
+    win.document.open()
+    win.document.write(buildInvoiceViewerShellHtml(`Hóa đơn ${maHoaDon.value || ''}`, fileName))
+    win.document.close()
+  }
+
   await nextTick()
 
   try {
-    // Detect mobile and adjust settings accordingly
-    const isMobileDevice = window.innerWidth < 768 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-    
-    // Mobile-optimized settings: lower scale and quality to prevent memory issues
-    const canvasOptions = {
-      scale: isMobileDevice ? 1 : 1.5, // Lower scale on mobile to prevent memory crash
-      backgroundColor: '#ffffff',
-      useCORS: true,
-      allowTaint: true,
-      logging: false,
-      imageTimeout: 15000, // Timeout for loading images
-      removeContainer: true, // Clean up cloned elements
-      windowWidth: hoaDonRef.value?.scrollWidth || 800, // Explicit width
-      windowHeight: hoaDonRef.value?.scrollHeight || 1200, // Explicit height
-    }
+    const canvas = await renderInvoiceCanvasIsolated()
+    const pngDataUrl = canvas.toDataURL('image/png')
+    invoiceImageUrl.value = pngDataUrl
 
-    // Create canvas with timeout wrapper for mobile
-    let canvas
-    if (isMobileDevice) {
-      // Wrap in timeout to prevent infinite hang on mobile
-      canvas = await Promise.race([
-        html2canvas(hoaDonRef.value, canvasOptions),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout: Tạo ảnh quá lâu')), 20000)
-        )
-      ])
-    } else {
-      canvas = await html2canvas(hoaDonRef.value, canvasOptions)
-    }
-
-    // Mobile uses JPEG with lower quality, desktop uses PNG
-    const imgFormat = isMobileDevice ? 'image/jpeg' : 'image/png'
-    const imgQuality = isMobileDevice ? 0.7 : 0.85
-    const img = canvas.toDataURL(imgFormat, imgQuality)
-    invoiceImageUrl.value = img
-
-    // Try to open new window
-    const win = window.open('', '_blank')
-    
-    // Handle popup blocked on mobile
-    if (!win || win.closed || typeof win.closed === 'undefined') {
-      // Fallback: Create download link directly
-      toast('info', 'Popup bị chặn. Đang tải ảnh xuống...')
+    if (win && !win.closed && typeof win.setInvoiceImage === 'function') {
+      win.setInvoiceImage(pngDataUrl, fileName)
+    } else if (!win || win.closed) {
+      // Fallback nếu popup bị trình duyệt chặn
       const link = document.createElement('a')
-      link.href = img
-      link.download = `hoa-don-${maHoaDon.value || 'export'}.${isMobileDevice ? 'jpg' : 'png'}`
+      link.href = pngDataUrl
+      link.download = fileName
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      toast('success', 'Đã tải ảnh hóa đơn!')
-      return
+      toast('info', 'Popup bị chặn. Đã tự động tải ảnh hóa đơn!')
     }
-
-    win.document.write(`
-    <html>
-    <head>
-      <title>Xem hóa đơn</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
-      <style>
-        * { box-sizing: border-box; }
-        body { margin:0; text-align:center; background:#eee; font-family: system-ui, -apple-system, sans-serif; }
-        img { max-width:100%; margin-top:10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .bar {
-          position: sticky;
-          top: 0;
-          background: white;
-          padding: 12px;
-          border-bottom: 1px solid #ddd;
-          display: flex;
-          justify-content: center;
-          flex-wrap: wrap;
-          gap: 10px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }
-        .btn {
-          border: none;
-          padding: 10px 18px;
-          border-radius: 8px;
-          cursor: pointer;
-          font-weight: 600;
-          color: white;
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 14px;
-          transition: transform 0.1s, opacity 0.2s;
-          -webkit-tap-highlight-color: transparent;
-        }
-        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
-        .btn:active { transform: scale(0.97); opacity: 0.85; }
-        
-        .btn-download { background-color: #22c55e; }
-        .btn-copy { background-color: #f59e0b; }
-        .btn-print { background-color: #3b82f6; }
-
-        @media (max-width: 480px) {
-          .bar { padding: 10px; gap: 8px; }
-          .btn { padding: 10px 14px; font-size: 13px; flex: 1; justify-content: center; min-width: 90px; }
-        }
-
-        @media print {
-          .bar { display: none !important; }
-          title { display: none !important; }
-          body { 
-            margin: 0 !important;
-            padding: 0 !important;
-            background: white !important;
-          }
-          img { margin: 0; box-shadow: none; }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="bar">
-        <button class="btn btn-download" onclick="handleDownload()"><i class="ri-download-line"></i> Tải ảnh</button>
-        <button class="btn btn-copy" onclick="handleCopy()"><i class="ri-file-copy-line"></i> Copy ảnh</button>
-        <button class="btn btn-print" onclick="window.print()"><i class="ri-printer-line"></i> In</button>
-      </div>
-      <img id="img" src="${img}" />
-      <script>
-        function handleDownload() {
-          const a = document.createElement('a')
-          a.href = document.getElementById('img').src
-          a.download = 'hoa-don.${isMobileDevice ? 'jpg' : 'png'}'
-          a.click()
-        }
-        async function handleCopy() {
-          try {
-            const img = document.getElementById('img')
-            const response = await fetch(img.src)
-            const blob = await response.blob()
-            await navigator.clipboard.write([
-              new ClipboardItem({ [blob.type]: blob })
-            ])
-            alert('Đã copy ảnh vào clipboard!')
-          } catch (err) {
-            console.error('Lỗi copy:', err)
-            // Fallback for mobile: show message to long-press
-            alert('Không thể copy tự động. Hãy nhấn giữ vào ảnh để lưu.')
-          }
-        }
-      <${'/'}script>
-    </body>
-    </html>
-  `)
   } catch (err) {
     console.error('Lỗi tạo ảnh hóa đơn:', err)
-    
-    // More specific error messages
-    if (err.message?.includes('Timeout')) {
-      toast('error', 'Tạo ảnh quá lâu. Vui lòng thử lại hoặc dùng "Xuất text".')
-    } else if (err.message?.includes('memory') || err.message?.includes('Memory')) {
-      toast('error', 'Thiết bị không đủ bộ nhớ. Vui lòng đóng bớt ứng dụng khác và thử lại.')
-    } else {
-      toast('error', 'Không thể tạo ảnh hóa đơn. Vui lòng dùng nút "Xuất text" thay thế.')
+    if (win && !win.closed && typeof win.setInvoiceError === 'function') {
+      win.setInvoiceError('Không thể xuất ảnh hóa đơn. Vui lòng thử lại hoặc dùng "Xuất hóa đơn (chữ)".')
     }
+    toast('error', 'Không thể tạo ảnh hóa đơn. Vui lòng dùng "Xuất hóa đơn (chữ)" thay thế.')
   } finally {
     isPreviewing.value = false
   }
@@ -3056,10 +4838,23 @@ function copyTextInvoice() {
   }, 2000)
 }
 
-function openEditItem(item, idx) {
+function openEditItem(item, idx, siblingEntries = []) {
   editIndex.value = idx
   Object.assign(editItem, JSON.parse(JSON.stringify(item)))
+  const hint = getOrderPrimaryMemberHint(items.value)
+  editItemMemberKey.value = resolveMemberGroupKeyForItem(item, hint)
+  editModalSiblings.value = Array.isArray(siblingEntries) && siblingEntries.length > 1 ? siblingEntries : []
   showEditModal.value = true
+}
+
+function switchEditModalSibling(sib) {
+  if (!sib || sib.idx === undefined) return
+  const liveItem = items.value[sib.idx] || sib.item
+  if (!liveItem) return
+  editIndex.value = sib.idx
+  Object.assign(editItem, JSON.parse(JSON.stringify(liveItem)))
+  const hint = getOrderPrimaryMemberHint(items.value)
+  editItemMemberKey.value = resolveMemberGroupKeyForItem(liveItem, hint)
 }
 
 function deleteItem(idx) {
@@ -3072,21 +4867,8 @@ function saveEditItem() {
   const i = editItem
 
   const hang = hangHoaList.value.find(h => h.Ma_hang === i.maHang)
-  const tonKho = hang ? Number(hang.So_luong_kho || 0) : 0
-
-  if (tonKho === 0) {
-    toast('error', '❌ Sản phẩm này đã HẾT HÀNG trong kho!')
-    return
-  }
-
-  if (i.soLuong > tonKho) {
-    toast(
-      'error',
-      `❌ KHÔNG ĐỦ HÀNG TRONG KHO!\n\n` +
-      `Tồn kho hiện tại: ${tonKho} ${i.dvt}\n` +
-      `Bạn đang nhập: ${i.soLuong} ${i.dvt}\n\n` +
-      `Vui lòng giảm số lượng hoặc nhập thêm hàng vào kho.`
-    )
+  if (hang && isOutOfStock(hang)) {
+    toast('error', '❌ Sản phẩm này đang ở trạng thái HẾT HÀNG!')
     return
   }
 
@@ -3110,9 +4892,21 @@ function saveEditItem() {
   i.Giam_gia = i.giamGia
   i.Ghi_chu = i.ghiChuHang || '' // ✅ CẬP NHẬT GHI CHÚ HÀNG
 
+  if (showMemberTargetBar.value && editItemMemberKey.value) {
+    const chosenMember = invoiceOrderMembers.value.find(
+      (m) => m.groupKey === editItemMemberKey.value,
+    )
+    if (chosenMember) {
+      i.Nguoi_dat = chosenMember.role === 'admin' ? 'Quán thêm' : chosenMember.name
+      i.Nguoi_dat_id = chosenMember.memberId || ''
+      i.Added_by_role = chosenMember.role || 'host'
+    }
+  }
+
   items.value[editIndex.value] = { ...i }
 
   showEditModal.value = false
+  editModalSiblings.value = []
 }
 
 const hoaDonNCCRef = ref(null)
@@ -3155,15 +4949,16 @@ function decreaseQty(product) {
 }
 
 function increaseQty(product) {
-  if (productQty[product.Ma_hang] < product.So_luong_kho) {
-    productQty[product.Ma_hang]++
+  if (!isOutOfStock(product)) {
+    productQty[product.Ma_hang] = (productQty[product.Ma_hang] || 1) + 1
   }
 }
 
-function getStockClass(stock) {
-  if (stock === 0) return 'stock-out'
-  if (stock <= 5) return 'stock-low' // Updated threshold to 5
-  return 'stock-ok'
+function getStockClass(productOrStatus) {
+  if (typeof productOrStatus === 'object' && productOrStatus !== null) {
+    return isOutOfStock(productOrStatus) ? 'stock-out' : 'stock-ok'
+  }
+  return String(productOrStatus || '').trim() === 'Hết hàng' ? 'stock-out' : 'stock-ok'
 }
 
 const addedSuccess = reactive({})
@@ -3172,32 +4967,29 @@ function addProductToCart(product) {
   const qtyToAdd = productQty[product.Ma_hang] || 1
   const ghiChuMoi = productNotes[product.Ma_hang] || ''
 
-  if (product.So_luong_kho === 0) {
-    toast('error', 'Sản phẩm đã HẾT HÀNG trong kho!')
+  if (isOutOfStock(product)) {
+    toast('error', 'Sản phẩm đang ở trạng thái HẾT HÀNG!')
     return
   }
 
+  const targetMember = getTargetMemberPayload()
+
   /* ===== CHECK EXISTS & AGGREGATE ===== */
   const maHangKey = product.Ma_hang
-  const sizeKey = product.Size
-  const dvtKey = product.Dvt
+  const sizeKey = product.Size || ''
+  const dvtKey = product.Dvt || ''
 
   const existingItemIndex = items.value.findIndex(i => 
     (i.Ma_hang || i.maHang) === maHangKey && 
-    i.Size === sizeKey && 
-    i.Dvt === dvtKey
+    (i.Size ?? i.size ?? '') === sizeKey && 
+    (i.Dvt ?? i.dvt ?? '') === dvtKey &&
+    isSameItemOwner(i, targetMember)
   )
 
   if (existingItemIndex > -1) {
     // Aggregation Logic
     const existingItem = items.value[existingItemIndex]
     const newQty = existingItem.So_luong + qtyToAdd
-
-    // Check stock limit
-    if (newQty > product.So_luong_kho) {
-      toast('error', `Số lượng vượt quá tồn kho (Đã có: ${existingItem.So_luong}, Thêm: ${qtyToAdd}, Tồn: ${product.So_luong_kho})`)
-      return
-    }
 
     // Calculations
     const giaGoc = Number(product.Gia_goc) || 0
@@ -3224,6 +5016,9 @@ function addProductToCart(product) {
     existingItem.tongGiamGiaDong = d.tongGiamTru
     existingItem.Loi_nhuan = Loi_nhuan
     existingItem.loiNhuan = Loi_nhuan
+    if (!existingItem.Nguoi_dat && targetMember.Nguoi_dat) existingItem.Nguoi_dat = targetMember.Nguoi_dat
+    if (!existingItem.Nguoi_dat_id && targetMember.Nguoi_dat_id) existingItem.Nguoi_dat_id = targetMember.Nguoi_dat_id
+    if (!existingItem.Added_by_role && targetMember.Added_by_role) existingItem.Added_by_role = targetMember.Added_by_role
     
     // Merge Notes
     if (ghiChuMoi && ghiChuMoi !== existingItem.Ghi_chu) {
@@ -3233,7 +5028,8 @@ function addProductToCart(product) {
       existingItem.ghiChuHang = existingItem.Ghi_chu
     }
 
-    toast('success', `✅ Đã cộng dồn +${qtyToAdd} vào ${product.Ten_hang}`)
+    const ownerSuffix = showMemberTargetBar.value && targetMember.Nguoi_dat ? ` (${targetMember.Nguoi_dat})` : ''
+    toast('success', `✅ Đã cộng dồn +${qtyToAdd} vào ${product.Ten_hang}${ownerSuffix}`)
     highlightRow(existingItemIndex)
 
     // Trigger Success State
@@ -3263,16 +5059,12 @@ function addProductToCart(product) {
       Ngay_tao_duong_lich: formatDateTimeVN(),
       Ma_hang: product.Ma_hang,
       Ten_hang: product.Ten_hang,
-      Ma_nha_cung_cap: product.Ma_nha_cung_cap,
-      Ten_nha_cung_cap: product.Ten_nha_cung_cap,
       Trang_thai: product.Trang_thai,
       Danh_muc: product.Danh_muc,
       Size: product.Size,
       Dvt: product.Dvt,
-      Lang: product.Lang || 'vi',
-      Don_vi_tien_te: product.Don_vi_tien_te || 'VND',
-      lang: product.Lang || 'vi',
-      donViTienTe: product.Don_vi_tien_te || 'VND',
+      Don_vi_tien_te: product.Don_vi_tien_te || 'P',
+      donViTienTe: product.Don_vi_tien_te || 'P',
       So_luong: qtyToAdd,
       Gia_goc: giaGoc,
       Gia_ban: giaBan,
@@ -3282,6 +5074,9 @@ function addProductToCart(product) {
       Loi_nhuan: loiNhuan,
       Ghi_chu: ghiChuMoi,
       ghiChuHang: ghiChuMoi,
+      Nguoi_dat: targetMember.Nguoi_dat,
+      Nguoi_dat_id: targetMember.Nguoi_dat_id,
+      Added_by_role: targetMember.Added_by_role,
       soLuong: qtyToAdd,
       giaGoc: giaGoc,
       giaBan: giaBan,
@@ -3297,8 +5092,6 @@ function addProductToCart(product) {
       tenHang: product.Ten_hang,
       size: product.Size,
       dvt: product.Dvt,
-      maNCC: product.Ma_nha_cung_cap,
-      tenNCC: product.Ten_nha_cung_cap,
       danhMuc: product.Danh_muc,
       trangThai: product.Trang_thai,
     })
@@ -12808,22 +14601,40 @@ textarea:focus {
 </style>
 
 <style scoped>
-/* ================= MOBILE PILL TABS (REFACTORED) ================= */
+/* ================= MOBILE SUB-DOCK (ABOVE BOTTOM BAR) ================= */
+.mobile-entry-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1045;
+  background: transparent;
+}
+
 .mobile-tabs-header {
   display: flex;
-  background: rgba(15, 23, 42, 0.9);
+  align-items: stretch;
+  background: rgba(15, 23, 42, 0.94);
   padding: 5px;
-  position: sticky;
-  top: 12px;
-  left: 0;
-  right: 0;
-  z-index: 3000;
-  margin: 0 16px 12px;
-  border-radius: 100px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  position: fixed;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  left: 14px;
+  right: 14px;
+  top: auto;
+  z-index: 1050;
+  margin: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.45), 0 8px 24px rgba(2, 6, 23, 0.65);
   gap: 4px;
+}
+
+@media (max-width: 768px) {
+  .mobile-tabs-header {
+    bottom: 78px;
+    left: 10px;
+    right: 10px;
+  }
 }
 
 .m-tab-item {
@@ -12836,38 +14647,50 @@ textarea:focus {
   background: transparent;
   border: none;
   color: #94a3b8;
-  padding: 8px 2px;
-  border-radius: 100px;
+  padding: 7px 2px;
+  border-radius: 999px;
   font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.3px;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
   position: relative;
 }
 
 .m-tab-item i {
   font-size: 16px;
-  margin-bottom: 0px;
+  margin-bottom: 0;
+}
+
+.m-tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  line-height: 1.1;
+}
+
+.m-tab-caret {
+  font-size: 13px !important;
+  margin-left: 1px;
 }
 
 .m-tab-item.active {
-  background: #ffffff !important; 
-  color: green !important;   
-  box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2);
+  background: #ffffff !important;
+  color: #15803d !important;
+  box-shadow: 0 4px 14px rgba(255, 255, 255, 0.22);
   transform: scale(1.02);
 }
 
 .m-tab-item.active i {
-  color: green !important;
+  color: #15803d !important;
 }
 
 .m-badge {
   position: absolute;
-  top: 4px;
-  right: 20%;
+  top: 3px;
+  right: 18%;
   background: #ef4444;
   color: white;
   font-size: 9px;
@@ -12877,24 +14700,70 @@ textarea:focus {
   border: 1px solid #0f172a;
 }
 
-/* On Mobile, ensure grid collapses to single column and components take full width */
+/* Shared Grab-sheet helpers (hidden on desktop) */
+.grab-sheet-handle,
+.grab-detail-topbar {
+  display: none;
+}
+
+.text-invoice-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.text-invoice-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.grab-sheet-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.65);
+  color: #cbd5e1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.grab-sheet-close:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+/* On Mobile, ensure single scroll flow & Grab-style Bottom Sheet modals */
 @media (max-width: 1024px) {
   .layout-grid {
-    display: block !important; /* Force block so v-show works nicely */
+    display: block !important;
+    height: auto !important;
   }
-  
-  .left-stack, .right-stack {
+
+  .left-stack,
+  .right-stack {
     width: 100% !important;
     display: block;
     max-width: none !important;
     padding: 0 !important;
-    height: 100%;
+    height: auto !important;
     min-height: 0;
   }
 
   .page {
-    padding: 0 0 80px 0 !important; /* Bottom padding for fixed buttons */
-    overflow-x: hidden;
+    padding: 0 0 calc(92px + env(safe-area-inset-bottom)) 0 !important;
+    overflow: visible !important;
+    overflow-x: clip !important;
     --mobile-filter-gap: clamp(3px, 1.2vw, 6px);
     --mobile-filter-height: clamp(30px, 7.5vw, 36px);
     --mobile-filter-font: clamp(9px, 2.1vw, 11px);
@@ -12903,13 +14772,37 @@ textarea:focus {
     --mobile-filter-cat-w: clamp(70px, 22vw, 96px);
     --mobile-filter-size-w: clamp(46px, 14vw, 60px);
     --mobile-filter-btn: clamp(30px, 8vw, 34px);
-    --mobile-content-offset: clamp(150px, 20vh, 200px);
-    --mobile-catalog-pad: clamp(40px, 8vh, 80px);
-    --mobile-order-pad: clamp(12px, 3vh, 28px);
-    --mobile-manual-pad: clamp(40px, 8vh, 80px);
-    --mobile-manual-gap: clamp(20px, 4vh, 40px);
-    height: 100%;
-    min-height: 100%;
+    height: auto !important;
+    min-height: 100% !important;
+  }
+
+  .entry-box {
+    padding: 0 !important;
+    height: auto !important;
+  }
+
+  .entry-box > .entry-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  .entry-box > .entry-header .catalog-toolbar-unified {
+    border-radius: 0 !important;
+    background: rgba(15, 23, 42, 0.96) !important;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 6px 18px rgba(2, 6, 23, 0.45);
+  }
+
+  .entry-body {
+    height: auto !important;
+    overflow: visible !important;
+    border-radius: 0 !important;
+    border: none !important;
+    padding: 12px 10px 16px !important;
   }
 
   .manual-entry-header {
@@ -12923,8 +14816,8 @@ textarea:focus {
     background: transparent;
     border: none;
     box-shadow: none;
-    padding: 0;
-    overflow: visible;
+    padding: 0 !important;
+    overflow: visible !important;
   }
 
   .mobile-filters-row {
@@ -12988,87 +14881,105 @@ textarea:focus {
     margin-bottom: 0 !important;
     border-radius: 0 !important;
     border: none !important;
-    border-bottom: 1px dashed rgba(255,255,255,0.1) !important;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.1) !important;
   }
 
-  /* Customer/Delivery Box Tweaks */
+  /* Single-flow Customer / Delivery Tab */
   .info-row-2col {
     display: block !important;
   }
 
-  /* Fixed Bottom Bar for Payment Actions */
-  .mobile-fixed-bottom {
-    position: fixed !important;
-    bottom: 70px !important;
-    left: 0 !important;
-    width: 100% !important;
-    background: #1e293b !important; /* Slightly lighter than bg */
-    padding: 12px !important;
-    z-index: 1000 !important;
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.5) !important;
-    border-top: 1px solid rgba(255,255,255,0.1) !important;
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    align-items: stretch !important;
-    gap: 8px !important;
-    height: auto !important;
+  .customer-scroll-container {
+    max-height: none !important;
+    overflow: visible !important;
+    padding-bottom: 4px !important;
   }
-  
-  .mobile-fixed-bottom button {
-    flex: 1 !important;
-    margin: 0 !important;
-    font-size: 13px !important;
+
+  .customer-next-wrap,
+  .order-next-wrap {
+    padding: 12px 12px 8px !important;
+    max-width: 480px;
   }
-  
-  /* Ensure content is not hidden behind fixed bottom */
+
+  /* Single-flow Payment Tab (Option 1B: 1 luồng cuộn) */
   .bottom-row {
-    padding-bottom: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 14px !important;
+    padding: 12px !important;
   }
 
   .payment-scroll {
-    flex: 1;
-    min-height: 0;
-    max-height: calc(100dvh - var(--mobile-content-offset));
-    overflow-y: auto;
-    padding-bottom: calc(90px + env(safe-area-inset-bottom));
-    -webkit-overflow-scrolling: touch;
+    flex: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding-bottom: 0 !important;
   }
 
-  /* Catalog Scroll Fix */
+  .submit-stack.mobile-scroll-submit {
+    position: static !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    padding: 4px 0 8px !important;
+  }
+
+  .submit-stack.mobile-scroll-submit .btn-preview,
+  .submit-stack.mobile-scroll-submit .btn-text {
+    min-height: 48px !important;
+    padding: 10px 8px !important;
+    font-size: 12px !important;
+    flex-direction: row !important;
+    gap: 6px !important;
+  }
+
+  .submit-stack.mobile-scroll-submit .btn-complete {
+    grid-column: 1 / -1;
+    min-height: 56px !important;
+    padding: 14px 16px !important;
+    font-size: 16px !important;
+    flex-direction: row !important;
+    gap: 8px !important;
+  }
+
+  /* Single-flow Catalog & Order & Manual Entry */
   .catalog-grid-section {
-    height: calc(100dvh - var(--mobile-content-offset)) !important; /* Switch to dvh for mobile browsers */
-    overflow-y: auto !important;
-    padding-bottom: calc(var(--mobile-catalog-pad) + env(safe-area-inset-bottom)) !important;
-    -webkit-overflow-scrolling: touch;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding-bottom: 8px !important;
   }
 
   .order-box {
-    height: 100%;
+    height: auto !important;
     min-height: 0;
-    overflow: hidden;
+    overflow: visible !important;
+    padding: 14px 12px !important;
   }
 
   .order-card-container {
-    flex: 1;
+    flex: none;
     min-height: 0;
   }
 
   .order-card-list {
-    padding-bottom: calc(var(--mobile-order-pad) + env(safe-area-inset-bottom));
+    max-height: none !important;
+    overflow: visible !important;
+    padding-bottom: 8px !important;
   }
 
-  /* Manual Entry Scroll Parent */
   .manual-mobile-block-parent {
-    max-height: calc(100dvh - var(--mobile-content-offset)) !important;
+    max-height: none !important;
     height: auto !important;
-    overflow-y: auto !important;
-    padding: 10px 10px var(--mobile-manual-pad) !important;
-    -webkit-overflow-scrolling: touch;
+    overflow: visible !important;
+    padding: 12px 10px 16px !important;
     display: block;
-    background: rgba(15, 23, 42, 0.4); 
+    background: rgba(15, 23, 42, 0.4);
     border-radius: 16px;
-    margin: 0 8px;
+    margin: 8px;
   }
 
   .manual-content {
@@ -13077,42 +14988,243 @@ textarea:focus {
   }
 
   .mv4-card {
-    margin-bottom: calc(var(--mobile-manual-gap) + env(safe-area-inset-bottom));
+    margin-bottom: 8px;
+  }
+
+  /* ================= GRAB-STYLE MOBILE BOTTOM SHEET MODALS ================= */
+  .grab-modal-overlay {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 9999 !important;
+    display: flex !important;
+    align-items: flex-end !important;
+    justify-content: center !important;
+    padding: max(96px, calc(env(safe-area-inset-top) + 76px)) 0 0 0 !important;
+    background: rgba(2, 6, 23, 0.72) !important;
+    backdrop-filter: blur(6px) !important;
+    -webkit-backdrop-filter: blur(6px) !important;
+  }
+
+  .grab-sheet {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: calc(100dvh - max(96px, calc(env(safe-area-inset-top) + 76px))) !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    border-radius: 22px 22px 0 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
+    border-top: 1px solid rgba(148, 163, 184, 0.22) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    box-shadow: 0 -16px 40px rgba(0, 0, 0, 0.65) !important;
+    animation: grabSheetSlideUp 0.26s cubic-bezier(0.22, 1, 0.36, 1) !important;
+  }
+
+  .grab-sheet-handle {
+    display: block;
+    width: 44px;
+    height: 5px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.42);
+    margin: 10px auto 4px;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  /* 1. Product Detail Sheet */
+  .product-detail-box.grab-sheet {
+    padding: 0 !important;
+    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%) !important;
+  }
+
+  .product-detail-box.grab-sheet .desktop-detail-close {
+    display: none !important;
+  }
+
+  .grab-detail-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 16px 12px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+    flex-shrink: 0;
+  }
+
+  .grab-detail-topbar-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: #f8fafc;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .product-detail-box.grab-sheet .detail-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+    padding: 14px 16px 0 !important;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .product-detail-box.grab-sheet .main-image {
+    height: 210px !important;
+  }
+
+  .product-detail-box.grab-sheet .detail-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    margin: 12px -16px 0;
+    padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+    background: rgba(15, 23, 42, 0.97);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(148, 163, 184, 0.14);
+  }
+
+  /* 2 & 3. Edit Cart Item & Global Discount Sheets */
+  .premium-modal-v4.grab-sheet .pmv4-header {
+    padding: 8px 16px 12px;
+    flex-shrink: 0;
+  }
+
+  .premium-modal-v4.grab-sheet .pmv4-close {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(148, 163, 184, 0.12);
+    color: #e2e8f0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .premium-modal-v4.grab-sheet .pmv4-body {
+    padding: 16px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .premium-modal-v4.grab-sheet .pmv4-footer {
+    padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
+    flex-shrink: 0;
+    background: rgba(15, 23, 42, 0.98);
+  }
+
+  .premium-modal-v4.grab-sheet .pmv4-btn-ghost {
+    flex: 1;
+    min-height: 44px;
+    background: rgba(148, 163, 184, 0.1);
+  }
+
+  .premium-modal-v4.grab-sheet .pmv4-btn-primary {
+    flex: 2;
+    min-height: 44px;
+  }
+
+  /* 4. Text Invoice Sheet */
+  .text-invoice-box.grab-sheet {
+    padding: 0 16px calc(16px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .text-invoice-box.grab-sheet .text-invoice-header {
+    padding: 6px 0 10px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+    flex-shrink: 0;
+  }
+
+  .text-invoice-box.grab-sheet textarea {
+    flex: 1;
+    min-height: 160px;
+    max-height: 46dvh;
+    overflow-y: auto;
+  }
+
+  .text-invoice-box.grab-sheet .actions {
+    flex-shrink: 0;
+    padding-top: 12px;
+    margin-top: 0;
+  }
+
+  .text-invoice-box.grab-sheet .actions .btn {
+    flex: 1;
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  /* 5. VIP Success Sheet */
+  .vip-success-card.grab-sheet {
+    padding: 6px 24px calc(24px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .page {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+@keyframes grabSheetSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(48px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 </style>
 
 <style scoped>
-/* ================= MOBILE ENTRY DROPDOWN (TAB HEADER) ================= */
+/* ================= MOBILE ENTRY DROP-UP (SUB-DOCK) ================= */
 .mobile-entry-dropdown {
   position: absolute;
-  top: 100%;
+  bottom: calc(100% + 10px);
+  top: auto;
   left: 0;
-  width: 100%;
-  background: #1e293b; /* Matches dark background */
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  min-width: 150px;
+  width: max-content;
+  background: rgba(15, 23, 42, 0.98);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 14px;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.55);
   z-index: 2000;
-  margin-top: 4px;
+  margin: 0;
   overflow: hidden;
-  animation: slideDown 0.2s ease-out;
+  animation: subDockDropUp 0.18s cubic-bezier(0.22, 1, 0.36, 1);
   display: flex;
   flex-direction: column;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .me-dropdown-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 14px;
-  color: #94a3b8;
+  padding: 12px 16px;
+  color: #cbd5e1;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   background: transparent;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   text-align: left;
+  white-space: nowrap;
 }
 
 .me-dropdown-item:last-child {
@@ -13124,13 +15236,19 @@ textarea:focus {
 }
 
 .me-dropdown-item.active {
-  background: rgba(16, 185, 129, 0.15); /* Green tint */
-  color: #34d399; /* Green text */
+  background: rgba(16, 185, 129, 0.16);
+  color: #34d399;
 }
 
-@keyframes slideDown {
-  from { opacity: 0; transform: translateY(-5px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes subDockDropUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>
 
@@ -13147,5 +15265,586 @@ textarea:focus {
   background: rgba(15, 23, 42, 0.6) !important; /* Slightly darker input bg */
   border-color: rgba(148, 163, 184, 0.1) !important;
   color: #e2e8f0 !important;
+}
+
+/* ================= MULTI-ORDER TABS BAR ================= */
+.invoice-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  margin-bottom: 10px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.68);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.invoice-tabs-scroll {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 2px;
+}
+
+.invoice-tab-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 190px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(30, 41, 59, 0.72);
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.16s ease;
+}
+
+.invoice-tab-pill:hover {
+  border-color: rgba(52, 211, 153, 0.45);
+  color: #f8fafc;
+}
+
+.invoice-tab-pill.active {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.24), rgba(5, 150, 105, 0.28));
+  border-color: rgba(52, 211, 153, 0.7);
+  color: #ecfdf5;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.22);
+}
+
+.invoice-tab-pill .itp-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #64748b;
+  flex-shrink: 0;
+}
+
+.invoice-tab-pill.active .itp-dot {
+  background: #34d399;
+}
+
+.invoice-tab-pill.is-approved .itp-dot {
+  background: #38bdf8;
+}
+
+.invoice-tab-pill .itp-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.invoice-tab-pill .itp-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.9);
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.invoice-tab-pill .itp-close {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 13px;
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+
+.invoice-tab-pill .itp-close:hover {
+  background: rgba(239, 68, 68, 0.24);
+  color: #fecaca;
+}
+
+.invoice-tab-add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 11px;
+  border-radius: 9px;
+  border: 1px dashed rgba(52, 211, 153, 0.55);
+  background: rgba(16, 185, 129, 0.12);
+  color: #6ee7b7;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.16s ease;
+}
+
+.invoice-tab-add-btn:hover {
+  background: rgba(16, 185, 129, 0.24);
+  border-style: solid;
+  color: #ecfdf5;
+}
+
+/* ================= ORDER VIEW MODE (THEO TỪNG NGƯỜI / DẠNG GỘP) ================= */
+.order-header-right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.order-view-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.ov-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.16s ease;
+}
+
+.ov-btn:hover {
+  color: #e2e8f0;
+}
+
+.ov-btn.active {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.26), rgba(5, 150, 105, 0.34));
+  color: #ecfdf5;
+  box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.55);
+}
+
+.order-table-empty {
+  text-align: center;
+  padding: 20px 12px !important;
+  color: #64748b;
+  font-style: italic;
+}
+
+.order-group-row td {
+  background: linear-gradient(90deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.86)) !important;
+  border-top: 1px solid rgba(56, 189, 248, 0.25) !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18) !important;
+  padding: 7px 12px !important;
+}
+
+.ogr-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ogr-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #e2e8f0;
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.ogr-left i {
+  color: #38bdf8;
+  font-size: 14px;
+}
+
+.ogr-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.ogr-qty {
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.ogr-total {
+  color: #34d399;
+  font-weight: 800;
+}
+
+.omg-badge {
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(56, 189, 248, 0.16);
+  color: #7dd3fc;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.omg-badge.role-host {
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.omg-badge.role-admin {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fcd34d;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.order-member-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.order-member-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 11px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+}
+
+.omg-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: #f1f5f9;
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.omg-left i {
+  color: #38bdf8;
+  flex-shrink: 0;
+}
+
+.omg-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.omg-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.omg-qty {
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.omg-total {
+  color: #34d399;
+  font-weight: 800;
+}
+
+.order-member-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.om-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  background: rgba(15, 23, 42, 0.65);
+  color: #bae6fd;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.om-chip:hover {
+  border-color: rgba(56, 189, 248, 0.65);
+  background: rgba(30, 41, 59, 0.9);
+}
+
+.om-chip.is-admin {
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #fde68a;
+}
+
+.om-chip em {
+  font-style: italic;
+  color: #94a3b8;
+  font-size: 10.5px;
+}
+
+@media (max-width: 640px) {
+  .order-header-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .ov-btn {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+}
+
+/* ================= ONLINE ORDER LIFECYCLE SYNC (STATUS & ACTIONS) ================= */
+.itp-status-tag {
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.itp-status-tag.status-waiting,
+.order-live-status-pill.status-waiting {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+}
+
+.itp-status-tag.status-processing,
+.order-live-status-pill.status-processing {
+  background: rgba(6, 182, 212, 0.18);
+  color: #67e8f9;
+  border: 1px solid rgba(6, 182, 212, 0.45);
+}
+
+.itp-status-tag.status-shipping,
+.order-live-status-pill.status-shipping {
+  background: rgba(99, 102, 241, 0.22);
+  color: #c7d2fe;
+  border: 1px solid rgba(99, 102, 241, 0.48);
+}
+
+.itp-status-tag.status-done,
+.order-live-status-pill.status-done {
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.48);
+}
+
+.itp-status-tag.status-cancelled,
+.order-live-status-pill.status-cancelled {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+}
+
+.invoice-tab-pill.status-waiting .itp-dot { background: #fbbf24; }
+.invoice-tab-pill.status-processing .itp-dot { background: #22d3ee; }
+.invoice-tab-pill.status-shipping .itp-dot { background: #818cf8; }
+.invoice-tab-pill.status-done .itp-dot { background: #34d399; }
+.invoice-tab-pill.status-cancelled .itp-dot { background: #f87171; }
+
+.order-title-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.order-live-status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.order-back-donhang-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(30, 41, 59, 0.75);
+  color: #cbd5e1;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.order-back-donhang-btn:hover {
+  border-color: rgba(56, 189, 248, 0.55);
+  color: #f8fafc;
+}
+
+.submit-stack .btn-order-draft {
+  background: linear-gradient(135deg, #334155, #475569) !important;
+  color: #f8fafc !important;
+}
+
+.submit-stack .btn-order-approve {
+  background: linear-gradient(135deg, #0891b2, #06b6d4) !important;
+  color: #ffffff !important;
+}
+
+.submit-stack .btn-order-ship {
+  background: linear-gradient(135deg, #4f46e5, #6366f1) !important;
+  color: #ffffff !important;
+}
+
+.submit-stack .btn-order-cancel {
+  background: linear-gradient(135deg, #dc2626, #ef4444) !important;
+  color: #ffffff !important;
+}
+
+.entry-member-target-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.emtb-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.emtb-pills {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.emtb-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(30, 41, 59, 0.8);
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.emtb-pill:hover {
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #f8fafc;
+}
+
+.emtb-pill.active {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(6, 182, 212, 0.25));
+  border-color: rgba(52, 211, 153, 0.75);
+  color: #ecfdf5;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.22);
+}
+
+.emtb-badge {
+  font-style: normal;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.55);
+  color: #a5f3fc;
+}
+
+.ogr-add-for-btn,
+.omg-add-for-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: rgba(30, 41, 59, 0.85);
+  color: #7dd3fc;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.ogr-add-for-btn:hover,
+.omg-add-for-btn:hover {
+  border-color: rgba(56, 189, 248, 0.7);
+  color: #e0f2fe;
+}
+
+.ogr-add-for-btn.active,
+.omg-add-for-btn.active {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: rgba(52, 211, 153, 0.75);
+  color: #6ee7b7;
+}
+
+.pmv4-member-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pmv4-member-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border-radius: 9px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(30, 41, 59, 0.75);
+  color: #cbd5e1;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pmv4-member-pill.active {
+  background: rgba(14, 165, 233, 0.22);
+  border-color: rgba(56, 189, 248, 0.8);
+  color: #e0f2fe;
 }
 </style>

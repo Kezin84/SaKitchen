@@ -1,25 +1,37 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { API_URL, IMGBB_KEY } from '@/config/api'
-/* ======================
-   CONFIG
-====================== */
-
+import { getOneSheet, dispatchAction } from '@/config/api'
+import {
+  SUPPORTED_DATA_LANGS,
+  createEmptyNoticeI18n,
+  normalizeNoticeI18n,
+  resolveNoticeText,
+  getNoticeTranslatedLangs,
+} from '@/utils/i18nData'
 
 /* ======================
    STATE
 ====================== */
 const thongBao = ref([])
-const ncc = ref(null)
-
-const noiDung = ref('')
+const activeAddLang = ref('vi')
+const addI18n = ref(createEmptyNoticeI18n())
+const previewLang = ref('vi')
 const loading = ref(false)
 const tableLoading = ref(true)
 
 /* ===== EDIT MODAL ===== */
 const showEditModal = ref(false)
 const editingItem = ref(null)
-const editNoiDung = ref('')
+const activeEditLang = ref('vi')
+const editI18n = ref(createEmptyNoticeI18n())
+
+const hasAnyAddText = computed(() =>
+  SUPPORTED_DATA_LANGS.some((l) => addI18n.value[l.code]?.Noi_dung?.trim()),
+)
+
+const hasAnyEditText = computed(() =>
+  SUPPORTED_DATA_LANGS.some((l) => editI18n.value[l.code]?.Noi_dung?.trim()),
+)
 
 /* ======================
    HELPERS
@@ -45,53 +57,47 @@ function genNotiId() {
 async function loadThongBao() {
   tableLoading.value = true
   try {
-    const res = await fetch(`${API_URL}?action=sheet&sheet=thong_bao`)
-    const json = await res.json()
+    const json = await getOneSheet('thong_bao')
     thongBao.value = (json.data || []).reverse()
   } finally {
     tableLoading.value = false
   }
 }
 
-async function loadNCC() {
-  const res = await fetch(`${API_URL}?action=sheet&sheet=nha_cung_cap`)
-  const json = await res.json()
-  ncc.value = json.data?.[0] || null
-}
-
 /* ======================
    ADD
 ====================== */
 async function addThongBao() {
-  if (!noiDung.value.trim()) {
-    alert('Chưa nhập nội dung')
-    return
-  }
-  if (!ncc.value) {
-    alert('Chưa có NCC')
+  if (!hasAnyAddText.value) {
+    alert('Chưa nhập nội dung thông báo')
     return
   }
 
   loading.value = true
+  try {
+    const viDefault =
+      addI18n.value.vi.Noi_dung.trim() ||
+      SUPPORTED_DATA_LANGS.map((l) => addI18n.value[l.code].Noi_dung.trim()).find(Boolean) ||
+      ''
 
-  fetch(API_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+    await dispatchAction({
       action: 'addThongBao',
       data: {
         ID: genNotiId(),
-        Noi_dung: noiDung.value.trim(),
-        Ma_nha_cung_cap: ncc.value.Ma_nha_cung_cap,
-        Ten_nha_cung_cap: ncc.value.Ten_nha_cung_cap,
+        Noi_dung: viDefault,
+        i18n: addI18n.value,
       },
-    }),
-  })
+    })
 
-  noiDung.value = ''
-  setTimeout(loadThongBao, 800)
-  loading.value = false
+    addI18n.value = createEmptyNoticeI18n()
+    activeAddLang.value = 'vi'
+    await loadThongBao()
+  } catch (e) {
+    console.error(e)
+    alert('Lỗi thêm thông báo')
+  } finally {
+    loading.value = false
+  }
 }
 
 /* ======================
@@ -99,68 +105,71 @@ async function addThongBao() {
 ====================== */
 function openEditModal(item) {
   editingItem.value = item
-  editNoiDung.value = item.Noi_dung
+  editI18n.value = normalizeNoticeI18n(item)
+  activeEditLang.value = previewLang.value || 'vi'
   showEditModal.value = true
 }
 
 async function saveEdit() {
-  if (!editNoiDung.value.trim()) {
+  if (!hasAnyEditText.value) {
     alert('Nội dung trống')
     return
   }
 
   loading.value = true
+  try {
+    const viDefault =
+      editI18n.value.vi.Noi_dung.trim() ||
+      SUPPORTED_DATA_LANGS.map((l) => editI18n.value[l.code].Noi_dung.trim()).find(Boolean) ||
+      ''
 
-  fetch(API_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+    await dispatchAction({
       action: 'updateThongBao',
       data: {
         ID: editingItem.value.ID,
-        Noi_dung: editNoiDung.value.trim(),
-        Ma_nha_cung_cap: editingItem.value.Ma_nha_cung_cap,
-        Ten_nha_cung_cap: editingItem.value.Ten_nha_cung_cap,
+        Noi_dung: viDefault,
+        i18n: editI18n.value,
       },
-    }),
-  })
+    })
 
-  closeEditModal()
-  setTimeout(loadThongBao, 800)
+    closeEditModal()
+    await loadThongBao()
+  } catch (e) {
+    console.error(e)
+    alert('Lỗi cập nhật thông báo')
+    loading.value = false
+  }
 }
 
 function closeEditModal() {
   showEditModal.value = false
   editingItem.value = null
-  editNoiDung.value = ''
+  editI18n.value = createEmptyNoticeI18n()
   loading.value = false
 }
 
 /* ======================
    DELETE
 ====================== */
-function deleteThongBao(id) {
+async function deleteThongBao(id) {
   if (!confirm('Xóa thông báo này?')) return
 
-  fetch(API_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  try {
+    await dispatchAction({
       action: 'deleteThongBao',
       ID: id,
-    }),
-  })
-
-  setTimeout(loadThongBao, 600)
+    })
+    await loadThongBao()
+  } catch (e) {
+    console.error(e)
+    alert('Lỗi xóa thông báo')
+  }
 }
 
 /* ======================
    INIT
 ====================== */
 onMounted(async () => {
-  await loadNCC()
   await loadThongBao()
 })
 </script>
@@ -170,10 +179,9 @@ onMounted(async () => {
     <!-- HEADER -->
     <div class="page-header">
       <div class="header-content">
-       
         <div>
           <h1 style="color: rgb(134, 239, 172); text-shadow: 0 0 10px rgba(34, 197, 94, 0.5);font-weight: bold;">QUẢN LÝ THÔNG BÁO WEB</h1>
-          <p class="page-subtitle">Thêm, chỉnh sửa và quản lý thông báo hiển thị</p>
+          <p class="page-subtitle">Gom đa ngôn ngữ (VI · EN · ZH · FIL · KO) trên cùng 1 thông báo</p>
         </div>
       </div>
     </div>
@@ -182,26 +190,40 @@ onMounted(async () => {
     <div class="card add-card">
       <div class="card-header">
         <h3 class="card-title"><i class="ri-add-circle-fill"></i>Thêm thông báo mới</h3>
+        <div class="lang-tabs">
+          <button
+            v-for="l in SUPPORTED_DATA_LANGS"
+            :key="l.code"
+            type="button"
+            class="lang-tab-btn"
+            :class="{ active: activeAddLang === l.code, filled: Boolean(addI18n[l.code]?.Noi_dung?.trim()) }"
+            @click="activeAddLang = l.code"
+          >
+            <img :src="l.flagImg" :alt="l.short" class="lang-flag" />
+            <span>{{ l.short }}</span>
+            <span v-if="addI18n[l.code]?.Noi_dung?.trim()" class="lang-dot"></span>
+          </button>
+        </div>
       </div>
       <div class="card-body">
         <div class="add-area">
           <input
-            v-model="noiDung"
-            placeholder="Nhập nội dung thông báo..."
+            v-model="addI18n[activeAddLang].Noi_dung"
+            :placeholder="`Nhập nội dung thông báo (${SUPPORTED_DATA_LANGS.find(x => x.code === activeAddLang)?.label})...`"
             class="input-field"
             @keypress.enter="addThongBao"
           />
           <button
             @click="addThongBao"
-            :disabled="loading || !noiDung.trim()"
+            :disabled="loading || !hasAnyAddText"
             class="btn btn-primary"
           >
             <span v-if="loading" class="btn-loading">
               <span class="spinner"></span>
               Đang thêm...
             </span>
-            <span v-else>            
-              Thêm Thông báo 
+            <span v-else>
+              Thêm Thông báo
             </span>
           </button>
         </div>
@@ -210,9 +232,25 @@ onMounted(async () => {
 
     <!-- LIST -->
     <div class="card list-card">
-      <div class="card-header">
+      <div class="card-header list-header-wrap">
         <h3 class="card-title"><i class="ri-notification-fill"></i> Danh sách Thông báo</h3>
-        <div class="badge">{{ thongBao.length }} thông báo</div>
+        <div class="header-right-tools">
+          <div class="lang-tabs mini">
+            <button
+              v-for="l in SUPPORTED_DATA_LANGS"
+              :key="l.code"
+              type="button"
+              class="lang-tab-btn"
+              :class="{ active: previewLang === l.code }"
+              @click="previewLang = l.code"
+              :title="`Xem bản ${l.label}`"
+            >
+              <img :src="l.flagImg" :alt="l.short" class="lang-flag" />
+              <span>{{ l.short }}</span>
+            </button>
+          </div>
+          <div class="badge">{{ thongBao.length }} thông báo</div>
+        </div>
       </div>
 
       <!-- TABLE LOADING -->
@@ -230,7 +268,7 @@ onMounted(async () => {
             <thead>
               <tr>
                 <th class="th-index">Vị trí hiển thị</th>
-                <th class="th-content">Nội dung</th>
+                <th class="th-content">Nội dung ({{ SUPPORTED_DATA_LANGS.find(x => x.code === previewLang)?.label }})</th>
                 <th class="th-action">Thao tác</th>
               </tr>
             </thead>
@@ -240,16 +278,24 @@ onMounted(async () => {
                   <div class="index-badge">#{{ i + 1 }}</div>
                 </td>
                 <td class="td-content" data-label="Nội dung">
-                  <div class="content-text">{{ t.Noi_dung }}</div>
+                  <div class="content-text">{{ resolveNoticeText(t, previewLang) }}</div>
+                  <div class="lang-badges-row">
+                    <span
+                      v-for="l in SUPPORTED_DATA_LANGS"
+                      :key="l.code"
+                      class="lang-mini-pill"
+                      :class="{ ok: getNoticeTranslatedLangs(t).includes(l.code) }"
+                    >
+                      {{ l.short }}
+                    </span>
+                  </div>
                 </td>
                 <td class="td-action" data-label="Thao tác">
                   <div class="action-group">
                     <button @click="openEditModal(t)" class="btn-icon-action btn-edit" title="Chỉnh sửa">
-                      
                       <span class="text">Sửa</span>
                     </button>
                     <button @click="deleteThongBao(t.ID)" class="btn-icon-action btn-delete" title="Xóa">
-                      
                       <span class="text">Xóa</span>
                     </button>
                   </div>
@@ -278,7 +324,6 @@ onMounted(async () => {
         <div class="modal-container">
           <div class="modal-header">
             <div class="modal-title-group">
-              
               <h3 class="modal-title">Chỉnh sửa Thông báo</h3>
             </div>
             <button @click="closeEditModal" class="modal-close">
@@ -287,13 +332,30 @@ onMounted(async () => {
           </div>
 
           <div class="modal-body">
+            <div class="lang-tabs modal-lang-tabs">
+              <button
+                v-for="l in SUPPORTED_DATA_LANGS"
+                :key="l.code"
+                type="button"
+                class="lang-tab-btn"
+                :class="{ active: activeEditLang === l.code, filled: Boolean(editI18n[l.code]?.Noi_dung?.trim()) }"
+                @click="activeEditLang = l.code"
+              >
+                <img :src="l.flagImg" :alt="l.short" class="lang-flag" />
+                <span>{{ l.label }}</span>
+                <span v-if="editI18n[l.code]?.Noi_dung?.trim()" class="lang-dot"></span>
+              </button>
+            </div>
+
             <div class="modal-field">
-              <label class="modal-label">Nội dung thông báo</label>
+              <label class="modal-label">
+                Nội dung ({{ SUPPORTED_DATA_LANGS.find(x => x.code === activeEditLang)?.label }})
+              </label>
               <textarea
-                v-model="editNoiDung"
+                v-model="editI18n[activeEditLang].Noi_dung"
                 rows="5"
                 class="modal-textarea"
-                placeholder="Nhập nội dung thông báo..."
+                :placeholder="`Nhập nội dung thông báo tiếng ${SUPPORTED_DATA_LANGS.find(x => x.code === activeEditLang)?.label}...`"
               ></textarea>
             </div>
           </div>
@@ -305,7 +367,7 @@ onMounted(async () => {
             </button>
             <button
               @click="saveEdit"
-              :disabled="loading || !editNoiDung.trim()"
+              :disabled="loading || !hasAnyEditText"
               class="btn btn-success"
             >
               <span v-if="loading" class="btn-loading">
@@ -313,7 +375,6 @@ onMounted(async () => {
                 Đang lưu...
               </span>
               <span v-else>
-                
                 Lưu thay đổi
               </span>
             </button>
@@ -975,5 +1036,80 @@ onMounted(async () => {
     font-size: 13px;
     padding: 10px 20px;
   }
+}
+
+/* MULTI-LANGUAGE TABS & BADGES */
+.list-header-wrap {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.header-right-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.lang-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.modal-lang-tabs {
+  margin-bottom: 14px;
+}
+.lang-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.55);
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.lang-tab-btn:hover {
+  border-color: rgba(34, 197, 94, 0.5);
+  color: #ffffff;
+}
+.lang-tab-btn.active {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: #22c55e;
+  color: #86efac;
+}
+.lang-flag {
+  width: 16px;
+  height: 12px;
+  object-fit: cover;
+  border-radius: 2px;
+}
+.lang-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+}
+.lang-badges-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+.lang-mini-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(148, 163, 184, 0.12);
+  color: #64748b;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+.lang-mini-pill.ok {
+  background: rgba(34, 197, 94, 0.16);
+  color: #86efac;
+  border-color: rgba(34, 197, 94, 0.35);
 }
 </style>

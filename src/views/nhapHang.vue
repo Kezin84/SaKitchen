@@ -18,22 +18,36 @@
             <label>Mã hàng (ẩn)</label>
             <input v-model="form.Ma_hang" readonly />
           </div>
-          <div class="hidden-field">
-            <label>Mã NCC (ẩn)</label>
-            <input v-model="form.Ma_nha_cung_cap" disabled />
-          </div>
-          <div class="hidden-field">
-            <label>Tên NCC (ẩn)</label>
-            <input v-model="form.Ten_nha_cung_cap" disabled />
-          </div>
 
           <div class="form-panels">
             <div class="panel">
               <div class="panel-header">
                 <i class="app-ico ri-layout-grid-line"></i>
-                Hình ảnh & tên
+                Hình ảnh & tên (Đa ngôn ngữ)
               </div>
               <div class="panel-body panel-grid">
+                <!-- TAB 5 NGÔN NGỮ -->
+                <div class="field span-12">
+                  <label>Ngôn ngữ nội dung món (gộp chung 1 mã hàng)</label>
+                  <div class="lang-tabs-bar">
+                    <button
+                      v-for="lang in SUPPORTED_DATA_LANGS"
+                      :key="lang.code"
+                      type="button"
+                      class="lang-tab-btn"
+                      :class="{ active: activeFormLang === lang.code }"
+                      @click="activeFormLang = lang.code"
+                    >
+                      <img :src="lang.flagImg" :alt="lang.short" class="lang-tab-flag" />
+                      <span>{{ lang.short }}</span>
+                      <span
+                        class="lang-tab-dot"
+                        :class="{ filled: hasLangContent(form.i18n, lang.code) }"
+                      ></span>
+                    </button>
+                  </div>
+                </div>
+
                 <div class="field span-6">
                   <label>ẢNH CHÍNH</label>
 
@@ -54,22 +68,22 @@
                 </div>
 
                 <div class="field span-6 relative" ref="suggestionRef">
-                  <label>Tên hàng</label>
+                  <label>Tên hàng ({{ getLangShort(activeFormLang) }})</label>
                   <div class="input-icon-wrap">
                     <input 
-                      v-model="form.Ten_hang" 
-                      placeholder="VD: Áo thun cotton..." 
+                      v-model="form.i18n[activeFormLang].Ten_hang" 
+                      :placeholder="activeFormLang === 'vi' ? 'VD: Cơm ba chỉ cháy cạnh...' : (form.i18n.vi.Ten_hang ? `Dịch từ: ${form.i18n.vi.Ten_hang}` : `Nhập tên món (${getLangLabel(activeFormLang)})...`)" 
                       @focus="onFocus"
                     />
                     <!-- LOAD ICON -->
                     <div class="input-status-icon">
                       <i v-if="isLoadingProducts" class="ri-loader-4-line spin-icon"></i>
-                      <i v-else-if="!form.Ten_hang" class="ri-checkbox-circle-fill success-icon"></i>
+                      <i v-else-if="!form.i18n[activeFormLang].Ten_hang" class="ri-checkbox-circle-fill success-icon"></i>
                     </div>
 
                     <!-- NÚT XOÁ -->
                      <button 
-                      v-if="form.Ten_hang" 
+                      v-if="form.i18n[activeFormLang].Ten_hang || isExistingProductSelected" 
                       type="button" 
                       class="btn-clear-input"
                       @click="clearSearch" 
@@ -89,17 +103,16 @@
                     >
                       <img :src="p.Main_img" v-if="p.Main_img" class="suggest-thumb" />
                       <div class="suggest-info">
-                        <div class="suggest-name">{{ p.Ten_hang }}</div>
+                        <div class="suggest-name">{{ resolveSuggestionName(p) }}</div>
                        <div class="suggest-meta">
-                          {{ p.Ma_hang }} • {{ p.Size }} • {{ p.Dvt }} 
-                          <span v-if="p.So_luong_kho" style="color: #4ade80; font-weight: bold; margin-left: 5px;">
-                            (Kho: {{ p.So_luong_kho }})
+                          {{ p.Ma_hang }}<template v-if="p.Size"> • {{ p.Size }}</template><template v-if="p.Dvt"> • {{ p.Dvt }}</template>
+                          <span :style="{ color: p.Trang_thai === 'Hết hàng' ? '#f87171' : '#4ade80', fontWeight: 'bold', marginLeft: '5px' }">
+                            ({{ p.Trang_thai === 'Hết hàng' ? 'Hết hàng' : 'Còn hàng' }})
                           </span>
                         </div>
                       </div>
                     </div>
                   </div>
-                  <!-- ✅ ẨN phần “mã hàng tự gen” -->
                 </div>
 
                 <!-- MOVED SUB IMAGES HERE -->
@@ -187,8 +200,12 @@
                 </div>
 
                 <div class="field span-12">
-                  <label>Mô tả</label>
-                  <textarea v-model="form.Mo_ta" rows="4" placeholder="Mô tả ngắn gọn..."></textarea>
+                  <label>Mô tả ({{ getLangShort(activeFormLang) }})</label>
+                  <textarea
+                    v-model="form.i18n[activeFormLang].Mo_ta"
+                    rows="4"
+                    :placeholder="activeFormLang === 'vi' ? 'Mô tả ngắn gọn...' : (form.i18n.vi.Mo_ta ? `Dịch từ: ${form.i18n.vi.Mo_ta}` : `Mô tả (${getLangLabel(activeFormLang)})...`)"
+                  ></textarea>
                 </div>
               </div>
             </div>
@@ -199,27 +216,23 @@
                 Chi tiết sản phẩm
               </div>
               <div class="panel-body panel-grid">
-                <div class="field span-4">
-                  <label>Danh mục</label>
-                  <input v-model="form.Danh_muc" placeholder="VD: Áo, Quần, Giày..." />
+                <div class="field span-6">
+                  <label>Danh mục ({{ getLangShort(activeFormLang) }})</label>
+                  <input
+                    v-model="form.i18n[activeFormLang].Danh_muc"
+                    :placeholder="activeFormLang === 'vi' ? 'VD: Cơm, Bún - Phở - Mì, Đồ uống...' : (form.i18n.vi.Danh_muc ? `Dịch từ: ${form.i18n.vi.Danh_muc}` : 'Danh mục...')"
+                  />
                 </div>
-                <div class="field span-4">
-                  <label>ĐVT</label>
-                  <input v-model="form.Dvt" placeholder="VD: cái, hộp, đôi..." />
+                <div class="field span-6">
+                  <label>ĐVT ({{ getLangShort(activeFormLang) }})</label>
+                  <input
+                    v-model="form.i18n[activeFormLang].Dvt"
+                    :placeholder="activeFormLang === 'vi' ? 'VD: Phần, Tô, Ly, Dĩa...' : (form.i18n.vi.Dvt ? `Dịch từ: ${form.i18n.vi.Dvt}` : 'ĐVT...')"
+                  />
                 </div>
                 <div class="field span-4">
                   <label>Size</label>
-                  <input v-model="form.Size" placeholder="VD: S/M/L, 40, 41..." />
-                </div>
-                <div class="field span-4">
-                  <label>Ngôn ngữ (Lang)</label>
-                  <select v-model="form.Lang">
-                    <option value="vi">Việt Nam</option>
-                    <option value="en">English</option>
-                    <option value="zh-CN">Trung Quốc</option>
-                    <option value="fil">Phillipines</option>
-                    <option value="ko">Hàn Quốc</option>
-                  </select>
+                  <input v-model="form.Size" placeholder="VD: S/M/L, Lớn/Nhỏ..." />
                 </div>
                 <div class="field span-4">
                   <label>Trạng thái</label>
@@ -230,17 +243,17 @@
                 </div>
                 <div class="field span-4">
                   <label>Đơn vị tiền tệ</label>
-                  <input v-model="form.Don_vi_tien_te" placeholder="VD: VND, USD, CNY..." />
+                  <input v-model="form.Don_vi_tien_te" placeholder="VD: P, VND, USD..." />
                 </div>
               </div>
             </div>
 <div class="panel">
   <div class="panel-header">
     <i class="app-ico ri-price-tag-3-line"></i>
-    Giá bán & Số lượng
+    Giá gốc & Giá bán
   </div>
   <div class="panel-body panel-grid">
-    <div class="field span-4">
+    <div class="field span-6">
       <label>Giá gốc</label>
       <div class="money-wrap">
         <input
@@ -254,7 +267,7 @@
         />
       </div>
     </div>
-    <div class="field span-4">
+    <div class="field span-6">
       <label>Giá bán</label>
       <div class="money-wrap">
         <input
@@ -267,17 +280,6 @@
           placeholder="0"
         />
       </div>
-    </div>
-    
-    <!-- ✅ THÊM Ô SỐ LƯỢNG -->
-    <div class="field span-4">
-      <label>Số lượng nhập kho</label>
-      <input
-        type="number"
-        v-model.number="form.So_luong"
-        placeholder="0"
-        min="0"
-      />
     </div>
   </div>
 </div>
@@ -334,15 +336,15 @@
               />
 
               <!-- Download template -->
-              <a
-                href="/Template/TEMPLATE-MẪU.xlsx"
-                download
+              <button
+                type="button"
                 class="btn info outline"
                 style="text-decoration:underline;background-color: white;color:green;font-weight: bold;"
+                @click="downloadExcelTemplate"
               >
                 <i class="app-ico ri-download-2-line"></i>
                 Tải file mẫu excel
-              </a>
+              </button>
 
               <!-- Bulk image -->
               <button class="btn primary" type="button" @click="triggerBulkImageUpload">
@@ -365,8 +367,6 @@
               >
                 Xem ảnh đã upload ({{ bulkImageUrls.length }})
               </button>
-
-              <!-- ✅ Nút chống trùng mã: ẨN (KHÔNG HIỂN THỊ) -->
             </div>
 
             <div v-if="uploadingBulkImg" class="hint" style="margin-top:10px">
@@ -385,7 +385,7 @@
           </div>
 
           <div v-if="!list.length" class="empty empty-fill">
-            Chưa có hàng nào trong danh sách. Nhập thông tin bên trái rồi bấm <b>Thêm vào danh sách</b>.
+            Chưa có hàng nào trong danh sách. Nhập thông tin bên trái rồi bấm <b>Thêm hàng</b>.
           </div>
 
           <div v-else class="table-wrap">
@@ -403,9 +403,8 @@
     <th>Size</th>
     <th>Giá gốc</th>
     <th>Giá bán</th>
-    <th>Số lượng</th> <!-- ✅ THÊM DÒNG NÀY -->
     <th>Tiền tệ</th>
-    <th>Lang</th>
+    <th>Ngôn ngữ</th>
     <th>Trạng thái</th>
     <th></th>
   </tr>
@@ -447,10 +446,18 @@
                   <td>{{ h.Size }}</td>
                   <td class="money">{{ fmtMoney(h.Gia_goc) }}</td>
                   <td class="money strong">{{ fmtMoney(h.Gia_ban) }}</td>
-                  <!-- ✅ THÊM DÒNG NÀY -->
-<td class="qty">{{ h.So_luong || 0 }}</td>
-                  <td><span class="tag currency">{{ h.Don_vi_tien_te }}</span></td>
-                  <td><span class="tag lang">{{ h.Lang }}</span></td>
+                  <td><span class="tag currency">{{ h.Don_vi_tien_te || 'P' }}</span></td>
+                  <td>
+                    <div class="lang-badges-wrap">
+                      <span
+                        v-for="code in getProductTranslatedLangs(h)"
+                        :key="code"
+                        class="lang-pill"
+                      >
+                        {{ getLangShort(code) }}
+                      </span>
+                    </div>
+                  </td>
 
                   <td>
                     <span class="tag" :class="h.Trang_thai === 'Còn hàng' ? 'ok' : 'bad'">
@@ -478,7 +485,6 @@
       </div>
 
       <!-- ================= BULK MODAL ================= -->
-  <!-- ================= BULK MODAL ================= -->
 <div v-if="showBulkModal" class="modal-mask" @click.self="closeBulk">
   <div class="modal-box wide">
     <h3>Nhập hàng loạt</h3>
@@ -486,7 +492,7 @@
     <textarea v-model="bulkText" rows="8" placeholder="Mỗi dòng là 1 giá trị"></textarea>
 
     <div class="bulk-buttons">
-      <button class="btn chip" @click="applyBulk('Ten_hang')"><i class="app-ico ri-add-circle-fill"></i>Tên hàng</button>
+      <button class="btn chip" @click="applyBulk('Ten_hang')"><i class="app-ico ri-add-circle-fill"></i>Tên hàng (VI)</button>
       <button class="btn chip" @click="applyBulk('Main_img')"><i class="ri-add-circle-fill"></i> Ảnh chính (URL)</button>
 
       <!-- ✅ 6 NÚT ẢNH PHỤ -->
@@ -497,18 +503,16 @@
       <button class="btn chip" @click="applyBulk('img_5')"><i class="ri-add-circle-fill"></i> Ảnh phụ 5</button>
       <button class="btn chip" @click="applyBulk('img_6')"><i class="ri-add-circle-fill"></i> Ảnh phụ 6</button>
 
-      <button class="btn chip" @click="applyBulk('Danh_muc')"><i class="ri-add-circle-fill"></i> Danh mục</button>
-      <button class="btn chip" @click="applyBulk('Dvt')"><i class="ri-add-circle-fill"></i> ĐVT</button>
+      <button class="btn chip" @click="applyBulk('Danh_muc')"><i class="ri-add-circle-fill"></i> Danh mục (VI)</button>
+      <button class="btn chip" @click="applyBulk('Dvt')"><i class="ri-add-circle-fill"></i> ĐVT (VI)</button>
       <button class="btn chip" @click="applyBulk('Size')"><i class="ri-add-circle-fill"></i> Size</button>
 
       <button class="btn chip" @click="applyBulk('Gia_goc')"><i class="ri-add-circle-fill"></i> Giá gốc</button>
       <button class="btn chip" @click="applyBulk('Gia_ban')"><i class="ri-add-circle-fill"></i> Giá bán</button>
-      <button class="btn chip" @click="applyBulk('So_luong')"><i class="ri-add-circle-fill"></i> Số lượng</button>
       <button class="btn chip" @click="applyBulk('Don_vi_tien_te')"><i class="ri-add-circle-fill"></i> Tiền tệ</button>
-      <button class="btn chip" @click="applyBulk('Lang')"><i class="ri-add-circle-fill"></i> Lang</button>
       <button class="btn chip" @click="applyBulk('Trang_thai')"><i class="ri-add-circle-fill"></i> Trạng thái</button>
 
-      <button class="btn chip" @click="applyBulk('Mo_ta')"><i class="ri-add-circle-fill"></i> Mô tả</button>
+      <button class="btn chip" @click="applyBulk('Mo_ta')"><i class="ri-add-circle-fill"></i> Mô tả (VI)</button>
     </div>
 
     <div class="modal-actions">
@@ -619,17 +623,24 @@
 
               <div class="kv"><span class="k">Giá gốc:</span><span class="v money">{{ fmtMoney(detailItem?.Gia_goc, detailItem?.Don_vi_tien_te) }}</span></div>
               <div class="kv"><span class="k">Giá bán:</span><span class="v money strong">{{ fmtMoney(detailItem?.Gia_ban, detailItem?.Don_vi_tien_te) }}</span></div>
-
-              <!-- ✅ THÊM DÒNG NÀY -->
-<div class="kv"><span class="k">Số lượng:</span><span class="v qty">{{ detailItem?.So_luong || 0 }}</span></div>
               <div class="kv">
                 <span class="k">Tiền tệ:</span>
-                <span class="v"><span class="tag currency">{{ detailItem?.Don_vi_tien_te }}</span></span>
+                <span class="v"><span class="tag currency">{{ detailItem?.Don_vi_tien_te || 'P' }}</span></span>
               </div>
 
               <div class="kv">
-                <span class="k">Lang:</span>
-                <span class="v"><span class="tag lang">{{ detailItem?.Lang }}</span></span>
+                <span class="k">Ngôn ngữ:</span>
+                <span class="v">
+                  <span class="lang-badges-wrap">
+                    <span
+                      v-for="code in getProductTranslatedLangs(detailItem)"
+                      :key="code"
+                      class="lang-pill"
+                    >
+                      {{ getLangShort(code) }}
+                    </span>
+                  </span>
+                </span>
               </div>
 
               <div class="kv">
@@ -641,8 +652,6 @@
                 </span>
               </div>
             </div>
-
-   
 
             <div class="detail-desc">
               <div class="k">Mô tả:</div>
@@ -722,25 +731,55 @@
             </div>
           </div>
 
-          <div class="form-grid">
+          <div class="form-grid" v-if="editForm.i18n">
+            <div class="field span-12">
+              <label>Ngôn ngữ nội dung món</label>
+              <div class="lang-tabs-bar">
+                <button
+                  v-for="lang in SUPPORTED_DATA_LANGS"
+                  :key="lang.code"
+                  type="button"
+                  class="lang-tab-btn"
+                  :class="{ active: activeEditLang === lang.code }"
+                  @click="activeEditLang = lang.code"
+                >
+                  <img :src="lang.flagImg" :alt="lang.short" class="lang-tab-flag" />
+                  <span>{{ lang.short }}</span>
+                  <span
+                    class="lang-tab-dot"
+                    :class="{ filled: hasLangContent(editForm.i18n, lang.code) }"
+                  ></span>
+                </button>
+              </div>
+            </div>
+
             <div class="field span-6">
               <label>Mã hàng</label>
               <input v-model="editForm.Ma_hang" readonly />
             </div>
 
             <div class="field span-6">
-              <label>Tên hàng</label>
-              <input v-model="editForm.Ten_hang" />
+              <label>Tên hàng ({{ getLangShort(activeEditLang) }})</label>
+              <input
+                v-model="editForm.i18n[activeEditLang].Ten_hang"
+                :placeholder="activeEditLang === 'vi' ? 'Tên hàng...' : (editForm.i18n.vi.Ten_hang ? `Dịch từ: ${editForm.i18n.vi.Ten_hang}` : 'Tên hàng...')"
+              />
             </div>
 
             <div class="field span-4">
-              <label>Danh mục</label>
-              <input v-model="editForm.Danh_muc" />
+              <label>Danh mục ({{ getLangShort(activeEditLang) }})</label>
+              <input
+                v-model="editForm.i18n[activeEditLang].Danh_muc"
+                :placeholder="activeEditLang === 'vi' ? 'Danh mục...' : (editForm.i18n.vi.Danh_muc ? `Dịch từ: ${editForm.i18n.vi.Danh_muc}` : 'Danh mục...')"
+              />
             </div>
 
             <div class="field span-4">
-              <label>ĐVT</label>
-              <input v-model="editForm.Dvt" />
+              <label>ĐVT ({{ getLangShort(activeEditLang) }})</label>
+              <input
+                v-model="editForm.i18n[activeEditLang].Dvt"
+                :placeholder="activeEditLang === 'vi' ? 'ĐVT...' : (editForm.i18n.vi.Dvt ? `Dịch từ: ${editForm.i18n.vi.Dvt}` : 'ĐVT...')"
+              />
             </div>
 
             <div class="field span-4">
@@ -750,66 +789,40 @@
 
             <div class="field span-4">
               <label>Tiền tệ</label>
-              <input v-model="editForm.Don_vi_tien_te" />
+              <input v-model="editForm.Don_vi_tien_te" placeholder="P" />
             </div>
 
             <div class="field span-4">
               <label>Giá gốc</label>
-             <div class="money-wrap">
-  <input
-    type="text"
-    inputmode="numeric"
-    autocomplete="off"
-    class="money-input"
-    :value="fmtMoneyInput(editForm.Gia_goc)"
-    @input="(e) => (editForm.Gia_goc = parseMoneyInput(e.target.value))"
-    placeholder="0"
-  />
-
-</div>
-            </div>
-
-           <div class="field span-4">
-  <label>Giá bán</label>
-  <div class="money-wrap">
-    <input
-      type="text"
-      inputmode="numeric"
-      autocomplete="off"
-      class="money-input"
-      :value="fmtMoneyInput(editForm.Gia_ban)"
-      @input="(e) => (editForm.Gia_ban = parseMoneyInput(e.target.value))"
-      placeholder="0"
-    />
-  </div>
-</div>
-
-<!-- ✅ THÊM DÒNG NÀY -->
-<div class="field span-4">
-  <label>Số lượng</label>
-  <input
-    type="number"
-    v-model.number="editForm.So_luong"
-    min="0"
-    placeholder="0"
-  />
-</div>
-
-<div class="field span-4">
-  <label>Ngôn ngữ</label>
-
-            <div class="field span-4">
-              <label>Ngôn ngữ</label>
-              <select v-model="editForm.Lang">
-                <option value="vi">Việt Nam</option>
-                <option value="en">Tiếng Anh</option>
-                <option value="zh-CN">Trung Quốc</option>
-                <option value="fil">Phillipines</option>
-                <option value="ko">Hàn Quốc</option>
-              </select>
+              <div class="money-wrap">
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  class="money-input"
+                  :value="fmtMoneyInput(editForm.Gia_goc)"
+                  @input="(e) => (editForm.Gia_goc = parseMoneyInput(e.target.value))"
+                  placeholder="0"
+                />
+              </div>
             </div>
 
             <div class="field span-4">
+              <label>Giá bán</label>
+              <div class="money-wrap">
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  class="money-input"
+                  :value="fmtMoneyInput(editForm.Gia_ban)"
+                  @input="(e) => (editForm.Gia_ban = parseMoneyInput(e.target.value))"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div class="field span-12">
               <label>Trạng thái</label>
               <select v-model="editForm.Trang_thai">
                 <option value="Còn hàng">Còn hàng</option>
@@ -818,8 +831,12 @@
             </div>
 
             <div class="field span-12">
-              <label>Mô tả</label>
-              <textarea v-model="editForm.Mo_ta" rows="4"></textarea>
+              <label>Mô tả ({{ getLangShort(activeEditLang) }})</label>
+              <textarea
+                v-model="editForm.i18n[activeEditLang].Mo_ta"
+                rows="4"
+                :placeholder="activeEditLang === 'vi' ? 'Mô tả...' : (editForm.i18n.vi.Mo_ta ? `Dịch từ: ${editForm.i18n.vi.Mo_ta}` : 'Mô tả...')"
+              ></textarea>
             </div>
           </div>
 
@@ -831,31 +848,29 @@
       </div>
 
       <!-- ================= NOTIFY MODAL ================= -->
-   
     </div>
-  </div>
 
-  <div v-if="confirmBox.show" class="modal-mask" @click.self="confirmCancel">
-    <div class="notify-box">
-      <div class="notify-title">⚠️ {{ confirmBox.title }}</div>
-      <div class="notify-msg">{{ confirmBox.message }}</div>
+    <div v-if="confirmBox.show" class="modal-mask" @click.self="confirmCancel">
+      <div class="notify-box">
+        <div class="notify-title">⚠️ {{ confirmBox.title }}</div>
+        <div class="notify-msg">{{ confirmBox.message }}</div>
 
-      <div class="notify-actions">
-        <button class="btn success" type="button" @click="confirmOK">OK</button>
-        <button class="btn ghost" type="button" @click="confirmCancel">Hủy</button>
-      </div>
-    </div>
-  </div>
-     <div v-if="notify.open" class="modal-mask" @click.self="closeNotify">
-        <div class="notify-box" :class="notify.type">
-          <div class="notify-title">{{ notify.title }}</div>
-          <div class="notify-msg">{{ notify.message }}</div>
-
-          <div class="notify-actions">
-            <button class="btn primary" type="button" @click="closeNotify">OK</button>
-          </div>
+        <div class="notify-actions">
+          <button class="btn success" type="button" @click="confirmOK">OK</button>
+          <button class="btn ghost" type="button" @click="confirmCancel">Hủy</button>
         </div>
       </div>
+    </div>
+    <div v-if="notify.open" class="modal-mask" @click.self="closeNotify">
+      <div class="notify-box" :class="notify.type">
+        <div class="notify-title">{{ notify.title }}</div>
+        <div class="notify-msg">{{ notify.message }}</div>
+
+        <div class="notify-actions">
+          <button class="btn primary" type="button" @click="closeNotify">OK</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -863,20 +878,35 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import * as XLSX from 'xlsx'
 import { onBeforeRouteLeave } from 'vue-router'
-import { API_URL, IMGBB_KEY } from '@/config/api'
-/* ================= CONFIG ================= */
+import { getOneSheet, dispatchAction } from '@/config/api'
+import { uploadImageToImgBB } from '@/utils/imageUpload.js'
+import {
+  SUPPORTED_DATA_LANGS,
+  createEmptyProductI18n,
+  normalizeProductI18n,
+  syncProductWithI18n,
+  resolveProductField,
+  getProductTranslatedLangs,
+  productMatchesKeyword,
+} from '@/utils/i18nData'
 
-const IMGBB_UPLOAD_URL = 'https://api.imgbb.com/1/upload'
+/* ================= CONFIG ================= */
+const PRODUCT_IMAGE_COMPRESS_OPTS = {
+  targetKB: 100,
+  maxWidth: 1200,
+  maxHeight: 1200,
+}
 
 /* ================= STATE ================= */
-const nhaCungCapList = ref([])
-const defaultNCC = ref(null)
-
 const list = ref([])
-const productList = ref([]) // ✅ DANH SÁCH HÀNG HÓA TỪ SHEET
+const productList = ref([])
 const showSuggestions = ref(false)
-const isLoadingProducts = ref(false) // ✅ LOADING STATE
-const isAutoFilling = ref(false) // ✅ FLAG: Đang tự động điền từ gợi ý
+const isLoadingProducts = ref(false)
+const isAutoFilling = ref(false)
+const isExistingProductSelected = ref(false)
+
+const activeFormLang = ref('vi')
+const activeEditLang = ref('vi')
 
 const isDirty = ref(false)
 
@@ -900,7 +930,7 @@ const showBulkImageModal = ref(false)
 
 const bulkImageInput = ref(null)
 const excelInput = ref(null)
-const suggestionRef = ref(null) // ✅ REF ĐỂ CLICK OUTSIDE
+const suggestionRef = ref(null)
 
 const showEditModal = ref(false)
 const editIndex = ref(null)
@@ -924,13 +954,31 @@ const notify = ref({
   open: false,
   title: '',
   message: '',
-  type: 'info' // success | error | info
+  type: 'info'
 })
 function openNotify(title, message, type = 'info') {
   notify.value = { open: true, title, message, type }
 }
 function closeNotify() {
   notify.value.open = false
+}
+
+/* ================= LANG HELPERS ================= */
+function getLangShort(code) {
+  return SUPPORTED_DATA_LANGS.find((l) => l.code === code)?.short || String(code || 'vi').toUpperCase()
+}
+
+function getLangLabel(code) {
+  return SUPPORTED_DATA_LANGS.find((l) => l.code === code)?.label || code
+}
+
+function hasLangContent(i18nObj, code) {
+  if (!i18nObj || !i18nObj[code]) return false
+  return Boolean(String(i18nObj[code].Ten_hang || '').trim())
+}
+
+function resolveSuggestionName(p) {
+  return resolveProductField(p, 'Ten_hang', activeFormLang.value) || p.Ten_hang || ''
 }
 
 /* ================= FORM ================= */
@@ -942,21 +990,18 @@ const emptyForm = () => ({
   Danh_muc: '',
   Size: '',
   Dvt: '',
-   Gia_goc: '',   // ✅ đổi 0 -> ''
-  Gia_ban: '',   // ✅ đổi 0 -> ''
+  Gia_goc: '',
+  Gia_ban: '',
   Trang_thai: 'Còn hàng',
-  Lang: 'vi',
-  Don_vi_tien_te: '',
-   So_luong: '', // ✅ THÊM
-  // ẩn nhưng vẫn nhận
-  Ma_nha_cung_cap: '',
-  Ten_nha_cung_cap: '',
-  img_1: '', // ✅
-  img_2: '', // ✅
-  img_3: '', // ✅
-  img_4: '', // ✅
-  img_5: '',  // ✅
-    img_6: '' // ✅ THÊM
+  Don_vi_tien_te: 'P',
+  img_1: '',
+  img_2: '',
+  img_3: '',
+  img_4: '',
+  img_5: '',
+  img_6: '',
+  i18n: createEmptyProductI18n(),
+  _fromExisting: false,
 })
 
 const form = ref(emptyForm())
@@ -966,31 +1011,13 @@ const uploadingSubImg = ref({
   img_3: false,
   img_4: false,
   img_5: false,
-   img_6: false
+  img_6: false
 })
-/* ================= LOAD NCC ================= */
-async function loadNCC() {
-  try {
-    const res = await fetch(`${API_URL}?action=sheet&sheet=nha_cung_cap`)
-    const json = await res.json()
-    nhaCungCapList.value = json.data || []
-
-    if (nhaCungCapList.value.length > 0) {
-      defaultNCC.value = nhaCungCapList.value[0]
-      form.value.Ma_nha_cung_cap = defaultNCC.value.Ma_nha_cung_cap
-      form.value.Ten_nha_cung_cap = defaultNCC.value.Ten_nha_cung_cap
-    }
-  } catch (err) {
-    console.error(err)
-    openNotify('❌ Lỗi', 'Không load được NCC', 'error')
-  }
-}
 
 async function loadProducts() {
   isLoadingProducts.value = true
   try {
-    const res = await fetch(`${API_URL}?action=sheet&sheet=hang_hoa`)
-    const json = await res.json()
+    const json = await getOneSheet('hang_hoa')
     productList.value = json.data || []
   } catch (err) {
     console.error('❌ Lỗi load hàng hóa:', err)
@@ -1000,35 +1027,34 @@ async function loadProducts() {
 }
 
 function selectProduct(p) {
-  isAutoFilling.value = true // ✅ BẬT O
+  isAutoFilling.value = true
+  isExistingProductSelected.value = true
 
+  const i18n = normalizeProductI18n(p)
   form.value = {
     ...emptyForm(),
     Ma_hang: p.Ma_hang || '',
-    Ten_hang: p.Ten_hang || '',
+    Ten_hang: i18n.vi.Ten_hang || p.Ten_hang || '',
     Main_img: p.Main_img || '',
-    Mo_ta: p.Mo_ta || '',
-    Danh_muc: p.Danh_muc || '',
+    Mo_ta: i18n.vi.Mo_ta || p.Mo_ta || '',
+    Danh_muc: i18n.vi.Danh_muc || p.Danh_muc || '',
     Size: p.Size || '',
-    Dvt: p.Dvt || '',
-    Gia_goc: p.Gia_goc || '',
-    Gia_ban: p.Gia_ban || '',
+    Dvt: i18n.vi.Dvt || p.Dvt || '',
+    Gia_goc: p.Gia_goc ?? '',
+    Gia_ban: p.Gia_ban ?? '',
     Trang_thai: p.Trang_thai || 'Còn hàng',
-    Lang: p.Lang || 'vi',
-    Don_vi_tien_te: p.Don_vi_tien_te || 'VND',
-    So_luong: '', // Để trống để người dùng nhập số lượng mới
-    Ma_nha_cung_cap: p.Ma_nha_cung_cap || defaultNCC.value?.Ma_nha_cung_cap || '',
-    Ten_nha_cung_cap: p.Ten_nha_cung_cap || defaultNCC.value?.Ten_nha_cung_cap || '',
+    Don_vi_tien_te: p.Don_vi_tien_te || 'P',
     img_1: p.img_1 || '',
     img_2: p.img_2 || '',
     img_3: p.img_3 || '',
     img_4: p.img_4 || '',
     img_5: p.img_5 || '',
-    img_6: p.img_6 || ''
+    img_6: p.img_6 || '',
+    i18n,
+    _fromExisting: true,
   }
   showSuggestions.value = false
 
-  // ✅ SAU KHI DOM UPDATE THÌ TẮT FLAG
   setTimeout(() => {
     isAutoFilling.value = false
   }, 100)
@@ -1037,107 +1063,110 @@ function selectProduct(p) {
 const filteredSuggestions = ref([])
 
 function filterProducts(val) {
-  if (!val) {
-    // Nếu chưa nhập gì, hiển thị 50 hàng đầu tiên
+  const q = String(val || '').trim()
+  if (!q) {
     filteredSuggestions.value = productList.value.slice(0, 50)
     return
   }
-  const search = val.toLowerCase()
-  filteredSuggestions.value = productList.value.filter(p => 
-    p.Ten_hang?.toLowerCase().includes(search) || 
-    p.Ma_hang?.toLowerCase().includes(search)
-  ).slice(0, 20)
+  filteredSuggestions.value = productList.value
+    .filter((p) => productMatchesKeyword(p, q))
+    .slice(0, 20)
 }
 
 function onFocus() {
   showSuggestions.value = true
-  filterProducts(form.value.Ten_hang)
+  filterProducts(form.value.i18n[activeFormLang.value]?.Ten_hang || '')
 }
 
 function clearSearch() {
-  // Xóa sạch form về mặc định, giữ lại NCC
-  form.value = {
-    ...emptyForm(),
-    Ma_nha_cung_cap: defaultNCC.value?.Ma_nha_cung_cap || '',
-    Ten_nha_cung_cap: defaultNCC.value?.Ten_nha_cung_cap || ''
-  }
-  onFocus() // show lại list full
+  isExistingProductSelected.value = false
+  form.value = emptyForm()
+  activeFormLang.value = 'vi'
+  onFocus()
 }
 
-watch(() => form.value.Ten_hang, (val) => {
-  filterProducts(val)
-})
-
-/* ================= AUTO GEN MÃ HÀNG ================= */
-watch(
-  () => [form.value.Ten_hang, form.value.Ma_nha_cung_cap],
-  ([tenHang, maNCC]) => {
-    if (!tenHang || !maNCC) {
-      form.value.Ma_hang = ''
-      return
-    }
-    // ✅ NẾU ĐANG AUTO FILL TỪ DANH SÁCH GỢI Ý THÌ KHÔNG GHI ĐÈ
-    if (isAutoFilling.value) {
-      return
-    }
-    form.value.Ma_hang = genMaHangFE(tenHang, maNCC)
-  }
-)
-
-watch(
-  () => editForm.value?.Ten_hang,
-  (newName) => {
-    if (!showEditModal.value) return
-    if (!newName) {
-      editForm.value.Ma_hang = ''
-      return
-    }
-    const maNCC =
-      editForm.value.Ma_nha_cung_cap ||
-      list.value[editIndex.value]?.Ma_nha_cung_cap ||
-      defaultNCC.value?.Ma_nha_cung_cap
-    if (!maNCC) return
-    editForm.value.Ma_hang = genMaHangFE(newName, maNCC)
-  }
-)
-
-function genMaHangFE(tenHang, maNCC) {
-  if (!tenHang || !maNCC) return ''
-  const code = tenHang
-    .trim()
+/* ================= AUTO SYNC I18N & GEN MÃ HÀNG ================= */
+function genMaHangFE(tenHang) {
+  const clean = String(tenHang || '').trim()
+  if (!clean) return ''
+  const ascii = clean
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+  const code = ascii
     .split(/\s+/)
-    .map((w) => w[0]?.toUpperCase())
+    .map((w) => w.replace(/[^a-zA-Z0-9]/g, '')[0]?.toUpperCase())
     .filter(Boolean)
     .join('')
-  return `${code}_${maNCC}`
+  return code || 'SP'
 }
+
+watch(
+  () => form.value.i18n,
+  (i18nVal) => {
+    if (!i18nVal) return
+    const currentInput = i18nVal[activeFormLang.value]?.Ten_hang || ''
+    if (!isAutoFilling.value) {
+      filterProducts(currentInput)
+    }
+
+    const primaryName =
+      String(i18nVal.vi?.Ten_hang || '').trim() ||
+      String(i18nVal.en?.Ten_hang || '').trim() ||
+      String(i18nVal['zh-CN']?.Ten_hang || '').trim() ||
+      String(i18nVal.fil?.Ten_hang || '').trim() ||
+      String(i18nVal.ko?.Ten_hang || '').trim()
+
+    form.value.Ten_hang = primaryName
+    form.value.Danh_muc = String(i18nVal.vi?.Danh_muc || '').trim()
+    form.value.Dvt = String(i18nVal.vi?.Dvt || '').trim()
+    form.value.Mo_ta = String(i18nVal.vi?.Mo_ta || '').trim()
+
+    if (isAutoFilling.value || isExistingProductSelected.value) return
+    form.value.Ma_hang = primaryName ? genMaHangFE(primaryName) : ''
+  },
+  { deep: true }
+)
+
+watch(
+  () => editForm.value?.i18n?.vi?.Ten_hang,
+  (newName) => {
+    if (!showEditModal.value || !editForm.value) return
+    if (editForm.value._fromExisting) return
+    const fallbackName =
+      String(newName || '').trim() ||
+      String(editForm.value.i18n?.en?.Ten_hang || '').trim()
+    editForm.value.Ma_hang = fallbackName ? genMaHangFE(fallbackName) : ''
+  }
+)
 
 /* ================= ADD TẠM ================= */
 function themHang() {
-  if (!form.value.Ten_hang) {
-    openNotify('⚠️ Thiếu thông tin', 'Thiếu tên hàng!', 'info')
+  const synced = syncProductWithI18n(form.value)
+  if (!synced.Ten_hang) {
+    openNotify('⚠️ Thiếu thông tin', 'Vui lòng nhập Tên hàng (ít nhất Tiếng Việt hoặc Tiếng Anh)!', 'info')
     return
   }
 
-  if (!form.value.Ma_nha_cung_cap && defaultNCC.value) {
-    form.value.Ma_nha_cung_cap = defaultNCC.value.Ma_nha_cung_cap
-    form.value.Ten_nha_cung_cap = defaultNCC.value.Ten_nha_cung_cap
+  if (!synced.Ma_hang) {
+    synced.Ma_hang = genMaHangFE(synced.Ten_hang)
   }
 
-  const keepCurrency = form.value.Don_vi_tien_te
-  const keepLang = form.value.Lang
+  const keepCurrency = form.value.Don_vi_tien_te || 'P'
 
-  list.value.push({ ...form.value })
+  list.value.push({
+    ...synced,
+    Don_vi_tien_te: keepCurrency,
+    _fromExisting: Boolean(form.value._fromExisting),
+  })
 
-  Object.assign(form.value, emptyForm())
-
-  form.value.Don_vi_tien_te = keepCurrency
-  form.value.Lang = keepLang
-
-  if (defaultNCC.value) {
-    form.value.Ma_nha_cung_cap = defaultNCC.value.Ma_nha_cung_cap
-    form.value.Ten_nha_cung_cap = defaultNCC.value.Ten_nha_cung_cap
+  isExistingProductSelected.value = false
+  form.value = {
+    ...emptyForm(),
+    Don_vi_tien_te: keepCurrency,
   }
+  activeFormLang.value = 'vi'
 }
 
 function removeItem(i) {
@@ -1175,23 +1204,14 @@ function confirmCancel() {
   confirmBox.value.show = false
   confirmBox.value.resolve = null
 }
+
 async function handleSubImageUpload(e, fieldName) {
   const file = e.target.files[0]
   if (!file) return
 
   uploadingSubImg.value[fieldName] = true
   try {
-    const formData = new FormData()
-    formData.append('image', file)
-
-    const res = await fetch(`${IMGBB_UPLOAD_URL}?key=${IMGBB_KEY}`, {
-      method: 'POST',
-      body: formData
-    })
-    const json = await res.json()
-    if (!json.success) throw new Error('Upload imgbb failed')
-
-    form.value[fieldName] = json.data.url
+    form.value[fieldName] = await uploadImageToImgBB(file, PRODUCT_IMAGE_COMPRESS_OPTS)
   } catch (err) {
     console.error(err)
     openNotify('❌ Lỗi', `Upload ${fieldName} thất bại`, 'error')
@@ -1200,67 +1220,62 @@ async function handleSubImageUpload(e, fieldName) {
     e.target.value = ''
   }
 }
+
 /* ================= PAYLOAD ================= */
 function buildPayload() {
-  return list.value.map((i) => ({
-    Ma_hang: i.Ma_hang,
-    Ten_hang: i.Ten_hang,
-    Main_img: i.Main_img,
-
-    Ma_nha_cung_cap: i.Ma_nha_cung_cap || defaultNCC.value?.Ma_nha_cung_cap,
-    Ten_nha_cung_cap: i.Ten_nha_cung_cap || defaultNCC.value?.Ten_nha_cung_cap,
-
-    Mo_ta: i.Mo_ta,
-    Danh_muc: i.Danh_muc,
-    Size: i.Size,
-    Dvt: i.Dvt,
-    Gia_goc: Number(i.Gia_goc || 0),
-    Gia_ban: Number(i.Gia_ban || 0),
-    So_luong: Number(i.So_luong || 0), // ✅ THÊM DÒNG NÀY
-    Trang_thai: i.Trang_thai,
-    Lang: i.Lang || 'vi',
-    Don_vi_tien_te: i.Don_vi_tien_te || 'VND',
-    img_1: i.img_1 || '',
-    img_2: i.img_2 || '',
-    img_3: i.img_3 || '',
-    img_4: i.img_4 || '',
-    img_5: i.img_5 || '',
-    img_6: i.img_6 || ''
-  }))
+  return list.value.map((raw) => {
+    const i = syncProductWithI18n(raw)
+    return {
+      Ma_hang: i.Ma_hang || genMaHangFE(i.Ten_hang),
+      Ten_hang: i.Ten_hang,
+      Main_img: i.Main_img || '',
+      Mo_ta: i.Mo_ta || '',
+      Danh_muc: i.Danh_muc || '',
+      Size: i.Size || '',
+      Dvt: i.Dvt || '',
+      Gia_goc: Number(i.Gia_goc || 0),
+      Gia_ban: Number(i.Gia_ban || 0),
+      Trang_thai: i.Trang_thai || 'Còn hàng',
+      Don_vi_tien_te: i.Don_vi_tien_te || 'P',
+      img_1: i.img_1 || '',
+      img_2: i.img_2 || '',
+      img_3: i.img_3 || '',
+      img_4: i.img_4 || '',
+      img_5: i.img_5 || '',
+      img_6: i.img_6 || '',
+      i18n: i.i18n,
+    }
+  })
 }
+
 /* ================= SUBMIT ================= */
 async function submit() {
   if (submitting.value) return
   if (!list.value.length) return
 
   const totalItems = list.value.length
-  
-  console.log('🚀 Bắt đầu submit, số hàng:', totalItems) // ✅ THÊM
-
   submitting.value = true
   try {
     const payload = buildPayload()
 
-    await fetch(API_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'nhapHangHoa',
-        data: payload
-      })
+    const res = await dispatchAction({
+      action: 'nhapHangHoa',
+      data: payload,
     })
+    if (!res.success) {
+      throw new Error(res.message || 'Không thể nhập hàng')
+    }
 
-    console.log('✅ Fetch xong, gọi openNotify') // ✅ THÊM
-    openNotify('✅ Thành công', `Đã thêm ${totalItems} hàng vào hệ thống!`, 'success')
+    openNotify('✅ Thành công', `Đã thêm/cập nhật ${totalItems} hàng vào hệ thống!`, 'success')
 
     list.value = []
     isDirty.value = false
     showMobileList.value = false
     showDetailModal.value = false
+    await loadProducts()
   } catch (err) {
     console.error('❌ Lỗi submit:', err)
-    openNotify('❌ Lỗi', 'Lỗi kết nối, không gửi được dữ liệu!', 'error')
+    openNotify('❌ Lỗi', 'Lỗi kết nối Firebase, không gửi được dữ liệu!', 'error')
   } finally {
     submitting.value = false
   }
@@ -1295,8 +1310,46 @@ watch(
   { deep: true }
 )
 
-/* ================= EXCEL IMPORT ================= */
-/* ================= EXCEL IMPORT (CẬP NHẬT) ================= */
+/* ================= EXCEL TEMPLATE & IMPORT ================= */
+function downloadExcelTemplate() {
+  const sampleRows = [
+    {
+      Ma_hang: '',
+      Ten_hang: 'Cơm sườn nướng mật ong',
+      Danh_muc: 'Cơm',
+      Dvt: 'Phần',
+      Size: '',
+      Gia_goc: 0,
+      Gia_ban: 270,
+      Don_vi_tien_te: 'P',
+      Trang_thai: 'Còn hàng',
+      Main_img: '',
+      Mo_ta: 'Sườn nướng thơm mềm ăn kèm cơm nóng',
+      Ten_hang_en: 'Honey Grilled Pork Chop Rice',
+      Danh_muc_en: 'Rice',
+      Dvt_en: 'Portion',
+      Mo_ta_en: 'Tender honey-glazed pork chop with steamed rice',
+      Ten_hang_zh: '蜜汁烤猪排饭',
+      Danh_muc_zh: '米饭',
+      Dvt_zh: '份',
+      Mo_ta_zh: '',
+      Ten_hang_fil: 'Kanin na may Inihaw na Pork Chop sa Pulot',
+      Danh_muc_fil: 'Kanin (Rice Meals)',
+      Dvt_fil: 'Order',
+      Mo_ta_fil: '',
+      Ten_hang_ko: '허니 그릴 폭찹 덮밥',
+      Danh_muc_ko: '덮밥 · 밥류',
+      Dvt_ko: '인분',
+      Mo_ta_ko: '',
+    },
+  ]
+
+  const ws = XLSX.utils.json_to_sheet(sampleRows)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Hang_Hoa')
+  XLSX.writeFile(wb, 'TEMPLATE-SA-KITCHEN-5LANG.xlsx')
+}
+
 function importExcel(e) {
   const file = e.target.files[0]
   if (!file) return
@@ -1308,42 +1361,34 @@ function importExcel(e) {
     const sheet = workbook.Sheets[workbook.SheetNames[0]]
     const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
 
+    let addedCount = 0
     rows.forEach((r) => {
-      // ✅ LUÔN DÙNG DEFAULT NCC
-      const maNCC = defaultNCC.value?.Ma_nha_cung_cap || ''
-      const tenNCC = defaultNCC.value?.Ten_nha_cung_cap || ''
-
-      const item = {
-        Ma_hang: genMaHangFE(r.Ten_hang, maNCC),
-        Ten_hang: r.Ten_hang,
-        Main_img: r.Main_img,
-        Ma_nha_cung_cap: maNCC, // ✅ Luôn có giá trị từ default
-        Ten_nha_cung_cap: tenNCC, // ✅ Luôn có giá trị từ default
-        Mo_ta: r.Mo_ta,
-        Danh_muc: r.Danh_muc,
-        Size: r.Size,
-        Dvt: r.Dvt,
+      const synced = syncProductWithI18n({
+        ...r,
         Gia_goc: parseMoneyInput(String(r.Gia_goc || '')),
         Gia_ban: parseMoneyInput(String(r.Gia_ban || '')),
         Trang_thai: r.Trang_thai || 'Còn hàng',
-        Lang: r.Lang || 'vi',
-        Don_vi_tien_te: r.Don_vi_tien_te || 'VND',
+        Don_vi_tien_te: r.Don_vi_tien_te || 'P',
         img_1: r.img_1 || '',
         img_2: r.img_2 || '',
         img_3: r.img_3 || '',
         img_4: r.img_4 || '',
         img_5: r.img_5 || '',
         img_6: r.img_6 || '',
-        So_luong: r.So_luong ? Number(r.So_luong) : '',
-      }
+      })
 
-      // ✅ CHỈ KIỂM TRA TÊN HÀNG (VỪNG MÃ NCC ĐÃ CÓ TỪ DEFAULT)
-      if (item.Ten_hang) {
-        list.value.push(item)
+      if (synced.Ten_hang) {
+        const explicitMa = String(r.Ma_hang || '').trim()
+        synced.Ma_hang = explicitMa || genMaHangFE(synced.Ten_hang)
+        synced._fromExisting = Boolean(
+          explicitMa && productList.value.some((p) => p.Ma_hang === explicitMa)
+        )
+        list.value.push(synced)
+        addedCount++
       }
     })
 
-    openNotify('📥 Import', `Đã import ${rows.length} dòng`, 'success')
+    openNotify('📥 Import', `Đã import ${addedCount} dòng hợp lệ`, 'success')
   }
 
   reader.readAsArrayBuffer(file)
@@ -1359,30 +1404,23 @@ function applyBulk(field) {
 
   lines.forEach((value, index) => {
     if (!list.value[index]) {
-      list.value[index] = {
-        ...emptyForm(),
-        Ma_nha_cung_cap: defaultNCC.value?.Ma_nha_cung_cap || '',
-        Ten_nha_cung_cap: defaultNCC.value?.Ten_nha_cung_cap || ''
-      }
+      list.value[index] = emptyForm()
     }
 
-    // ✅ XỬ LÝ SỐ CHO CẢ GIÁ VÀ SỐ LƯỢNG
-if (field.includes('Gia') || field === 'So_luong') {
-  list.value[index][field] = Number(value || 0)
-} else {
-  list.value[index][field] = value
-}
+    const row = list.value[index]
+    if (!row.i18n) row.i18n = createEmptyProductI18n()
 
-    if (defaultNCC.value) {
-      list.value[index].Ma_nha_cung_cap = defaultNCC.value.Ma_nha_cung_cap
-      list.value[index].Ten_nha_cung_cap = defaultNCC.value.Ten_nha_cung_cap
+    if (field.includes('Gia')) {
+      row[field] = Number(value || 0)
+    } else if (['Ten_hang', 'Danh_muc', 'Dvt', 'Mo_ta'].includes(field)) {
+      row[field] = value
+      row.i18n.vi[field] = value
+    } else {
+      row[field] = value
     }
 
-    if (list.value[index].Ten_hang) {
-      list.value[index].Ma_hang = genMaHangFE(
-        list.value[index].Ten_hang,
-        list.value[index].Ma_nha_cung_cap
-      )
+    if (row.Ten_hang && !row._fromExisting) {
+      row.Ma_hang = genMaHangFE(row.Ten_hang)
     }
   })
 
@@ -1401,17 +1439,7 @@ async function handleMainImageUpload(e) {
 
   uploadingImg.value = true
   try {
-    const formData = new FormData()
-    formData.append('image', file)
-
-    const res = await fetch(`${IMGBB_UPLOAD_URL}?key=${IMGBB_KEY}`, {
-      method: 'POST',
-      body: formData
-    })
-    const json = await res.json()
-    if (!json.success) throw new Error('Upload imgbb failed')
-
-    form.value.Main_img = json.data.url
+    form.value.Main_img = await uploadImageToImgBB(file, PRODUCT_IMAGE_COMPRESS_OPTS)
   } catch (err) {
     console.error(err)
     openNotify('❌ Lỗi', 'Upload ảnh thất bại', 'error')
@@ -1434,17 +1462,16 @@ async function handleBulkImageUpload(e) {
   bulkImageUrls.value = []
 
   try {
-    const uploads = files.map((file) => {
-      const fd = new FormData()
-      fd.append('image', file)
-      return fetch(`${IMGBB_UPLOAD_URL}?key=${IMGBB_KEY}`, {
-        method: 'POST',
-        body: fd
-      }).then((res) => res.json())
-    })
+    const results = await Promise.allSettled(
+      files.map((file) => uploadImageToImgBB(file, PRODUCT_IMAGE_COMPRESS_OPTS))
+    )
+    bulkImageUrls.value = results
+      .filter((r) => r.status === 'fulfilled' && r.value)
+      .map((r) => r.value)
 
-    const results = await Promise.all(uploads)
-    bulkImageUrls.value = results.filter((r) => r.success).map((r) => r.data.url)
+    if (!bulkImageUrls.value.length) {
+      throw new Error('Upload ảnh hàng loạt thất bại')
+    }
 
     showBulkImageModal.value = true
     openNotify('✅ Upload', `Đã upload ${bulkImageUrls.value.length} ảnh`, 'success')
@@ -1467,18 +1494,30 @@ function copyAllLinks() {
 /* ================= EDIT ================= */
 function openEdit(index) {
   editIndex.value = index
-  editForm.value = { ...list.value[index] }
+  const target = list.value[index]
+  const i18n = normalizeProductI18n(target)
+  activeEditLang.value = 'vi'
+  editForm.value = {
+    ...target,
+    i18n: JSON.parse(JSON.stringify(i18n)),
+    _fromExisting: Boolean(
+      target._fromExisting ||
+      (target.Ma_hang && productList.value.some((p) => p.Ma_hang === target.Ma_hang))
+    ),
+  }
   showEditModal.value = true
 }
 
 function saveEdit() {
   if (editIndex.value === null) return
-  const oldItem = list.value[editIndex.value]
+  const synced = syncProductWithI18n(editForm.value)
+  if (!synced.Ma_hang && synced.Ten_hang) {
+    synced.Ma_hang = genMaHangFE(synced.Ten_hang)
+  }
 
   list.value[editIndex.value] = {
-    ...editForm.value,
-    Ma_nha_cung_cap: oldItem.Ma_nha_cung_cap || defaultNCC.value?.Ma_nha_cung_cap,
-    Ten_nha_cung_cap: oldItem.Ten_nha_cung_cap || defaultNCC.value?.Ten_nha_cung_cap
+    ...synced,
+    _fromExisting: Boolean(editForm.value._fromExisting),
   }
 
   isDirty.value = true
@@ -1492,17 +1531,7 @@ async function handleEditImageUpload(e) {
 
   uploadingEditImg.value = true
   try {
-    const fd = new FormData()
-    fd.append('image', file)
-
-    const res = await fetch(`${IMGBB_UPLOAD_URL}?key=${IMGBB_KEY}`, {
-      method: 'POST',
-      body: fd
-    })
-    const json = await res.json()
-    if (!json.success) throw new Error('Upload failed')
-
-    editForm.value.Main_img = json.data.url
+    editForm.value.Main_img = await uploadImageToImgBB(file, PRODUCT_IMAGE_COMPRESS_OPTS)
     openNotify('✅ Upload', 'Đã đổi ảnh thành công', 'success')
   } catch (err) {
     console.error(err)
@@ -1519,17 +1548,7 @@ async function handleEditSubImageUpload(e, fieldName) {
 
   uploadingEditSubImg.value[fieldName] = true
   try {
-    const fd = new FormData()
-    fd.append('image', file)
-
-    const res = await fetch(`${IMGBB_UPLOAD_URL}?key=${IMGBB_KEY}`, {
-      method: 'POST',
-      body: fd
-    })
-    const json = await res.json()
-    if (!json.success) throw new Error('Upload failed')
-
-    editForm.value[fieldName] = json.data.url
+    editForm.value[fieldName] = await uploadImageToImgBB(file, PRODUCT_IMAGE_COMPRESS_OPTS)
   } catch (err) {
     console.error(err)
     openNotify('❌ Lỗi', `Upload ${fieldName} thất bại`, 'error')
@@ -1560,7 +1579,7 @@ function fmtMoney(val, cur) {
 function parseMoneyInput(v) {
   const s = String(v ?? '').trim()
   if (!s) return ''
-  const digits = s.replace(/[^\d]/g, '') // chỉ lấy số
+  const digits = s.replace(/[^\d]/g, '')
   return digits ? Number(digits) : ''
 }
 
@@ -1586,15 +1605,14 @@ function handleClickOutside(e) {
 }
 
 onMounted(() => {
-  loadNCC()
-  loadProducts() // ✅ LOAD HÀNG HÓA
+  loadProducts()
   computeMobile()
   window.addEventListener('resize', computeMobile)
-  window.addEventListener('click', handleClickOutside) // ✅ LẮNG NGHE CLICK
+  window.addEventListener('click', handleClickOutside)
 })
 onUnmounted(() => {
   window.removeEventListener('resize', computeMobile)
-  window.removeEventListener('click', handleClickOutside) // ✅ REMOVE
+  window.removeEventListener('click', handleClickOutside)
 })
 </script>
 
@@ -1604,15 +1622,6 @@ onUnmounted(() => {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-}
-
-:global(html),
-:global(body),
-:global(#app) {
-  height: 100%;
-  margin: 0;
-  background: rgb(15, 23, 42);
-  overflow: hidden;
 }
 
 /* ================== LAYOUT ================== */
@@ -2971,5 +2980,77 @@ h2 {
   font-size: 10px;
   color: #94a3b8;
   text-align: center;
+}
+
+/* ================= 5-LANGUAGE TABS & PILLS ================= */
+.lang-tabs-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lang-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.6);
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lang-tab-btn:hover {
+  border-color: rgba(34, 197, 94, 0.5);
+  color: #ffffff;
+}
+
+.lang-tab-btn.active {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: #22c55e;
+  color: #86efac;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.25);
+}
+
+.lang-tab-flag {
+  width: 18px;
+  height: 13px;
+  object-fit: cover;
+  border-radius: 2px;
+}
+
+.lang-tab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(148, 163, 184, 0.35);
+}
+
+.lang-tab-dot.filled {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.8);
+}
+
+.lang-badges-wrap {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.lang-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(59, 130, 246, 0.18);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  color: #93c5fd;
 }
 </style>

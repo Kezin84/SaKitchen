@@ -1,9 +1,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { API_URL, IMGBB_KEY } from '@/config/api'
+import { getOneSheet, dispatchAction } from '@/config/api'
 
 /* ================= STATE ================= */
-const ncc = ref(null)
 const openTime = ref(null)
 const text = ref('')
 const loading = ref(false)
@@ -31,16 +30,8 @@ function genOpenTimeId() {
 async function loadData() {
   pageLoading.value = true
   try {
-    const res = await fetch(`${API_URL}?action=all`)
-    const json = await res.json()
-
-    ncc.value = json.data.nha_cung_cap?.[0] || null
-
-    openTime.value =
-      json.data.time?.find(
-        t => t.Ma_nha_cung_cap === ncc.value?.Ma_nha_cung_cap
-      ) || null
-
+    const json = await getOneSheet('time')
+    openTime.value = json.data?.[0] || null
     text.value = openTime.value?.thoi_gian_hoat_dong_shop || ''
   } catch (e) {
     console.error('Load OpenTime lỗi', e)
@@ -69,51 +60,49 @@ function closeDelete() {
 }
 
 async function saveOpenTime() {
-  if (!ncc.value || !text.value.trim()) {
+  if (!text.value.trim()) {
     alert('Thiếu dữ liệu')
     return
   }
 
   loading.value = true
-
-  fetch(API_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  try {
+    await dispatchAction({
       action: 'upsertOpenTime',
       data: {
-        ID: genOpenTimeId(),
-        Ma_nha_cung_cap: ncc.value.Ma_nha_cung_cap,
-        Ten_nha_cung_cap: ncc.value.Ten_nha_cung_cap,
-        thoi_gian_hoat_dong_shop: text.value.trim()
-      }
+        ID: openTime.value?.ID || genOpenTimeId(),
+        thoi_gian_hoat_dong_shop: text.value.trim(),
+      },
     })
-  })
 
-  showEditModal.value = false
-  setTimeout(loadData, 800)
-  loading.value = false
+    showEditModal.value = false
+    await loadData()
+  } catch (e) {
+    console.error(e)
+    alert('Lỗi lưu thời gian hoạt động')
+  } finally {
+    loading.value = false
+  }
 }
 
 async function deleteOpenTime() {
   if (!openTime.value?.ID) return
 
   loading.value = true
-
-  fetch(API_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  try {
+    await dispatchAction({
       action: 'deleteTimeShop',
-      ID: openTime.value.ID
+      ID: openTime.value.ID,
     })
-  })
 
-  showDeleteModal.value = false
-  setTimeout(loadData, 800)
-  loading.value = false
+    showDeleteModal.value = false
+    await loadData()
+  } catch (e) {
+    console.error(e)
+    alert('Lỗi xóa thời gian hoạt động')
+  } finally {
+    loading.value = false
+  }
 }
 
 /* ================= INIT ================= */
@@ -128,7 +117,7 @@ onMounted(loadData)
       
         <div>
           <h1 style="color: rgb(134, 239, 172); text-shadow: 0 0 10px rgba(34, 197, 94, 0.5);font-weight: bold;"><i class="app-ico ri-time-line"></i> QUẢN LÝ THỜI GIAN</h1>
-          <p class="page-subtitle" v-if="ncc">{{ ncc.Ten_nha_cung_cap }}</p>
+          <p class="page-subtitle">Cập nhật giờ mở cửa hiển thị trên menu</p>
         </div>
       </div>
     </div>

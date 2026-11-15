@@ -1,21 +1,23 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import { API_URL, IMGBB_KEY } from '@/config/api'
+import { ref, computed, onMounted } from 'vue'
+import { getOneSheet, dispatchAction } from '@/config/api'
+import { uploadImageToImgBB } from '@/utils/imageUpload.js'
 
 /* ================= CONFIG ================= */
 
 
 /* ================= STATE ================= */
 const contacts = ref([])
-const ncc = ref(null)
 const loading = ref(false)
 const tableLoading = ref(true)
+const togglingId = ref('')
 
 /* ADD FORM */
 const form = ref({
   PLATFORM_name: '',
   INFO: '',
   Direct_link: '',
+  Allow_message: false,
   file: null,
   preview: '',
 })
@@ -23,6 +25,24 @@ const form = ref({
 /* EDIT MODAL */
 const showEdit = ref(false)
 const editing = ref(null)
+
+function isAllowMessage(c) {
+  if (!c) return false
+  const v = c.Allow_message
+  return v === true || v === 1 || v === '1' || String(v).toLowerCase() === 'true'
+}
+
+const activeMessageContact = computed(() =>
+  contacts.value.find((c) => isAllowMessage(c)) || null
+)
+
+function clearStorefrontCache() {
+  try {
+    localStorage.removeItem('MENU_CACHE_SA_UNIFIED')
+  } catch {
+    // ignore storage errors
+  }
+}
 
 /* ================= HELPERS ================= */
 function genId() {
@@ -39,30 +59,19 @@ function genId() {
 }
 
 async function uploadImgBB(file) {
-  const fd = new FormData()
-  fd.append('image', file)
-
-  const res = await fetch(
-    `https://api.imgbb.com/1/upload?key=${IMGBB_KEY}`,
-    { method: 'POST', body: fd }
-  )
-  const json = await res.json()
-  return json?.data?.url || ''
+  return uploadImageToImgBB(file, {
+    targetKB: 100,
+    maxWidth: 1000,
+    maxHeight: 1000,
+  })
 }
 
 /* ================= LOAD ================= */
 async function loadData() {
   tableLoading.value = true
   try {
-    const res = await fetch(`${API_URL}?action=all`)
-    const json = await res.json()
-
-    ncc.value = json.data.nha_cung_cap?.[0] || null
-
-contacts.value = [...(json.data.shop_contact || [])]
-  .filter(c => c.Ma_nha_cung_cap === ncc.value?.Ma_nha_cung_cap)
-  
-
+    const json = await getOneSheet('shop_contact')
+    contacts.value = [...(json.data || [])]
   } finally {
     tableLoading.value = false
   }
@@ -79,9 +88,9 @@ function onFileChange(e) {
     return
   }
   
-  // Validate file size (max 5MB)
-  if (f.size > 5 * 1024 * 1024) {
-    alert('Kích thước ảnh tối đa 5MB')
+  // Validate file size (max 25MB before compression)
+  if (f.size > 25 * 1024 * 1024) {
+    alert('Kích thước ảnh tối đa 25MB')
     return
   }
   
@@ -94,6 +103,7 @@ function resetForm() {
     PLATFORM_name: '',
     INFO: '',
     Direct_link: '',
+    Allow_message: false,
     file: null,
     preview: '',
   }
@@ -106,30 +116,30 @@ async function addContact() {
     return
   }
 
+  if (form.value.Allow_message && !String(form.value.Direct_link || '').trim()) {
+    alert('Vui lòng nhập đường dẫn nền tảng để bật cho phép nhắn tin')
+    return
+  }
+
   loading.value = true
   try {
     const img = await uploadImgBB(form.value.file)
 
-    fetch(API_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'addShopContact',
-        data: {
-          ID: genId(),
-          PLATFORM_name: form.value.PLATFORM_name,
-          URL_img: img,
-          INFO: form.value.INFO,
-          Direct_link: form.value.Direct_link,
-          Ma_nha_cung_cap: ncc.value.Ma_nha_cung_cap,
-          Ten_nha_cung_cap: ncc.value.Ten_nha_cung_cap,
-        },
-      }),
+    await dispatchAction({
+      action: 'addShopContact',
+      data: {
+        ID: genId(),
+        PLATFORM_name: form.value.PLATFORM_name,
+        URL_img: img,
+        INFO: form.value.INFO,
+        Direct_link: form.value.Direct_link,
+        Allow_message: Boolean(form.value.Allow_message),
+      },
     })
 
+    clearStorefrontCache()
     resetForm()
-    setTimeout(loadData, 900)
+    await loadData()
   } catch {
     alert('Lỗi thêm contact')
   }
@@ -139,6 +149,7 @@ async function addContact() {
 function openEdit(c) {
   editing.value = {
     ...c,
+    Allow_message: isAllowMessage(c),
     file: null,
     preview: c.URL_img,
   }
@@ -159,8 +170,8 @@ function onEditFile(e) {
     return
   }
   
-  if (f.size > 5 * 1024 * 1024) {
-    alert('Kích thước ảnh tối đa 5MB')
+  if (f.size > 25 * 1024 * 1024) {
+    alert('Kích thước ảnh tối đa 25MB')
     return
   }
   
@@ -174,6 +185,11 @@ async function saveEdit() {
     return
   }
 
+  if (editing.value.Allow_message && !String(editing.value.Direct_link || '').trim()) {
+    alert('Vui lòng nhập đường dẫn nền tảng để bật cho phép nhắn tin')
+    return
+  }
+
   loading.value = true
   try {
     let img = editing.value.URL_img
@@ -181,46 +197,68 @@ async function saveEdit() {
       img = await uploadImgBB(editing.value.file)
     }
 
-    fetch(API_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'updateShopContact',
-        data: {
-          ID: editing.value.ID,
-          PLATFORM_name: editing.value.PLATFORM_name,
-          URL_img: img,
-          INFO: editing.value.INFO,
-          Direct_link: editing.value.Direct_link,
-          Ma_nha_cung_cap: editing.value.Ma_nha_cung_cap,
-          Ten_nha_cung_cap: editing.value.Ten_nha_cung_cap,
-        },
-      }),
+    await dispatchAction({
+      action: 'updateShopContact',
+      data: {
+        ID: editing.value.ID,
+        PLATFORM_name: editing.value.PLATFORM_name,
+        URL_img: img,
+        INFO: editing.value.INFO,
+        Direct_link: editing.value.Direct_link,
+        Allow_message: Boolean(editing.value.Allow_message),
+      },
     })
 
+    clearStorefrontCache()
     closeEdit()
-    setTimeout(loadData, 800)
+    await loadData()
   } catch {
     alert('Lỗi cập nhật')
   }
   loading.value = false
 }
 
-function deleteContact(id) {
+async function toggleAllowMessage(c) {
+  if (!c?.ID || togglingId.value) return
+  const nextVal = !isAllowMessage(c)
+
+  if (nextVal && !String(c.Direct_link || '').trim()) {
+    alert('Liên hệ này chưa có đường dẫn nền tảng. Vui lòng bổ sung đường dẫn để cho phép nhắn tin.')
+    openEdit({ ...c, Allow_message: true })
+    return
+  }
+
+  togglingId.value = c.ID
+  try {
+    await dispatchAction({
+      action: 'updateShopContact',
+      data: {
+        ID: c.ID,
+        Allow_message: nextVal,
+      },
+    })
+    clearStorefrontCache()
+    await loadData()
+  } catch {
+    alert('Lỗi cập nhật trạng thái nhắn tin')
+  } finally {
+    togglingId.value = ''
+  }
+}
+
+async function deleteContact(id) {
   if (!confirm('Xóa contact này?')) return
 
-  fetch(API_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  try {
+    await dispatchAction({
       action: 'deleteShopContact',
       ID: id,
-    }),
-  })
-
-  setTimeout(loadData, 700)
+    })
+    clearStorefrontCache()
+    await loadData()
+  } catch {
+    alert('Lỗi xóa contact')
+  }
 }
 
 /* ================= INIT ================= */
@@ -285,6 +323,31 @@ onMounted(loadData)
           </div>
         </div>
 
+        <div
+          class="allow-msg-toggle-box"
+          :class="{ active: form.Allow_message }"
+          @click="form.Allow_message = !form.Allow_message"
+        >
+          <div class="allow-msg-meta">
+            <div class="allow-msg-title">
+              <i class="ri-message-3-fill"></i>
+              <span>Cho phép nhắn tin nhận đơn qua MXH</span>
+            </div>
+            <div class="allow-msg-desc">
+              Chỉ 1 liên hệ được bật tại một thời điểm. Khi khách gửi thông tin đơn qua MXH sẽ chỉ nhắn qua kênh này.
+            </div>
+          </div>
+          <button
+            type="button"
+            class="switch-pill"
+            :class="{ active: form.Allow_message }"
+            :aria-pressed="form.Allow_message"
+            @click.stop="form.Allow_message = !form.Allow_message"
+          >
+            <span class="switch-knob"></span>
+          </button>
+        </div>
+
         <!-- LIVE PREVIEW -->
         <div
           v-if="form.PLATFORM_name || form.preview || form.INFO"
@@ -297,8 +360,13 @@ onMounted(loadData)
               <div v-else class="img-placeholder">IMG</div>
             </div>
             <div class="preview-content">
-              <div class="preview-title">
-                {{ form.PLATFORM_name || 'Tên nền tảng' }}
+              <div class="preview-title-row">
+                <div class="preview-title">
+                  {{ form.PLATFORM_name || 'Tên nền tảng' }}
+                </div>
+                <span v-if="form.Allow_message" class="preview-msg-badge">
+                  <i class="ri-chat-3-fill"></i> Cho phép nhắn tin
+                </span>
               </div>
               <div class="preview-info">
                 {{ form.INFO || 'Thông tin nền tảng' }}
@@ -328,7 +396,16 @@ onMounted(loadData)
     <div class="card list-card">
       <div class="card-header">
         <h3 class="card-title"><i class="ri-list-check"></i>Danh sách Contact</h3>
-        <div class="badge">{{ contacts.length }} contact</div>
+        <div class="header-badges">
+          <div v-if="activeMessageContact" class="msg-active-pill">
+            <i class="ri-message-3-fill"></i>
+            <span>Kênh nhắn tin: {{ activeMessageContact.PLATFORM_name }}</span>
+          </div>
+          <div v-else-if="contacts.length" class="msg-empty-pill">
+            <span>Chưa chọn kênh nhắn tin</span>
+          </div>
+          <div class="badge">{{ contacts.length }} contact</div>
+        </div>
       </div>
 
       <!-- TABLE LOADING -->
@@ -350,11 +427,17 @@ onMounted(loadData)
                 <th class="th-image">Ảnh</th>
                 <th class="th-info">Thông tin</th>
                 <th class="th-link">Đường dẫn</th>
+                <th class="th-message">Nhắn tin MXH</th>
                 <th class="th-action">Thao tác</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(c, i) in contacts" :key="c.ID" class="table-row">
+              <tr
+                v-for="(c, i) in contacts"
+                :key="c.ID"
+                class="table-row"
+                :class="{ 'is-msg-enabled': isAllowMessage(c) }"
+              >
                 <td class="td-index" data-label="Vị trí">
                   <div class="index-badge">#{{ i + 1 }}</div>
                 </td>
@@ -380,6 +463,26 @@ onMounted(loadData)
                     {{ c.Direct_link }}
                   </a>
                   <span v-else class="no-link">—</span>
+                </td>
+                <td class="td-message" data-label="Nhắn tin MXH">
+                  <button
+                    type="button"
+                    class="msg-status-btn"
+                    :class="{ active: isAllowMessage(c) }"
+                    :disabled="togglingId === c.ID"
+                    @click="toggleAllowMessage(c)"
+                  >
+                    <i :class="isAllowMessage(c) ? 'ri-checkbox-circle-fill' : 'ri-chat-3-line'"></i>
+                    <span>
+                      {{
+                        togglingId === c.ID
+                          ? 'Đang lưu...'
+                          : isAllowMessage(c)
+                            ? 'Đang cho phép'
+                            : 'Chọn nhắn tin'
+                      }}
+                    </span>
+                  </button>
                 </td>
                 <td class="td-action" data-label="Thao tác">
                   <div class="action-group">
@@ -461,6 +564,31 @@ onMounted(loadData)
                 @change="onEditFile"
                 class="modal-input"
               />
+            </div>
+
+            <div
+              class="allow-msg-toggle-box in-modal"
+              :class="{ active: editing.Allow_message }"
+              @click="editing.Allow_message = !editing.Allow_message"
+            >
+              <div class="allow-msg-meta">
+                <div class="allow-msg-title">
+                  <i class="ri-message-3-fill"></i>
+                  <span>Cho phép nhắn tin nhận đơn qua MXH</span>
+                </div>
+                <div class="allow-msg-desc">
+                  Chỉ 1 liên hệ được bật. Nếu bật ở đây, liên hệ đang bật trước đó sẽ tự tắt.
+                </div>
+              </div>
+              <button
+                type="button"
+                class="switch-pill"
+                :class="{ active: editing.Allow_message }"
+                :aria-pressed="editing.Allow_message"
+                @click.stop="editing.Allow_message = !editing.Allow_message"
+              >
+                <span class="switch-knob"></span>
+              </button>
             </div>
 
             <div v-if="editing.preview" class="modal-preview">
@@ -1267,6 +1395,207 @@ onMounted(loadData)
   .btn {
     font-size: 13px;
     padding: 10px 20px;
+  }
+}
+
+/* ALLOW MESSAGE TOGGLE & TABLE STATUS */
+.allow-msg-toggle-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  border-radius: 12px;
+  background: rgba(51, 65, 85, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.allow-msg-toggle-box:hover {
+  border-color: rgba(34, 197, 94, 0.45);
+  background: rgba(51, 65, 85, 0.65);
+}
+
+.allow-msg-toggle-box.active {
+  background: rgba(22, 163, 74, 0.16);
+  border-color: rgba(34, 197, 94, 0.55);
+}
+
+.allow-msg-toggle-box.in-modal {
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.allow-msg-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.allow-msg-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.allow-msg-title i {
+  color: #4ade80;
+  font-size: 17px;
+}
+
+.allow-msg-desc {
+  font-size: 12.5px;
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+
+.switch-pill {
+  width: 48px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.7);
+  padding: 2px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  transition: all 0.22s ease;
+}
+
+.switch-pill.active {
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  border-color: #4ade80;
+}
+
+.switch-knob {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: transform 0.22s ease;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
+}
+
+.switch-pill.active .switch-knob {
+  transform: translateX(22px);
+}
+
+.preview-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.preview-title-row .preview-title {
+  margin-bottom: 0;
+}
+
+.preview-msg-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #15803d;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.header-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.msg-active-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.msg-empty-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: rgba(245, 158, 11, 0.14);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.th-message {
+  width: 170px;
+}
+
+.td-message {
+  text-align: center;
+}
+
+.table-row.is-msg-enabled {
+  background: rgba(22, 163, 74, 0.08);
+}
+
+.msg-status-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(51, 65, 85, 0.55);
+  color: #cbd5e1;
+  transition: all 0.2s ease;
+}
+
+.msg-status-btn:hover:not(:disabled) {
+  border-color: #4ade80;
+  color: #ffffff;
+  background: rgba(22, 163, 74, 0.25);
+}
+
+.msg-status-btn.active {
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  border-color: #4ade80;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.32);
+}
+
+.msg-status-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+@media (max-width: 768px) {
+  .td-message {
+    text-align: left;
+  }
+
+  .card-header {
+    flex-wrap: wrap;
+    gap: 10px;
   }
 }
 </style>

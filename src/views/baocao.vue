@@ -680,7 +680,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { API_URL, IMGBB_KEY } from '@/config/api'
+import { getAllSheets } from '@/config/api'
 
 
 // States
@@ -2662,19 +2662,16 @@ function renderCharts() {
 async function loadBaoCao() {
   loading.value = true
   try {
-    const res = await fetch(`${API_URL}?action=all`)
-    const data = await res.json()
+    const data = await getAllSheets()
     if (data.success) {
       allData.value = data.data
-      // DEBUG: Kiểm tra CPPS data
-      console.log('[CPPS TEST] First so_thu_chi record:', allData.value?.so_thu_chi?.[0])
       nextTick(() => {
         console.log('[CPPS SUM KY]', costTotals.value.CPPS_ky)
         console.log('[CPPS SUM ALL]', costAllTotals.value.CPPS_all)
       })
     }
     else alert('Lỗi: ' + (data.message || data.error))
-  } catch (e) { console.error(e); alert('Lỗi kết nối API') }
+  } catch (e) { console.error(e); alert('Lỗi kết nối Firebase') }
   finally { loading.value = false }
 }
 

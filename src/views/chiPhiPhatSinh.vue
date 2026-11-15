@@ -344,7 +344,7 @@
 </template>
 
 <script>
-import { API_URL, IMGBB_KEY } from '@/config/api'
+import { getOneSheet, dispatchAction } from '@/config/api'
 
 
 export default {
@@ -357,9 +357,7 @@ export default {
         Ten_dich_vu: ''
       },
       formattedSoTien: '',
-      donViTienTe: 'VND',
-      selectedNCC: null,
-      danhSachNCC: [],
+      donViTienTe: 'P',
       entries: [],
       isLoadingEntries: false,
       filter: {
@@ -438,7 +436,6 @@ export default {
   },
 
   mounted() {
-    this.loadNCC()
     this.loadHangHoa()
     this.loadEntries()
     this.setDefaultDates()
@@ -544,30 +541,10 @@ export default {
       }, 3000)
     },
 
-    // ===== LOAD NCC =====
-    async loadNCC() {
-      try {
-        const url = `${API_URL}?action=sheet&sheet=nha_cung_cap`
-        const res = await fetch(url)
-        const json = await res.json()
-        
-        if (json.success && json.data) {
-          this.danhSachNCC = json.data
-          if (this.danhSachNCC.length > 0) {
-            this.selectedNCC = this.danhSachNCC[0]
-          }
-        }
-      } catch (err) {
-        console.error('Load NCC error:', err)
-      }
-    },
-
     // ===== LOAD HANG HOA (để lấy đơn vị tiền tệ) =====
     async loadHangHoa() {
       try {
-        const url = `${API_URL}?action=sheet&sheet=hang_hoa`
-        const res = await fetch(url)
-        const json = await res.json()
+        const json = await getOneSheet('hang_hoa')
         
         if (json.success && json.data && json.data.length > 0) {
           // Lấy đơn vị tiền tệ từ hàng hóa đầu tiên
@@ -581,13 +558,11 @@ export default {
       }
     },
 
-    // ===== LOAD ENTRIES (REALTIME TỪ API) =====
+    // ===== LOAD ENTRIES (REALTIME TỪ FIREBASE) =====
     async loadEntries() {
       this.isLoadingEntries = true
       try {
-        const url = `${API_URL}?action=sheet&sheet=so_thu_chi`
-        const res = await fetch(url)
-        const json = await res.json()
+        const json = await getOneSheet('so_thu_chi')
         
         if (json.success && json.data) {
           // Lọc chỉ lấy các chi phí phát sinh (Trang_thai = CHI_PHI_PHAT_SINH)
@@ -646,18 +621,14 @@ export default {
           data: {
             So_tien: this.form.So_tien,
             Ten_dich_vu: this.form.Ten_dich_vu.trim(),
-            Ma_nha_cung_cap: this.selectedNCC?.Ma_nha_cung_cap || '',
-            Ten_nha_cung_cap: this.selectedNCC?.Ten_nha_cung_cap || '',
             Don_vi_tien_te: this.donViTienTe
           }
         }
 
-        await fetch(API_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify(payload)
-        })
+        const res = await dispatchAction(payload)
+        if (!res.success) {
+          throw new Error(res.message || 'Lưu thất bại')
+        }
 
         // Reset form
         this.form.So_tien = 0
@@ -665,11 +636,7 @@ export default {
         this.formattedSoTien = ''
 
         this.showToast('Đã lưu chi phí thành công!', 'success')
-        
-        // Reload data từ server
-        setTimeout(() => {
-          this.loadEntries()
-        }, 1000)
+        await this.loadEntries()
 
       } catch (err) {
         console.error('Submit error:', err)
@@ -733,20 +700,14 @@ export default {
           }
         }
 
-        await fetch(API_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify(payload)
-        })
+        const res = await dispatchAction(payload)
+        if (!res.success) {
+          throw new Error(res.message || 'Cập nhật thất bại')
+        }
 
         this.showToast('Cập nhật thành công!', 'success')
         this.closeEditModal()
-        
-        // Reload data từ server
-        setTimeout(() => {
-          this.loadEntries()
-        }, 1000)
+        await this.loadEntries()
 
       } catch (err) {
         console.error('Update error:', err)
@@ -784,20 +745,14 @@ export default {
           Ma_dich_vu: this.deleteModal.data.Ma_dich_vu
         }
 
-        await fetch(API_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify(payload)
-        })
+        const res = await dispatchAction(payload)
+        if (!res.success) {
+          throw new Error(res.message || 'Xóa thất bại')
+        }
 
         this.showToast('Đã xóa chi phí!', 'success')
         this.closeDeleteModal()
-
-        // Reload data từ server
-        setTimeout(() => {
-          this.loadEntries()
-        }, 1000)
+        await this.loadEntries()
 
       } catch (err) {
         console.error('Delete error:', err)

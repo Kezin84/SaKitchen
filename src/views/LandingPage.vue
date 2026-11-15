@@ -219,8 +219,8 @@ function sparkleStyle(n) {
 }
 
 function goToMenu() {
-  const ncc = route.query.ncc || 'SA'
-  router.push({ path: '/vi', query: { ncc } })
+  const savedLang = localStorage.getItem('APP_LANG') || 'vi'
+  router.push({ path: `/${savedLang}` })
 }
 </script>
 

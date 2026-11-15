@@ -1,11 +1,11 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { API_URL, IMGBB_KEY } from '@/config/api'
+import { getOneSheet, dispatchAction } from '@/config/api'
+import { uploadImageToImgBB } from '@/utils/imageUpload.js'
 /* ================= CONFIG ================= */
 
 
 /* ================= STATE ================= */
-const ncc = ref(null)
 const logo = ref(null)
 
 const file = ref(null)
@@ -24,30 +24,19 @@ function genLogoId() {
 }
 
 async function uploadImgBB(file) {
-  const form = new FormData()
-  form.append('image', file)
-
-  const res = await fetch(
-    `https://api.imgbb.com/1/upload?key=${IMGBB_KEY}`,
-    { method: 'POST', body: form }
-  )
-  const json = await res.json()
-  return json?.data?.url || ''
+  return uploadImageToImgBB(file, {
+    targetKB: 100,
+    maxWidth: 1000,
+    maxHeight: 1000,
+  })
 }
 
 /* ================= LOAD ================= */
 async function loadData() {
   loading.value = true
   try {
-    const res = await fetch(`${API_URL}?action=all`)
-    const json = await res.json()
-
-    ncc.value = json.data.nha_cung_cap?.[0] || null
-
-    logo.value =
-      json.data.logo?.find(
-        (l) => l.Ma_nha_cung_cap === ncc.value?.Ma_nha_cung_cap
-      ) || null
+    const json = await getOneSheet('logo')
+    logo.value = json.data?.[0] || null
 
     if (logo.value) {
       preview.value = logo.value.URL
@@ -82,9 +71,9 @@ function onFileChange(e) {
       alert('Vui lòng chọn file ảnh')
       return
     }
-    // Validate file size (max 5MB)
-    if (selectedFile.size > 5 * 1024 * 1024) {
-      alert('Kích thước ảnh tối đa 5MB')
+    // Validate file size (max 25MB before compression)
+    if (selectedFile.size > 25 * 1024 * 1024) {
+      alert('Kích thước ảnh tối đa 25MB')
       return
     }
     file.value = selectedFile
@@ -101,7 +90,7 @@ function closeModal() {
 
 /* ================= SAVE ================= */
 async function saveLogo() {
-  if (!ncc.value || !nameInput.value.trim()) {
+  if (!nameInput.value.trim()) {
     alert('Vui lòng nhập tên logo')
     return
   }
@@ -123,24 +112,20 @@ async function saveLogo() {
       }
     }
 
-    await fetch(API_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'upsertLogo',
-        data: {
-          ID: genLogoId(),
-          URL: finalUrl,
-          Name: nameInput.value.trim(),
-          Ma_nha_cung_cap: ncc.value.Ma_nha_cung_cap,
-          Ten_nha_cung_cap: ncc.value.Ten_nha_cung_cap,
-        },
-      }),
+    const res = await dispatchAction({
+      action: 'upsertLogo',
+      data: {
+        ID: logo.value?.ID || genLogoId(),
+        URL: finalUrl,
+        Name: nameInput.value.trim(),
+      },
     })
+    if (!res.success) {
+      throw new Error(res.message || 'Không thể lưu logo')
+    }
 
     closeModal()
-    setTimeout(loadData, 1000)
+    await loadData()
   } catch (e) {
     alert('Lỗi lưu logo: ' + e.message)
   }
@@ -276,7 +261,7 @@ onMounted(loadData)
                   <div v-else class="upload-placeholder">
                     <div class="placeholder-icon"><i class="ri-image-line"></i></div>
                     <p><strong>Click để chọn ảnh</strong></p>
-                    <p class="placeholder-hint">PNG, JPG, SVG (tối đa 5MB)</p>
+                    <p class="placeholder-hint">PNG, JPG, WebP · Tự động nén JPG (~100KB)</p>
                   </div>
                   <input
                     ref="fileInput"

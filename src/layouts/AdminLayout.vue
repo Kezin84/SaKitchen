@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, provide } from 'vue'
-import { RouterView, useRouter } from 'vue-router'
+import { ref, computed, watch, onMounted, onUnmounted, provide } from 'vue'
+import { RouterView, useRouter, useRoute } from 'vue-router'
 import { KeepAlive } from 'vue'
 import {
   getOneSheet,
@@ -8,14 +8,39 @@ import {
   checkUserExpired,
   logoutFirebase,
 } from '@/config/api'
+import { attachAdminZeroInputBehavior } from '@/utils/adminZeroInput'
 const sidebarOpen = ref(true)
 const mobileSidebarOpen = ref(false)
 const router = useRouter()
+const route = useRoute()
 const nccInfo = ref({
   name: localStorage.getItem('NCC_NAME') || 'SA KITCHEN',
   logo: localStorage.getItem('NCC_LOGO') || '/Logo/FBC ONLY LOGO NO TEXT.png'
 })
 const pendingOrderCount = ref(0)
+const pendingWebOrderCount = ref(0)
+const newOrderAlert = ref(null)
+const isMobileDockHidden = ref(false)
+const lastScrollTopByTarget = new WeakMap()
+let lastWindowScrollY = 0
+
+const adminBaseTitle = computed(() => {
+  const name = String(nccInfo.value?.name || '').trim()
+  if (name) return name
+  if (typeof document !== 'undefined') {
+    return document.title.replace(/^\(\d+\)\s*/, '').trim() || 'SA KITCHEN'
+  }
+  return 'SA KITCHEN'
+})
+
+watch(
+  [pendingWebOrderCount, adminBaseTitle],
+  ([count, baseTitle]) => {
+    if (typeof document === 'undefined') return
+    document.title = count > 0 ? `(${count}) ${baseTitle}` : baseTitle
+  },
+  { immediate: true },
+)
 
 // Provide function để child component có thể gọi refresh
 provide('refreshPendingCount', () => loadPendingOrders())
@@ -41,7 +66,82 @@ const logout = async () => {
 let expiredTimer = null
 let unsubDonHang = null
 let unsubLogo = null
+let detachZeroInputBehavior = null
 let checking = false
+let hasInitWebOrderBell = false
+let newOrderAlertTimer = null
+let sharedAudioCtx = null
+const knownWaitingWebOrderIds = new Set()
+const knownWebOrderUpdateTimestamps = new Map()
+
+function ensureAudioContext() {
+  if (typeof window === 'undefined') return null
+  const Ctx = window.AudioContext || window.webkitAudioContext
+  if (!Ctx) return null
+  if (!sharedAudioCtx) {
+    sharedAudioCtx = new Ctx()
+  }
+  if (sharedAudioCtx.state === 'suspended') {
+    sharedAudioCtx.resume().catch(() => {})
+  }
+  return sharedAudioCtx
+}
+
+function playNewWebOrderBell() {
+  try {
+    const ctx = ensureAudioContext()
+    if (!ctx) return
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {})
+    }
+    const now = ctx.currentTime
+    const notes = [
+      { freq: 659.25, start: 0, duration: 0.24, gain: 0.22 },
+      { freq: 987.77, start: 0.14, duration: 0.45, gain: 0.24 },
+      { freq: 1318.51, start: 0.3, duration: 0.5, gain: 0.18 },
+    ]
+    for (const note of notes) {
+      const osc = ctx.createOscillator()
+      const amp = ctx.createGain()
+      osc.type = 'triangle'
+      osc.frequency.setValueAtTime(note.freq, now + note.start)
+
+      amp.gain.setValueAtTime(0.0001, now + note.start)
+      amp.gain.exponentialRampToValueAtTime(note.gain, now + note.start + 0.015)
+      amp.gain.exponentialRampToValueAtTime(0.0001, now + note.start + note.duration)
+
+      osc.connect(amp)
+      amp.connect(ctx.destination)
+      osc.start(now + note.start)
+      osc.stop(now + note.start + note.duration + 0.02)
+    }
+  } catch (err) {
+    console.warn('Order bell sound skipped:', err)
+  }
+}
+
+function unlockAdminAudio() {
+  ensureAudioContext()
+}
+
+function dismissNewOrderAlert() {
+  newOrderAlert.value = null
+  if (newOrderAlertTimer) {
+    clearTimeout(newOrderAlertTimer)
+    newOrderAlertTimer = null
+  }
+}
+
+function goToPendingWebOrders() {
+  const focusOrderId = newOrderAlert.value?.isUpdate ? newOrderAlert.value.maHoaDon : ''
+  dismissNewOrderAlert()
+  mobileSidebarOpen.value = false
+  if (focusOrderId) {
+    router.push({ name: 'nhap-hoa-don', query: { focusOrderId } })
+  } else {
+    router.push({ name: 'nhap-hoa-don' })
+  }
+}
 
 // Parse datetime từ format VN (an toàn với chuỗi tự do như "18h30")
 function parseVNDateTime(str) {
@@ -68,17 +168,90 @@ function getDonStatus(dh) {
   return dh.Trang_thai
 }
 
-function isActionableOrder(dh) {
-  const st = getDonStatus(dh)
-  return st === 'Chờ duyệt' || st === 'Đang xử lý' || st === 'Đang ship'
+function isWaitingApprovalOrder(dh) {
+  return getDonStatus(dh) === 'Chờ duyệt'
+}
+
+function isWaitingWebOrder(dh) {
+  if (!isWaitingApprovalOrder(dh)) return false
+  const src = String(dh.Nguon_don || '').trim().toUpperCase()
+  const code = String(dh.Ma_hoa_don || '').trim().toUpperCase()
+  return !src || src === 'WEB' || code.startsWith('WEB')
+}
+
+function syncDonHangIndicators(donHangList, allowBell = false) {
+  const list = donHangList || []
+  const waitingApprovalOrders = list.filter(isWaitingApprovalOrder)
+  const waitingCount = waitingApprovalOrders.length
+
+  pendingOrderCount.value = waitingCount
+  pendingWebOrderCount.value = waitingCount
+
+  const waitingWebOrders = waitingApprovalOrders.filter(isWaitingWebOrder)
+
+  if (!hasInitWebOrderBell) {
+    hasInitWebOrderBell = true
+    for (const dh of waitingWebOrders) {
+      const id = String(dh?.Ma_hoa_don || '').trim()
+      if (id) {
+        knownWaitingWebOrderIds.add(id)
+        knownWebOrderUpdateTimestamps.set(id, Number(dh?.Last_web_update_at || 0))
+      }
+    }
+    return
+  }
+
+  const freshOrders = []
+  const updatedOrders = []
+  for (const dh of waitingWebOrders) {
+    const id = String(dh?.Ma_hoa_don || '').trim()
+    if (!id) continue
+    const updTs = Number(dh?.Last_web_update_at || 0)
+    if (!knownWaitingWebOrderIds.has(id)) {
+      knownWaitingWebOrderIds.add(id)
+      knownWebOrderUpdateTimestamps.set(id, updTs)
+      freshOrders.push(dh)
+    } else {
+      const prevUpd = Number(knownWebOrderUpdateTimestamps.get(id) || 0)
+      if (updTs > prevUpd) {
+        knownWebOrderUpdateTimestamps.set(id, updTs)
+        updatedOrders.push(dh)
+      }
+    }
+  }
+
+  if (allowBell && (freshOrders.length > 0 || updatedOrders.length > 0)) {
+    playNewWebOrderBell()
+    if (freshOrders.length > 0) {
+      const newest = freshOrders[0]
+      newOrderAlert.value = {
+        count: freshOrders.length,
+        isUpdate: false,
+        maHoaDon: String(newest?.Ma_hoa_don || '').trim(),
+        tenKhach: String(newest?.Ten_khach_hang || 'Khách web').trim(),
+      }
+    } else {
+      const upd = updatedOrders[0]
+      newOrderAlert.value = {
+        count: updatedOrders.length,
+        isUpdate: true,
+        maHoaDon: String(upd?.Ma_hoa_don || '').trim(),
+        tenKhach: String(upd?.Ten_khach_hang || 'Khách web').trim(),
+      }
+    }
+    if (newOrderAlertTimer) clearTimeout(newOrderAlertTimer)
+    newOrderAlertTimer = setTimeout(() => {
+      newOrderAlert.value = null
+      newOrderAlertTimer = null
+    }, 7000)
+  }
 }
 
 // Load số đơn hàng chờ duyệt + đang xử lý (fallback manual refresh)
 const loadPendingOrders = async () => {
   try {
     const json = await getOneSheet('don_hang')
-    const donHangList = json.data || []
-    pendingOrderCount.value = donHangList.filter(isActionableOrder).length
+    syncDonHangIndicators(json.data || [], true)
   } catch (err) {
     console.warn('Load pending orders failed:', err)
   }
@@ -137,8 +310,11 @@ onMounted(() => {
 
   // Realtime Firebase listener cho đơn hàng chờ duyệt + đang xử lý
   unsubDonHang = subscribeSheet('don_hang', (donHangList) => {
-    pendingOrderCount.value = (donHangList || []).filter(isActionableOrder).length
+    syncDonHangIndicators(donHangList || [], true)
   })
+
+  window.addEventListener('pointerdown', unlockAdminAudio, { passive: true })
+  window.addEventListener('keydown', unlockAdminAudio, { passive: true })
 
   // Realtime Firebase listener cho logo / tên thương hiệu
   unsubLogo = subscribeSheet('logo', (logoList) => {
@@ -154,7 +330,72 @@ onMounted(() => {
 
   expiredTimer = setInterval(checkExpiredSilently, 120_000)
   document.addEventListener('visibilitychange', onVisibilityChange)
+  document.addEventListener('scroll', onAdminMobileScroll, { passive: true, capture: true })
+  window.addEventListener('scroll', onAdminMobileScroll, { passive: true })
+  detachZeroInputBehavior = attachAdminZeroInputBehavior()
 })
+
+function onAdminMobileScroll(e) {
+  if (typeof window === 'undefined' || window.innerWidth > 768) {
+    isMobileDockHidden.value = false
+    return
+  }
+  if (mobileSidebarOpen.value) {
+    isMobileDockHidden.value = false
+    return
+  }
+
+  const target = e?.target
+  const isDocOrWin = !target || target === document || target === document.documentElement || target === window
+
+  if (isDocOrWin) {
+    const curY = Math.max(0, window.scrollY || document.documentElement.scrollTop || 0)
+    if (curY <= 24) {
+      isMobileDockHidden.value = false
+      lastWindowScrollY = curY
+      return
+    }
+    const delta = curY - lastWindowScrollY
+    if (delta > 10) {
+      isMobileDockHidden.value = true
+      lastWindowScrollY = curY
+    } else if (delta < -8) {
+      isMobileDockHidden.value = false
+      lastWindowScrollY = curY
+    }
+    return
+  }
+
+  if (typeof target.scrollTop !== 'number') return
+  // Ignore tiny horizontal/dropdown scrollers inside forms or modals
+  const isVerticalMainScroll =
+    target.classList?.contains('crm-main') ||
+    (target.clientHeight >= 240 && target.scrollHeight - target.clientHeight > 40)
+  if (!isVerticalMainScroll) return
+
+  const curTop = Math.max(0, target.scrollTop)
+  if (curTop <= 24) {
+    isMobileDockHidden.value = false
+    lastScrollTopByTarget.set(target, curTop)
+    return
+  }
+  const prevTop = lastScrollTopByTarget.has(target) ? lastScrollTopByTarget.get(target) : curTop
+  const delta = curTop - prevTop
+  if (delta > 10) {
+    isMobileDockHidden.value = true
+    lastScrollTopByTarget.set(target, curTop)
+  } else if (delta < -8) {
+    isMobileDockHidden.value = false
+    lastScrollTopByTarget.set(target, curTop)
+  }
+}
+
+watch(
+  () => route.fullPath,
+  () => {
+    isMobileDockHidden.value = false
+  },
+)
 
 const onVisibilityChange = () => {
   if (document.visibilityState === 'visible') {
@@ -175,7 +416,22 @@ onUnmounted(() => {
     unsubLogo()
     unsubLogo = null
   }
+  if (newOrderAlertTimer) {
+    clearTimeout(newOrderAlertTimer)
+    newOrderAlertTimer = null
+  }
+  window.removeEventListener('pointerdown', unlockAdminAudio)
+  window.removeEventListener('keydown', unlockAdminAudio)
   document.removeEventListener('visibilitychange', onVisibilityChange)
+  document.removeEventListener('scroll', onAdminMobileScroll, { capture: true })
+  window.removeEventListener('scroll', onAdminMobileScroll)
+  if (detachZeroInputBehavior) {
+    detachZeroInputBehavior()
+    detachZeroInputBehavior = null
+  }
+  if (typeof document !== 'undefined') {
+    document.title = adminBaseTitle.value
+  }
 })
 </script>
 
@@ -205,6 +461,7 @@ onUnmounted(() => {
         <RouterLink :to="{ name: 'nhap-hoa-don' }" class="menu-item">
           <i class="ri-file-list-3-fill"></i>
           <span>Nhập hóa đơn</span>
+          <span v-if="pendingWebOrderCount > 0" class="badge-count is-web-badge">{{ pendingWebOrderCount }}</span>
         </RouterLink>
 
         <RouterLink :to="{ name: 'nhap-hang' }" class="menu-item">
@@ -270,6 +527,11 @@ onUnmounted(() => {
           <span>Banner</span>
         </RouterLink>
 
+        <RouterLink :to="{ name: 'admin-sap-xep-hien-thi' }" class="menu-item">
+          <i class="ri-arrow-up-down-line"></i>
+          <span>Sắp xếp hiển thị</span>
+        </RouterLink>
+
         <RouterLink to="/admin/thong-bao" class="menu-item">
           <i class="ri-alert-fill"></i>
           <span>Thông báo</span>
@@ -319,6 +581,42 @@ onUnmounted(() => {
 
     <!-- MAIN CONTENT -->
     <main class="crm-main">
+      <Transition name="admin-bell-toast">
+        <div
+          v-if="newOrderAlert"
+          class="admin-web-order-toast"
+          role="button"
+          tabindex="0"
+          @click="goToPendingWebOrders"
+          @keydown.enter.prevent="goToPendingWebOrders"
+        >
+          <span class="awt-bell">🔔</span>
+          <div class="awt-body">
+            <div class="awt-title">
+              {{
+                newOrderAlert.isUpdate
+                  ? (newOrderAlert.count > 1
+                      ? `Khách vừa cập nhật ${newOrderAlert.count} đơn!`
+                      : `Khách cập nhật đơn #${newOrderAlert.maHoaDon}`)
+                  : (newOrderAlert.count > 1
+                      ? `Có ${newOrderAlert.count} đơn web mới!`
+                      : `Đơn web mới #${newOrderAlert.maHoaDon}`)
+              }}
+            </div>
+            <div class="awt-sub">
+              {{ newOrderAlert.tenKhach }} · Bấm để mở Nhập hóa đơn
+            </div>
+          </div>
+          <button
+            type="button"
+            class="awt-close"
+            aria-label="Đóng thông báo"
+            @click.stop="dismissNewOrderAlert"
+          >
+            ✕
+          </button>
+        </div>
+      </Transition>
       <RouterView v-slot="{ Component }">
         <KeepAlive>
           <component :is="Component" />
@@ -326,10 +624,13 @@ onUnmounted(() => {
       </RouterView>
     </main>
 
-    <!-- MOBILE BOTTOM BAR -->
-    <nav class="mobile-bottom-bar">
+    <!-- MOBILE BOTTOM BAR (FLOATING ROUNDED DOCK) -->
+    <nav class="mobile-bottom-bar" :class="{ 'is-dock-hidden': isMobileDockHidden }">
       <RouterLink :to="{ name: 'nhap-hoa-don' }" class="bottom-bar-item">
-        <i class="ri-file-list-3-fill"></i>
+        <div class="bottom-icon-wrap">
+          <i class="ri-file-list-3-fill"></i>
+          <span v-if="pendingWebOrderCount > 0" class="badge-count-mobile">{{ pendingWebOrderCount }}</span>
+        </div>
         <span class="label">Nhập HĐ</span>
       </RouterLink>
 
@@ -389,6 +690,7 @@ onUnmounted(() => {
         <RouterLink :to="{ name: 'nhap-hoa-don' }" class="mobile-menu-item" @click="closeMobileSidebar">
           <i class="ri-file-list-3-fill"></i>
           <span>Nhập hóa đơn</span>
+          <span v-if="pendingWebOrderCount > 0" class="badge-count is-web-badge">{{ pendingWebOrderCount }}</span>
         </RouterLink>
 
         <RouterLink :to="{ name: 'nhap-hang' }" class="mobile-menu-item" @click="closeMobileSidebar">
@@ -448,6 +750,11 @@ onUnmounted(() => {
         <RouterLink to="/admin/banner" class="mobile-menu-item" @click="closeMobileSidebar">
           <i class="ri-tv-2-fill"></i>
           <span>Banner</span>
+        </RouterLink>
+
+        <RouterLink :to="{ name: 'admin-sap-xep-hien-thi' }" class="mobile-menu-item" @click="closeMobileSidebar">
+          <i class="ri-arrow-up-down-line"></i>
+          <span>Sắp xếp hiển thị</span>
         </RouterLink>
 
         <RouterLink to="/admin/thong-bao" class="mobile-menu-item" @click="closeMobileSidebar">
@@ -806,9 +1113,19 @@ onUnmounted(() => {
   color: #fca5a5 !important;
 }
 
-.admin-layout.collapsed .menu-item span,
+.admin-layout.collapsed .menu-item span:not(.badge-count),
 .admin-layout.collapsed .menu-section-title span {
   display: none;
+}
+
+.admin-layout.collapsed .menu-item .badge-count {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  font-size: 10px;
 }
 
 .admin-layout.collapsed .menu-section-title {
@@ -859,26 +1176,64 @@ onUnmounted(() => {
 
   .crm-main {
     padding: 0;
-    padding-bottom: 70px;
-    height: calc(100vh - 70px);
+    padding-bottom: calc(88px + env(safe-area-inset-bottom));
+    height: 100vh;
+    height: 100dvh;
     overflow-y: auto;
   }
 
-  /* ================= MOBILE BOTTOM BAR ================= */
+  /* ================= MOBILE BOTTOM BAR (LIQUID GLASS DOCK) ================= */
   .mobile-bottom-bar {
     display: flex;
     justify-content: space-around;
-    align-items: stretch;
+    align-items: center;
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 70px;
-    background: linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #1e293b 100%);
-    border-top: 2px solid rgba(34, 197, 94, 0.3);
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    left: 10px;
+    right: 10px;
+    max-width: 520px;
+    margin: 0 auto;
+    height: 64px;
+    background: linear-gradient(
+      165deg,
+      rgba(30, 41, 59, 0.54) 0%,
+      rgba(15, 23, 42, 0.4) 55%,
+      rgba(30, 41, 59, 0.5) 100%
+    );
+    backdrop-filter: blur(26px) saturate(190%) brightness(1.08);
+    -webkit-backdrop-filter: blur(26px) saturate(190%) brightness(1.08);
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    border-radius: 999px;
     z-index: 1000;
-    padding: 0;
-    box-shadow: 0 -4px 20px rgba(34, 197, 94, 0.15);
+    padding: 0 8px;
+    box-shadow:
+      0 16px 38px rgba(2, 6, 23, 0.56),
+      0 0 0 1px rgba(34, 197, 94, 0.14),
+      inset 0 1.5px 1px rgba(255, 255, 255, 0.34),
+      inset 0 -1.5px 2px rgba(0, 0, 0, 0.36);
+    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease;
+    will-change: transform, opacity;
+  }
+
+  .mobile-bottom-bar::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.16) 0%,
+      rgba(255, 255, 255, 0.02) 45%,
+      rgba(255, 255, 255, 0.07) 100%
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .mobile-bottom-bar.is-dock-hidden {
+    transform: translateY(calc(100% + 28px));
+    opacity: 0;
+    pointer-events: none;
   }
 
   .bottom-bar-item {
@@ -886,28 +1241,31 @@ onUnmounted(() => {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 3px;
     flex: 1;
-    padding: 10px 8px;
+    height: 50px;
+    padding: 4px 4px;
     color: #ffffff;
     text-decoration: none;
-    border-radius: 0;
-    transition: all 0.3s ease;
+    border-radius: 999px;
+    transition: all 0.25s ease;
     background: transparent;
     border: none;
     cursor: pointer;
     font-family: inherit;
     position: relative;
+    z-index: 1;
   }
 
   .bottom-bar-item::before {
     content: '';
     position: absolute;
-    top: 0;
+    bottom: 2px;
     left: 50%;
     transform: translateX(-50%);
     width: 0;
     height: 3px;
+    border-radius: 999px;
     background: linear-gradient(to right, 
       transparent, 
       rgb(34, 197, 94), 
@@ -917,12 +1275,13 @@ onUnmounted(() => {
   }
 
   .bottom-bar-item.router-link-active::before {
-    width: 80%;
+    width: 56%;
   }
 
   .bottom-bar-item i {
-    font-size: 24px;
+    font-size: 21px;
     color: #ffffff;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.55));
     transition: all 0.3s ease;
   }
 
@@ -935,8 +1294,9 @@ onUnmounted(() => {
   }
 
   .bottom-icon-wrap i {
-    font-size: 24px;
+    font-size: 21px;
     color: #ffffff;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.55));
     transition: all 0.3s ease;
   }
 
@@ -960,11 +1320,12 @@ onUnmounted(() => {
   }
 
   .bottom-bar-item .label {
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 10.5px;
+    font-weight: 700;
     text-align: center;
-    color: #ffffff;
-    line-height: 1.2;
+    color: #f8fafc;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+    line-height: 1.15;
     white-space: nowrap;
   }
 
@@ -979,10 +1340,10 @@ onUnmounted(() => {
   }
 
   .bottom-bar-logo {
-    width: 40px;
-    height: 40px;
+    width: 34px;
+    height: 34px;
     object-fit: contain;
-    border-radius: 8px;
+    border-radius: 999px;
     filter: drop-shadow(0 0 8px rgba(34, 197, 94, 0.5));
   }
 
@@ -991,7 +1352,9 @@ onUnmounted(() => {
   }
 
   .bottom-bar-item.router-link-active {
-    background: rgba(34, 197, 94, 0.1);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(34, 197, 94, 0.16) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.36);
   }
 
   .bottom-bar-item.router-link-active i {
@@ -1223,5 +1586,85 @@ onUnmounted(() => {
   .mobile-menu-item.logout-btn:active span {
     color: #fca5a5;
   }
+}
+
+/* ================= NEW WEB ORDER BELL TOAST ================= */
+.admin-web-order-toast {
+  position: fixed;
+  top: 16px;
+  right: 18px;
+  z-index: 9500;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 340px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  border: 1.5px solid #22c55e;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.35), 0 0 0 3px rgba(34, 197, 94, 0.18);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.awt-bell {
+  font-size: 22px;
+  line-height: 1;
+  animation: awtRing 0.8s ease-in-out infinite;
+}
+
+@keyframes awtRing {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(16deg); }
+  40% { transform: rotate(-14deg); }
+  60% { transform: rotate(10deg); }
+  80% { transform: rotate(-8deg); }
+}
+
+.awt-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.awt-title {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #86efac;
+  line-height: 1.3;
+}
+
+.awt-sub {
+  font-size: 12px;
+  color: #cbd5e1;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.awt-close {
+  border: none;
+  background: rgba(148, 163, 184, 0.16);
+  color: #e2e8f0;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.admin-bell-toast-enter-active,
+.admin-bell-toast-leave-active {
+  transition: all 0.25s ease;
+}
+
+.admin-bell-toast-enter-from,
+.admin-bell-toast-leave-to {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.96);
 }
 </style>

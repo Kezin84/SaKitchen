@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { getOneSheet, dispatchAction } from '@/config/api'
 import { uploadImageToImgBB } from '@/utils/imageUpload.js'
 /* ======================
@@ -22,6 +22,38 @@ const tableLoading = ref(true)
 const showEditBannerModal = ref(false)
 const editBannerFile = ref(null)
 const editBannerPreview = ref('')
+const editBannerOrder = ref(1)
+const originalEditOrder = ref(1)
+
+const isMobile = ref(typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
+const dragIndex = ref(-1)
+const dragOverIndex = ref(-1)
+const reordering = ref(false)
+
+const hasEditChanges = computed(
+  () =>
+    Boolean(editBannerFile.value) ||
+    (Boolean(editingBanner.value) && editBannerOrder.value !== originalEditOrder.value),
+)
+
+function updateIsMobile() {
+  if (typeof window !== 'undefined') {
+    isMobile.value = window.innerWidth <= 768
+  }
+}
+
+function parseBannerOrder(item) {
+  const n = Number(item?.Thu_tu)
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : Number.MAX_SAFE_INTEGER
+}
+
+function sortBanners(list) {
+  return [...(list || [])].sort((a, b) => {
+    const orderDiff = parseBannerOrder(a) - parseBannerOrder(b)
+    if (orderDiff !== 0) return orderDiff
+    return String(b.ID).localeCompare(String(a.ID))
+  })
+}
 
 /* ======================
    HELPERS
@@ -68,10 +100,70 @@ async function loadBanners() {
   tableLoading.value = true
   try {
     const json = await getOneSheet('banner')
-    banners.value = (json.data || []).reverse()
+    banners.value = sortBanners(json.data || [])
   } finally {
     tableLoading.value = false
   }
+}
+
+/* ======================
+   DRAG & DROP REORDER (PC)
+====================== */
+function onDragStartBanner(index, event) {
+  if (isMobile.value || reordering.value) {
+    event?.preventDefault?.()
+    return
+  }
+  dragIndex.value = index
+  dragOverIndex.value = index
+  if (event?.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(index))
+  }
+}
+
+function onDragOverBanner(index, event) {
+  if (isMobile.value || dragIndex.value < 0) return
+  event?.preventDefault?.()
+  if (event?.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
+  dragOverIndex.value = index
+}
+
+async function onDropBanner(targetIndex) {
+  if (isMobile.value || reordering.value) return
+  const fromIndex = dragIndex.value
+  dragIndex.value = -1
+  dragOverIndex.value = -1
+
+  if (fromIndex < 0 || fromIndex === targetIndex || fromIndex >= banners.value.length) {
+    return
+  }
+
+  const nextList = [...banners.value]
+  const [moved] = nextList.splice(fromIndex, 1)
+  nextList.splice(targetIndex, 0, moved)
+  banners.value = nextList.map((item, idx) => ({ ...item, Thu_tu: idx + 1 }))
+
+  reordering.value = true
+  try {
+    await dispatchAction({
+      action: 'reorderBanners',
+      ids: banners.value.map((item) => item.ID),
+    })
+  } catch (e) {
+    console.error(e)
+    alert('Lỗi cập nhật thứ tự banner')
+    await loadBanners()
+  } finally {
+    reordering.value = false
+  }
+}
+
+function onDragEndBanner() {
+  dragIndex.value = -1
+  dragOverIndex.value = -1
 }
 
 /* ======================
@@ -118,29 +210,35 @@ function onSelectEditFile(e) {
 /* ======================
    EDIT
 ====================== */
-function startEdit(banner) {
+function startEdit(banner, index = 0) {
   editingBanner.value = banner
   editBannerFile.value = null
   editBannerPreview.value = banner.URL
+  const pos = index >= 0 ? index + 1 : 1
+  editBannerOrder.value = pos
+  originalEditOrder.value = pos
   showEditBannerModal.value = true
 }
 
 
 async function saveEdit() {
-  if (!editBannerFile.value) {
-    alert('Chưa chọn ảnh mới')
+  if (!hasEditChanges.value) {
+    alert('Chưa có thay đổi nào để lưu')
     return
   }
 
   loading.value = true
   try {
-    const imgUrl = await uploadImgBB(editBannerFile.value)
+    const imgUrl = editBannerFile.value
+      ? await uploadImgBB(editBannerFile.value)
+      : editingBanner.value.URL
 
     await dispatchAction({
       action: 'updateBanner',
       data: {
         ID: editingBanner.value.ID,
         URL: imgUrl,
+        Thu_tu: editBannerOrder.value,
       },
     })
 
@@ -162,6 +260,8 @@ function closeEditBannerModal() {
   editingBanner.value = null
   editBannerFile.value = null
   editBannerPreview.value = ''
+  editBannerOrder.value = 1
+  originalEditOrder.value = 1
   loading.value = false
 }
 
@@ -198,7 +298,13 @@ function resetForm() {
    INIT
 ====================== */
 onMounted(async () => {
+  updateIsMobile()
+  window.addEventListener('resize', updateIsMobile)
   await loadBanners()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateIsMobile)
 })
 </script>
 
@@ -234,7 +340,9 @@ onMounted(async () => {
               <div class="upload-icon"><i class="ri-image-add-fill" style="color:white"></i></div>
               <div class="upload-text">
                 <span class="upload-primary">Chọn ảnh banner</span>
-                <span class="upload-secondary">PNG, JPG, WebP · Tự động nén JPG (~100KB)</span>
+                <span class="upload-secondary">
+                  Kích thước chuẩn: <strong>1600 × 1000 px</strong> (tỉ lệ ngang 16:10) · PNG, JPG, WebP · Tự nén ≤ 100KB
+                </span>
               </div>
             </div>
           </label>
@@ -289,8 +397,17 @@ onMounted(async () => {
 
     <!-- BANNER LIST -->
     <div class="card list-card">
-      <div class="card-header">
-        <h3 class="card-title"><i class="ri-layout-grid-fill"></i> Danh sách Banner</h3>
+      <div class="card-header list-header-wrap">
+        <div>
+          <h3 class="card-title"><i class="ri-layout-grid-fill"></i> Danh sách Banner</h3>
+          <p v-if="banners.length > 1" class="drag-hint">
+            {{
+              isMobile
+                ? 'Bấm Sửa để thay đổi vị trí ưu tiên hiển thị'
+                : 'Kéo thả hàng để ưu tiên vị trí hiển thị (hoặc bấm Sửa để chọn vị trí trong modal)'
+            }}
+          </p>
+        </div>
         <div class="badge">{{ banners.length }} banner</div>
       </div>
 
@@ -314,18 +431,42 @@ onMounted(async () => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(b, i) in banners" :key="b.ID" class="table-row">
+              <tr
+                v-for="(b, i) in banners"
+                :key="b.ID"
+                class="table-row"
+                :class="{
+                  'is-draggable': !isMobile,
+                  'is-dragging': dragIndex === i,
+                  'is-drag-over': dragOverIndex === i && dragIndex !== i,
+                }"
+                :draggable="!isMobile && !reordering"
+                @dragstart="onDragStartBanner(i, $event)"
+                @dragover="onDragOverBanner(i, $event)"
+                @drop.prevent="onDropBanner(i)"
+                @dragend="onDragEndBanner"
+              >
                 <td class="td-index" data-label="Vị trí hiển thị">
-                  <div class="index-badge">#{{ i + 1 }}</div>
+                  <div class="index-cell-wrap">
+                    <span
+                      v-if="!isMobile"
+                      class="drag-grip"
+                      title="Kéo thả để đổi thứ tự ưu tiên"
+                      aria-hidden="true"
+                    >
+                      ⋮⋮
+                    </span>
+                    <div class="index-badge">#{{ i + 1 }}</div>
+                  </div>
                 </td>
                 <td class="td-image" data-label="Hình ảnh Banner">
                   <div class="image-wrapper">
-                    <img :src="b.URL" alt="Banner" class="banner-thumb" />
+                    <img :src="b.URL" alt="Banner" class="banner-thumb" draggable="false" />
                   </div>
                 </td>
                 <td class="td-action" data-label="Thao tác">
                   <div class="action-group">
-                    <button @click="startEdit(b)" class="btn-icon-action btn-edit" title="Chỉnh sửa">
+                    <button @click="startEdit(b, i)" class="btn-icon-action btn-edit" title="Chỉnh sửa">
                      
                       <span class="text">Sửa</span>
                     </button>
@@ -375,6 +516,21 @@ onMounted(async () => {
               </div>
             </div>
 
+            <div class="modal-field-order">
+              <label class="modal-order-label" for="banner-order-select">
+                Vị trí hiển thị ưu tiên
+              </label>
+              <select
+                id="banner-order-select"
+                v-model.number="editBannerOrder"
+                class="modal-order-select"
+              >
+                <option v-for="pos in Math.max(banners.length, 1)" :key="pos" :value="pos">
+                  #{{ pos }}{{ pos === 1 ? ' (Hiển thị đầu tiên)' : '' }}
+                </option>
+              </select>
+            </div>
+
             <label class="modal-file-upload">
               <input
                 type="file"
@@ -384,7 +540,10 @@ onMounted(async () => {
               />
               <div class="modal-upload-content">
                 <span class="modal-upload-icon"><i class="ri-image-add-fill" style="color:white"></i></span>
-                <span class="modal-upload-text">Chọn ảnh mới</span>
+                <div class="modal-upload-text-wrap">
+                  <span class="modal-upload-text">Chọn ảnh mới</span>
+                  <span class="upload-size-hint">Kích thước chuẩn: 1600 × 1000 px (ngang 16:10) · Tự nén ≤ 100KB</span>
+                </div>
               </div>
             </label>
           </div>
@@ -396,7 +555,7 @@ onMounted(async () => {
             </button>
             <button
               @click="saveEdit"
-              :disabled="loading || !editBannerFile"
+              :disabled="loading || !hasEditChanges"
               class="btn btn-success"
             >
               <span v-if="loading" class="btn-loading">
@@ -1186,5 +1345,96 @@ onMounted(async () => {
   .modal-preview-image {
     max-height: 200px;
   }
+}
+
+.modal-upload-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.upload-size-hint {
+  font-size: 12px;
+  color: #93c5fd;
+  line-height: 1.4;
+}
+
+.list-header-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.drag-hint {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: #93c5fd;
+}
+
+.index-cell-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.drag-grip {
+  font-size: 16px;
+  line-height: 1;
+  color: #94a3b8;
+  letter-spacing: -2px;
+  user-select: none;
+  padding: 6px 4px;
+}
+
+.table-row.is-draggable {
+  cursor: grab;
+}
+
+.table-row.is-draggable:active {
+  cursor: grabbing;
+}
+
+.table-row.is-dragging {
+  opacity: 0.48;
+  background: rgba(59, 130, 246, 0.14);
+}
+
+.table-row.is-drag-over {
+  background: rgba(16, 185, 129, 0.14);
+  box-shadow: inset 0 2px 0 #10b981, inset 0 -2px 0 #10b981;
+}
+
+.modal-field-order {
+  margin-bottom: 16px;
+}
+
+.modal-order-label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #e2e8f0;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 8px;
+}
+
+.modal-order-select {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(51, 65, 85, 0.65);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+}
+
+.modal-order-select:focus {
+  border-color: #3b82f6;
 }
 </style>

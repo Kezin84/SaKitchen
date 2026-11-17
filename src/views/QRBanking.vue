@@ -18,6 +18,8 @@ const nganHang = ref('')
 const nguoiNhan = ref('')
 const tiGia = ref('')
 const donViTienTe = ref('')
+const showInInvoice = ref(false)
+const togglingInvoiceId = ref('')
 const file = ref(null)
 const preview = ref('')
 
@@ -135,6 +137,7 @@ async function addQR() {
         QR_IMG: url,
         Ti_gia: tiGia.value,
         Don_vi_tien_te: donViTienTe.value,
+        Show_in_invoice: showInInvoice.value,
       },
     })
 
@@ -147,12 +150,17 @@ async function addQR() {
   loading.value = false
 }
 
+function isQrShownInInvoice(item) {
+  return item?.Show_in_invoice === true || item?.Show_in_invoice === 'YES'
+}
+
 /* ================= EDIT ================= */
 function openEdit(item) {
   editing.value = item
   tieuDe.value = item.Tieu_de
   tiGia.value = item.Ti_gia
   donViTienTe.value = item.Don_vi_tien_te
+  showInInvoice.value = isQrShownInInvoice(item)
   preview.value = item.QR_IMG
   parseThongTin(item.ThongTin)
   showEdit.value = true
@@ -177,6 +185,7 @@ async function saveEdit() {
         QR_IMG: url,
         Ti_gia: tiGia.value,
         Don_vi_tien_te: donViTienTe.value,
+        Show_in_invoice: showInInvoice.value,
       },
     })
 
@@ -187,6 +196,31 @@ async function saveEdit() {
     showNotification('error', 'Lỗi', 'Không thể cập nhật: ' + e.message)
   }
   loading.value = false
+}
+
+async function toggleShowInInvoice(item) {
+  if (!item?.ID || togglingInvoiceId.value) return
+  const nextVal = !isQrShownInInvoice(item)
+  togglingInvoiceId.value = item.ID
+  try {
+    await dispatchAction({
+      action: 'updateThongTinChuyenKhoan',
+      data: {
+        ID: item.ID,
+        Tieu_de: item.Tieu_de,
+        ThongTin: item.ThongTin,
+        QR_IMG: item.QR_IMG,
+        Ti_gia: item.Ti_gia,
+        Don_vi_tien_te: item.Don_vi_tien_te,
+        Show_in_invoice: nextVal,
+      },
+    })
+    await loadData()
+  } catch (e) {
+    showNotification('error', 'Lỗi', 'Không thể cập nhật tùy chọn hóa đơn ảnh: ' + e.message)
+  } finally {
+    togglingInvoiceId.value = ''
+  }
 }
 
 /* ================= DELETE ================= */
@@ -237,6 +271,7 @@ function resetForm() {
   nguoiNhan.value = ''
   tiGia.value = ''
   donViTienTe.value = ''
+  showInInvoice.value = false
   file.value = null
   preview.value = ''
 }
@@ -317,6 +352,9 @@ onMounted(loadData)
                 @change="onFileChange"
                 class="form-input"
               />
+              <div class="upload-size-hint">
+                Kích thước chuẩn: <strong>600 × 600 px – 1000 × 1000 px</strong> (vuông 1:1) · Tự nén ≤ 100KB
+              </div>
             </div>
 
             <div class="form-row">
@@ -339,6 +377,11 @@ onMounted(loadData)
                 />
               </div>
             </div>
+
+            <label class="invoice-qr-opt" :class="{ active: showInInvoice }">
+              <input type="checkbox" v-model="showInInvoice" />
+              <span>Hiện QR này trong ảnh xuất hóa đơn (tự tắt các QR khác để tránh vỡ layout)</span>
+            </label>
 
             <button
               @click="addQR"
@@ -426,6 +469,7 @@ onMounted(loadData)
                 <th class="th-info">Thông tin </th>
                 <th class="th-rate">Tỉ giá</th>
                 <th class="th-currency">Đơn vị</th>
+                <th class="th-invoice">Ảnh hóa đơn</th>
                 <th class="th-action">Thao tác</th>
               </tr>
             </thead>
@@ -450,6 +494,19 @@ onMounted(loadData)
                 </td>
                 <td class="td-currency" data-label="Đơn vị">
                   <div class="currency-badge">{{ i.Don_vi_tien_te || 'VND' }}</div>
+                </td>
+                <td class="td-invoice" data-label="Ảnh hóa đơn">
+                  <button
+                    type="button"
+                    class="invoice-qr-switch"
+                    :class="{ active: isQrShownInInvoice(i) }"
+                    :disabled="togglingInvoiceId === i.ID"
+                    @click="toggleShowInInvoice(i)"
+                    title="Bật/tắt hiển thị QR này trong ảnh xuất hóa đơn"
+                  >
+                    <span class="iqs-dot"></span>
+                    <span>{{ isQrShownInInvoice(i) ? 'Đang hiện' : 'Ẩn' }}</span>
+                  </button>
                 </td>
                 <td class="td-action" data-label="Thao tác">
                   <div class="action-group">
@@ -525,6 +582,9 @@ onMounted(loadData)
                 @change="onFileChange"
                 class="modal-input"
               />
+              <div class="upload-size-hint">
+                Kích thước chuẩn: <strong>600 × 600 px – 1000 × 1000 px</strong> (vuông 1:1) · Tự nén ≤ 100KB
+              </div>
             </div>
 
             <div class="modal-row">
@@ -537,6 +597,11 @@ onMounted(loadData)
                 <input v-model="donViTienTe" class="modal-input" />
               </div>
             </div>
+
+            <label class="invoice-qr-opt" :class="{ active: showInInvoice }">
+              <input type="checkbox" v-model="showInInvoice" />
+              <span>Hiện QR này trong ảnh xuất hóa đơn (chỉ giữ 1 QR)</span>
+            </label>
 
             <div v-if="preview" class="modal-preview">
               <img :src="preview" alt="QR Preview" />
@@ -1830,5 +1895,88 @@ onMounted(loadData)
   .notification-title {
     font-size: 18px;
   }
+}
+
+.upload-size-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #93c5fd;
+  line-height: 1.4;
+}
+
+.invoice-qr-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.45);
+  color: #cbd5e1;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease;
+}
+
+.invoice-qr-opt.active {
+  border-color: rgba(34, 197, 94, 0.65);
+  background: rgba(34, 197, 94, 0.14);
+  color: #dcfce7;
+}
+
+.invoice-qr-opt input[type='checkbox'] {
+  width: 17px;
+  height: 17px;
+  accent-color: #22c55e;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.th-invoice,
+.td-invoice {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.invoice-qr-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(15, 23, 42, 0.65);
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.invoice-qr-switch .iqs-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #64748b;
+}
+
+.invoice-qr-switch.active {
+  border-color: rgba(34, 197, 94, 0.7);
+  background: rgba(34, 197, 94, 0.16);
+  color: #86efac;
+}
+
+.invoice-qr-switch.active .iqs-dot {
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.75);
+}
+
+.invoice-qr-switch:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 </style>

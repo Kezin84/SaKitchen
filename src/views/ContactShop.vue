@@ -320,6 +320,9 @@ onMounted(loadData)
               @change="onFileChange"
               class="form-input"
             />
+            <div class="upload-size-hint">
+              Kích thước chuẩn: <strong>256 × 256 px – 512 × 512 px</strong> (vuông 1:1) · Tối đa 1000 × 1000 px (~100KB)
+            </div>
           </div>
         </div>
 
@@ -564,6 +567,9 @@ onMounted(loadData)
                 @change="onEditFile"
                 class="modal-input"
               />
+              <div class="upload-size-hint">
+                Kích thước chuẩn: <strong>256 × 256 px – 512 × 512 px</strong> (vuông 1:1) · Tối đa 1000 × 1000 px (~100KB)
+              </div>
             </div>
 
             <div
@@ -1597,5 +1603,12 @@ onMounted(loadData)
     flex-wrap: wrap;
     gap: 10px;
   }
+}
+
+.upload-size-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #93c5fd;
+  line-height: 1.4;
 }
 </style>

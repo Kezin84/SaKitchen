@@ -2,7 +2,17 @@
   <div class="page">
     
 
-    <div class="layout-grid">
+    <div
+      ref="layoutGridRef"
+      class="layout-grid"
+      :class="{
+        'is-left-collapsed': !isMobile && pcCollapsed.left,
+        'is-center-collapsed': !isMobile && pcCollapsed.center,
+        'is-right-collapsed': !isMobile && pcCollapsed.right,
+        'is-resizing-cols': !isMobile && Boolean(resizingCol),
+      }"
+      :style="pcGridStyle"
+    >
 
       <!-- MOBILE SUB-DOCK (ABOVE BOTTOM BAR) -->
       <div
@@ -74,9 +84,19 @@
         </button>
       </div>
 
-      <div class="left-stack" v-show="!isMobile || ['entry', 'customer'].includes(activeMobileTab)">
+      <div class="left-stack" v-show="!isMobile || activeMobileTab === 'entry'">
+        <button
+          v-if="!isMobile && pcCollapsed.left"
+          type="button"
+          class="pc-col-rail pc-col-rail--left"
+          @click="pcCollapsed.left = false"
+          title="Mở cột nhập hàng"
+        >
+          <i class="ri-arrow-right-double-line pc-rail-ico"></i>
+          <span class="pc-rail-label">NHẬP HÀNG</span>
+        </button>
 
-        <div class="box entry-box" v-show="!isMobile || activeMobileTab === 'entry'">
+        <div class="box entry-box" v-show="isMobile ? activeMobileTab === 'entry' : !pcCollapsed.left">
 
           <!-- HEADER REFACTORED: Unified Toolbar for Catalog Mode -->
           <!-- HEADER REFACTORED: Unified Toolbar for Catalog Mode -->
@@ -85,14 +105,13 @@
                 
                 <!-- === DESKTOP LAYOUT (Unchanged) === -->
                 <template v-if="!isMobile">
-                  <!-- Row 1: Title & Buttons & Language -->
+                  <!-- Row 1: Buttons & Language -->
                   <div class="toolbar-section-title">
-                    <div class="header-title-text" style="color: #ffffff; font-weight: 900; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">NHẬP HÀNG</div>
                     <div class="entry-mode-toggle">
                       <button class="mode-btn mode-btn-green active"> <i class="app-ico ri-grid-fill"></i> Có sẵn </button>
                       <button class="mode-btn mode-btn-blue" @click="entryMode = 'manual'"> <i class="app-ico ri-keyboard-box-line"></i> Thủ công </button>
                       
-                      <div class="custom-select-wrapper header-lang-select" style="margin-left: 8px;">
+                      <div class="custom-select-wrapper header-lang-select" style="margin-left: 4px;">
                         <select v-model="selectedLang" class="custom-select custom-select-transparent">
                           <option v-for="opt in langOptions" :key="opt.value" :value="opt.value">
                             {{ opt.label }}
@@ -101,13 +120,21 @@
                         <span class="lang-label-text">{{ currentLangLabel }}</span>
                         <img :src="currentLangFlagUrl" alt="Lang" class="lang-flag-img" />
                       </div>
+                      <button
+                        type="button"
+                        class="pc-col-toggle-btn"
+                        @click="pcCollapsed.left = true"
+                        title="Thu gọn cột nhập hàng"
+                      >
+                        <i class="ri-arrow-left-double-line"></i>
+                      </button>
                     </div>
                   </div>
 
                   <!-- Row 2: Search & Filters -->
-                  <div class="toolbar-row-2 scrollbar-hide" style="display: flex; flex-direction: row; flex-wrap: nowrap; width: 100%; align-items: center; gap: 8px; overflow-x: auto; overflow-y: hidden; white-space: nowrap;">
+                  <div class="toolbar-row-2 pc-toolbar-row-2">
                     <!-- Search -->
-                    <div class="search-box-unified" style="flex: 1; min-width: 150px; flex-shrink: 0;">
+                    <div class="search-box-unified pc-search-full" :class="{ 'has-query': Boolean(searchProduct && searchProduct.trim()) }">
                       <i class="app-ico ri-search-line search-icon"></i>
                       <input v-model="searchProduct" type="text" placeholder="Tìm kiếm..." class="search-input-unified" />
                       <button v-if="searchProduct" class="search-clear" @click="searchProduct = ''"> <i class="app-ico ri-close-line"></i> </button>
@@ -159,7 +186,7 @@
                   <!-- Row 1: Search Box + Language -->
                   <div class="toolbar-section-title" style="gap: 8px;">
                      <!-- Search Box (Fill space) -->
-                     <div class="search-box-unified" style="flex: 1; min-width: 0;">
+                     <div class="search-box-unified" :class="{ 'has-query': Boolean(searchProduct && searchProduct.trim()) }" style="flex: 1; min-width: 0;">
                         <i class="app-ico ri-search-line search-icon"></i>
                         <input v-model="searchProduct" type="text" placeholder="Tìm kiếm..." class="search-input-unified" />
                         <button v-if="searchProduct" class="search-clear" @click="searchProduct = ''"> <i class="app-ico ri-close-line"></i> </button>
@@ -224,13 +251,20 @@
               </div>
           </div>
 
-          <!-- HEADER FOR MANUAL MODE (Simple Fallback) -->
+          <!-- HEADER FOR MANUAL MODE -->
           <div class="entry-header manual-entry-header" v-else>
              <div class="entry-mode-toggle">
-                <div v-if="!isMobile" class="header-title-text" style="color: #ffffff; font-weight: 800; font-size: 13px; text-transform: uppercase;">NHẬP HÀNG</div>
                 <template v-if="!isMobile">
                   <button class="mode-btn" style="background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.1);" @click="entryMode = 'catalog'"> <i class="app-ico ri-grid-fill"></i> Có sẵn </button>
                   <button class="mode-btn" :class="{ 'active-manual': entryMode === 'manual' }" style="background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.1);" @click="entryMode = 'manual'"> <i class="app-ico ri-keyboard-box-line"></i> Thủ công </button>
+                  <button
+                    type="button"
+                    class="pc-col-toggle-btn"
+                    @click="pcCollapsed.left = true"
+                    title="Thu gọn cột nhập hàng"
+                  >
+                    <i class="ri-arrow-left-double-line"></i>
+                  </button>
                 </template>
              </div>
           </div>
@@ -258,13 +292,33 @@
                     :class="m.role === 'admin' ? 'ri-store-2-line' : 'ri-user-3-line'"
                   ></i>
                   <span>{{ m.name }}</span>
+                  <span v-if="m.dupTag" class="omg-dup-tag">{{ m.dupTag }}</span>
                   <em v-if="m.badge" class="emtb-badge">{{ m.badge }}</em>
+                </button>
+                <button
+                  type="button"
+                  class="emtb-pill emtb-add-pill"
+                  @click="openAddMemberModal"
+                  title="Thêm người đặt mới vào đơn"
+                >
+                  <i class="app-ico ri-user-add-line"></i>
+                  <span>Thêm người</span>
                 </button>
               </div>
             </div>
 
             <template v-if="entryMode === 'catalog'">
               <!-- Filters moved to header -->
+
+              <div v-if="!isLoadingProducts && searchProduct && searchProduct.trim()" class="search-result-banner">
+                <span class="srb-text">
+                  <i class="ri-search-eye-line"></i>
+                  Tìm thấy <strong>{{ filteredProducts.length }}</strong> món cho "<em>{{ searchProduct.trim() }}</em>"
+                </span>
+                <button type="button" class="srb-clear" @click="searchProduct = ''">
+                  <i class="ri-close-line"></i> Xóa tìm
+                </button>
+              </div>
 
               <div class="catalog-grid-section">
                 <div class="product-grid">
@@ -285,8 +339,13 @@
                   v-for="product in filteredProducts"
                   :key="product.Ma_hang"
                   class="product-card product-card-horizontal"
-                  :class="[{ 'is-out': isOutOfStock(product) }, { 'is-flash': cardHighlight[product.Ma_hang] }]"
-                  @click="openProductDetail(product)"
+                  :class="[
+                    { 'is-out': isOutOfStock(product) },
+                    { 'is-flash': cardHighlight[product.Ma_hang] },
+                    { 'is-search-match': Boolean(searchProduct && searchProduct.trim()) },
+                    { 'is-mobile-in-cart': isMobile && getMobileCartQty(product) > 0 }
+                  ]"
+                  @click="onProductCardClick(product)"
                 >
                   <!-- Area 1: Product Image (Left) -->
                   <div class="pc-media-horizontal">
@@ -303,13 +362,32 @@
                     
                     <div v-if="product.Gia_Giam > 0" class="badge-sale">SALE</div>
                     <div v-if="isOutOfStock(product)" class="badge-out">Hết hàng</div>
+                    <button
+                      v-if="isMobile"
+                      type="button"
+                      class="mobile-detail-info-btn"
+                      @click.stop="openProductDetail(product)"
+                      title="Xem chi tiết"
+                      aria-label="Xem chi tiết sản phẩm"
+                    >
+                      <i class="ri-information-line"></i>
+                    </button>
+                    <span
+                      v-if="isMobile && getMobileCartQty(product) > 0"
+                      class="mobile-cart-qty-badge"
+                    >
+                      ×{{ getMobileCartQty(product) }}
+                    </span>
                   </div>
 
                   <!-- Right Content Wrapper (Areas 2-4) -->
                   <div class="pc-content-horizontal">
                     <!-- Area 2: Product Name -->
                     <div class="pc-name-horizontal" :title="product.Ten_hang">
-                      {{ product.Ten_hang }}
+                      <template v-for="(seg, sIdx) in getHighlightedSegments(product.Ten_hang, searchProduct)" :key="sIdx">
+                        <mark v-if="seg.match" class="search-hl-mark">{{ seg.text }}</mark>
+                        <template v-else>{{ seg.text }}</template>
+                      </template>
                     </div>
 
                     <!-- Area 3: Price, Status, Quantity Row -->
@@ -331,8 +409,8 @@
                         </div>
                       </div>
 
-                      <!-- Row 2: Quantity Stepper & Note -->
-                      <div class="qty-note-row">
+                      <!-- Row 2 (Desktop): Quantity Stepper & Note -->
+                      <div v-if="!isMobile" class="qty-note-row">
                         <div class="qty-stepper-modern" @click.stop>
                           <button 
                             class="qty-btn-circle" 
@@ -382,8 +460,8 @@
                       </div>
                     </div>
 
-                    <!-- Area 4: Action Buttons -->
-                    <div class="pc-actions-horizontal" @click.stop>
+                    <!-- Area 4 (Desktop): Action Buttons -->
+                    <div v-if="!isMobile" class="pc-actions-horizontal" @click.stop>
                       <button 
                         class="btn-add-green" 
                         :class="{ 'btn-added-success': addedSuccess[product.Ma_hang] }"
@@ -399,6 +477,74 @@
                            <span>Thêm hàng</span>
                         </template>
                       </button>
+                    </div>
+
+                    <!-- Area 4 (Mobile): Instant 1-tap add & live quantity stepper (no confirmation button) -->
+                    <div v-else class="mobile-quick-add-row" @click.stop>
+                      <div v-if="getMobileCartQty(product) > 0" class="mobile-live-stepper">
+                        <button
+                          type="button"
+                          class="qty-btn-circle mobile-qty-minus"
+                          @click="adjustMobileCartQty(product, -1)"
+                          aria-label="Giảm số lượng"
+                        >
+                          <i class="ri-subtract-line"></i>
+                        </button>
+                        <input
+                          type="number"
+                          min="0"
+                          :value="getMobileCartQty(product)"
+                          @change="setMobileCartQty(product, $event.target.value)"
+                          class="qty-input-box mobile-live-qty-input"
+                          aria-label="Số lượng đã thêm"
+                        />
+                        <button
+                          type="button"
+                          class="qty-btn-circle"
+                          @click="adjustMobileCartQty(product, 1)"
+                          :disabled="isOutOfStock(product)"
+                          aria-label="Tăng số lượng"
+                        >
+                          <i class="ri-add-line"></i>
+                        </button>
+                      </div>
+                      <button
+                        v-else
+                        type="button"
+                        class="mobile-tap-add-btn"
+                        :disabled="isOutOfStock(product)"
+                        @click="adjustMobileCartQty(product, 1)"
+                      >
+                        <i class="ri-add-line"></i>
+                        <span>{{ isOutOfStock(product) ? 'Hết hàng' : 'Nhấn để thêm' }}</span>
+                      </button>
+
+                      <span v-if="getMobileCartQty(product) > 0" class="mobile-added-pill">
+                        Đã thêm {{ getMobileCartQty(product) }}
+                      </span>
+
+                      <button
+                        type="button"
+                        class="btn-note-text-green"
+                        :class="{ 'has-note': productNotes[product.Ma_hang] }"
+                        @click.stop="toggleNotePopover(product.Ma_hang)"
+                        title="Ghi chú"
+                      >
+                        <i class="ri-file-edit-fill"></i>
+                      </button>
+
+                      <div
+                        v-if="notePopoverOpen[product.Ma_hang]"
+                        class="note-popover-horizontal"
+                        @click.stop
+                      >
+                        <textarea
+                          v-model="productNotes[product.Ma_hang]"
+                          placeholder="Ghi chú..."
+                          rows="2"
+                        ></textarea>
+                        <button class="note-save-horizontal" @click="saveMobileProductNote(product)">Lưu</button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -462,136 +608,247 @@
                     <div class="mv4-header">
                        <div class="mv4-header-left">
                           <i class="ri-box-3-line"></i>
-                          <span>Nhập hàng thủ công</span>
+                          <div class="mv4-header-titles">
+                            <span>Nhập hàng thủ công</span>
+                            <span
+                              v-if="isManualMatchedInDb"
+                              class="mv4-db-badge is-existing"
+                              :title="`Khớp sản phẩm trong kho: ${form.maHang}`"
+                            >
+                              Kho: #{{ form.maHang }}
+                            </span>
+                            <span v-else-if="form.tenHang && form.tenHang.trim()" class="mv4-db-badge is-new">
+                              Mặt hàng mới
+                            </span>
+                          </div>
                        </div>
-                       <button v-if="hasProductData" @click="xoaHang" class="mv4-btn-clear" title="Làm mới">
+                       <button v-if="hasProductData" @click="xoaHang" class="mv4-btn-clear" title="Làm mới form">
                           <i class="ri-refresh-line"></i>
                        </button>
                     </div>
-                    
-                    <!-- Row 1: Tên sản phẩm | Đơn vị tiền tệ -->
-                    <div class="mv4-row-2">
-                       <div class="mv4-field flex-2">
-                          <label>Tên sản phẩm <span class="req">*</span></label>
-                          <div class="mv4-input-hero" style="position: relative;">
-                             <input 
-                                v-model="form.tenHang" 
-                                list="ds-hang-ten" 
-                                placeholder="Nhập hoặc chọn sản phẩm..." 
-                                style="padding-left: 12px; padding-right: 60px;"
-                             />
-                             <button 
-                                v-if="form.tenHang || form.maHang" 
-                                class="btn-delete-cta"
-                                @click="resetItem"
-                                title="Xóa hàng đang chọn"
-                             >
-                                XÓA
-                             </button>
-                             <datalist id="ds-hang-ten">
-                                <option v-for="h in hangHoaList" :key="h.Ma_hang" :value="h.Ten_hang">{{ h.Ten_hang }}</option>
-                             </datalist>
-                          </div>
-                       </div>
-                       <div class="mv4-field flex-1">
-                          <label>Đơn vị tiền tệ</label>
-                          <input v-model="form.donViTienTe" placeholder="VND" />
-                       </div>
+
+                    <!-- NHÓM 1: THÔNG TIN SẢN PHẨM -->
+                    <div class="mv4-section">
+                      <div class="mv4-field">
+                         <label>Tên sản phẩm <span class="req">*</span></label>
+                         <div class="mv4-input-hero">
+                            <input 
+                               v-model="form.tenHang" 
+                               list="ds-hang-ten" 
+                               placeholder="Nhập tên mới hoặc chọn từ kho..." 
+                            />
+                            <button 
+                               v-if="form.tenHang || form.maHang" 
+                               type="button"
+                               class="btn-delete-cta"
+                               @click="resetItem"
+                               title="Xóa hàng đang chọn"
+                            >
+                               XÓA
+                            </button>
+                            <datalist id="ds-hang-ten">
+                               <option v-for="h in hangHoaList" :key="h.Ma_hang" :value="h.Ten_hang">{{ h.Ten_hang }}</option>
+                            </datalist>
+                         </div>
+                      </div>
+
+                      <div class="mv4-meta-grid">
+                         <div class="mv4-field">
+                            <label>Danh mục</label>
+                            <input v-model="form.danhMuc" list="ds-danhmuc" placeholder="VD: Đồ ăn..." />
+                            <datalist id="ds-danhmuc"><option v-for="d in uniqueDanhMucs" :key="d" :value="d">{{ d }}</option></datalist>
+                         </div>
+                         <div class="mv4-field">
+                            <label>Size</label>
+                            <input v-model="form.size" list="ds-size" placeholder="VD: L, M..." />
+                            <datalist id="ds-size"><option v-for="s in uniqueSizes" :key="s" :value="s">{{ s }}</option></datalist>
+                         </div>
+                         <div class="mv4-field">
+                            <label>Đơn vị tính</label>
+                            <input v-model="form.dvt" list="ds-dvt" placeholder="Phần, Ly..." />
+                            <datalist id="ds-dvt"><option v-for="u in uniqueDvts" :key="u" :value="u">{{ u }}</option></datalist>
+                         </div>
+                      </div>
+
+                      <div class="mv4-pair-grid">
+                         <div class="mv4-field">
+                            <label>Đơn vị tiền tệ</label>
+                            <input v-model="form.donViTienTe" placeholder="P / VND" />
+                         </div>
+                         <div class="mv4-field">
+                            <label>Ngôn ngữ</label>
+                            <select v-model="form.lang">
+                              <option value="vi">🇻🇳 Việt Nam</option>
+                              <option value="en">🇬🇧 English</option>
+                              <option value="zh-CN">🇨🇳 Trung Quốc</option>
+                              <option value="tl">🇵🇭 Philippines</option>
+                              <option value="ko">🇰🇷 Hàn Quốc</option>
+                            </select>
+                         </div>
+                      </div>
                     </div>
 
-                    <!-- Row 2: Giá vốn | Giá bán | Giảm giá -->
-                    <div class="mv4-row-3">
-                       <div class="mv4-field">
-                          <label>Giá vốn</label>
-                          <div class="mv4-input-price">
-                             <input type="number" v-model.number="form.giaGoc" placeholder="0" />
-                             <span class="currency">{{ form.donViTienTe }}</span>
-                          </div>
-                       </div>
-                       <div class="mv4-field highlight">
-                          <label>Giá bán</label>
-                          <div class="mv4-input-price">
-                             <input type="number" v-model.number="form.giaBan" placeholder="0" />
-                             <span class="currency">{{ form.donViTienTe }}</span>
-                          </div>
-                       </div>
-                       <div class="mv4-field">
-                          <label>Giảm giá</label>
-                          <div class="mv4-input-price danger">
-                             <input type="number" v-model.number="form.giamGia" placeholder="0" />
-                             <span class="currency">{{ form.donViTienTe }}</span>
-                          </div>
-                       </div>
+                    <!-- NHÓM 2: ĐỊNH GIÁ -->
+                    <div class="mv4-section is-pricing">
+                      <div class="mv4-section-head">
+                        <span><i class="ri-price-tag-3-line"></i> Định giá</span>
+                        <span v-if="manualLinePreview > 0" class="mv4-preview-chip">
+                          Tạm tính: {{ formatWithCurrency(manualLinePreview, form.donViTienTe || 'P') }}
+                        </span>
+                      </div>
+
+                      <div class="mv4-price-grid">
+                         <div class="mv4-field highlight">
+                            <label>Giá bán</label>
+                            <div class="mv4-input-price">
+                               <input type="number" v-model.number="form.giaBan" placeholder="0" />
+                               <span class="currency">{{ form.donViTienTe || 'P' }}</span>
+                            </div>
+                         </div>
+                         <div class="mv4-field">
+                            <label>Giá vốn</label>
+                            <div class="mv4-input-price">
+                               <input type="number" v-model.number="form.giaGoc" placeholder="0" />
+                               <span class="currency">{{ form.donViTienTe || 'P' }}</span>
+                            </div>
+                         </div>
+                         <div class="mv4-field">
+                            <label>Giảm giá / SP</label>
+                            <div class="mv4-input-price danger">
+                               <input type="number" v-model.number="form.giamGia" placeholder="0" />
+                               <span class="currency">{{ form.donViTienTe || 'P' }}</span>
+                            </div>
+                         </div>
+                      </div>
+                      <div class="mv4-field" style="margin-top: 8px;">
+                         <label>CK NCC (% giá gốc hoặc Tiền trực tiếp)</label>
+                         <div class="ncc-inline-control">
+                            <div class="ncc-type-toggle" role="group">
+                               <button
+                                 type="button"
+                                 class="ncc-type-btn"
+                                 :class="{ active: form.nccLoaiGiam !== 'money' }"
+                                 @click="form.nccLoaiGiam = 'percent'"
+                               >
+                                 %
+                               </button>
+                               <button
+                                 type="button"
+                                 class="ncc-type-btn"
+                                 :class="{ active: form.nccLoaiGiam === 'money' }"
+                                 @click="form.nccLoaiGiam = 'money'"
+                               >
+                                 Tiền ({{ form.donViTienTe || 'P' }})
+                               </button>
+                            </div>
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              v-model.number="form.nccGiaTriGiam"
+                              placeholder="0"
+                              class="ncc-inline-input"
+                            />
+                         </div>
+                      </div>
                     </div>
 
-                    <!-- Row 3: Danh mục | Size | Đơn vị tính | Ngôn ngữ -->
-                    <div class="mv4-row-4">
-                       <div class="mv4-field">
-                          <label>Danh mục</label>
-                          <input v-model="form.danhMuc" list="ds-danhmuc" placeholder="Chọn..." />
-                          <datalist id="ds-danhmuc"><option v-for="d in uniqueDanhMucs" :value="d">{{d}}</option></datalist>
-                       </div>
-                       <div class="mv4-field">
-                          <label>Size</label>
-                          <input v-model="form.size" list="ds-size" placeholder="Chọn..." />
-                          <datalist id="ds-size"><option v-for="s in uniqueSizes" :value="s">{{s}}</option></datalist>
-                       </div>
-                       <div class="mv4-field">
-                          <label>Đơn vị tính</label>
-                          <input v-model="form.dvt" list="ds-dvt" placeholder="Cái..." />
-                          <datalist id="ds-dvt"><option v-for="u in uniqueDvts" :value="u">{{u}}</option></datalist>
-                       </div>
-                       <div class="mv4-field">
-                          <label>Ngôn ngữ</label>
-                          <select v-model="form.lang">
-                            <option value="vi">🇻🇳 Việt Nam</option>
-                            <option value="en">🇬🇧 English</option>
-                            <option value="zh-CN">🇨🇳 Trung Quốc</option>
-                            <option value="tl">🇵🇭 Philippines</option>
-                            <option value="ko">🇰🇷 Hàn Quốc</option>
-                          </select>
-                       </div>
+                    <!-- NHÓM 3: GHI CHÚ & SỐ LƯỢNG -->
+                    <div class="mv4-section">
+                      <div class="mv4-field">
+                         <label>Ghi chú hàng hóa</label>
+                         <input v-model="form.ghiChuHang" placeholder="VD: Ít đường, để riêng sốt..." />
+                      </div>
+
+                      <div class="mv4-row-qty-bar">
+                         <div class="mv4-qty-section">
+                            <label>Số lượng</label>
+                            <div class="mv4-qty-stepper">
+                               <button type="button" @click="form.soLuong > 1 ? form.soLuong-- : null" :disabled="form.soLuong <= 1">
+                                  <i class="ri-subtract-line"></i>
+                               </button>
+                               <input type="number" v-model.number="form.soLuong" min="1" />
+                               <button type="button" @click="form.soLuong++">
+                                  <i class="ri-add-line"></i>
+                               </button>
+                            </div>
+                         </div>
+                         <div class="mv4-stock-badge" :class="stockColorClass">
+                            <i :class="isManualOutOfStock ? 'ri-close-circle-line' : 'ri-checkbox-circle-line'"></i>
+                            <span><strong>{{ isManualOutOfStock ? 'Hết hàng' : 'Còn hàng' }}</strong></span>
+                         </div>
+                      </div>
                     </div>
 
-                    <!-- Row 4: Ghi chú hàng hóa -->
-                    <div class="mv4-row-full">
-                       <div class="mv4-field">
-                          <label>Ghi chú hàng hóa</label>
-                          <input v-model="form.ghiChuHang" placeholder="VD: Màu đỏ, size lớn..." />
-                       </div>
-                    </div>
+                    <!-- ACTION FOOTER + OPTION POPOVER -->
+                    <div ref="manualAddWrapRef" class="mv4-action-wrap">
+                      <div
+                        v-if="showManualAddOptions"
+                        class="mv4-add-options-popover"
+                        @click.stop
+                      >
+                        <div class="mv4-opt-head">
+                          <span>Chọn cách thêm "{{ (form.tenHang || '').trim() }}"</span>
+                          <button
+                            type="button"
+                            class="mv4-opt-close"
+                            :disabled="isSavingManualToDb"
+                            @click="showManualAddOptions = false"
+                          >
+                            <i class="ri-close-line"></i>
+                          </button>
+                        </div>
 
-                    <!-- Row 5: Số lượng | Tồn kho -->
-                    <div class="mv4-row-qty">
-                       <div class="mv4-qty-section">
-                          <label>Số lượng</label>
-                          <div class="mv4-qty-stepper">
-                             <button @click="form.soLuong > 1 ? form.soLuong-- : null" :disabled="form.soLuong <= 1">
-                                <i class="ri-subtract-line"></i>
-                             </button>
-                             <input type="number" v-model.number="form.soLuong" min="1" />
-                             <button @click="form.soLuong++">
-                                <i class="ri-add-line"></i>
-                             </button>
+                        <button
+                          type="button"
+                          class="mv4-opt-btn is-order-only"
+                          :disabled="isSavingManualToDb"
+                          @click="manualAddOrderOnly"
+                        >
+                          <i class="ri-shopping-cart-2-line"></i>
+                          <div class="mv4-opt-text">
+                            <strong>Chỉ thêm vào đơn</strong>
+                            <span>Chỉ thêm vào hóa đơn hiện tại, không lưu vào kho hàng</span>
                           </div>
-                       </div>
-                       <div class="mv4-stock-badge" :class="stockColorClass">
-                          <i :class="isManualOutOfStock ? 'ri-close-circle-line' : 'ri-checkbox-circle-line'"></i>
-                          <span><strong>{{ isManualOutOfStock ? 'Hết hàng' : 'Còn hàng' }}</strong></span>
-                       </div>
-                    </div>
-                    <!-- Action Button (Inside Card) -->
-                    <div class="mv4-row-full" style="padding-top: 12px; border-top: 1px dashed rgba(148, 163, 184, 0.15); margin-top: auto;">
+                        </button>
+
+                        <button
+                          type="button"
+                          class="mv4-opt-btn is-save-db"
+                          :disabled="isSavingManualToDb"
+                          @click="manualAddAndSaveToDb"
+                        >
+                          <span v-if="isSavingManualToDb" class="btn-spinner" aria-hidden="true"></span>
+                          <i v-else class="ri-database-2-line"></i>
+                          <div class="mv4-opt-text">
+                            <strong>{{ isManualMatchedInDb ? 'Thêm vào đơn & Cập nhật DB' : 'Thêm vào đơn & Lưu vào DB' }}</strong>
+                            <span>
+                              {{
+                                isManualMatchedInDb
+                                  ? 'Cập nhật thông tin sản phẩm vào kho (hang_hoa) và thêm vào đơn'
+                                  : 'Lưu thành sản phẩm mới trong kho (hang_hoa) và thêm vào đơn'
+                              }}
+                            </span>
+                          </div>
+                        </button>
+                      </div>
+
                       <button 
+                        type="button"
                         class="mv4-btn-add-simple" 
                         :class="{ 
                           'success': addedSuccessManual,
-                          'is-disabled-stock': hasProductData && isManualOutOfStock
+                          'is-disabled-stock': hasProductData && isManualOutOfStock,
+                          'is-options-open': showManualAddOptions
                         }"
-                        :disabled="hasProductData && isManualOutOfStock"
-                        @click="addItem"
+                        :disabled="(hasProductData && isManualOutOfStock) || isSavingManualToDb"
+                        @click.stop="handleManualAddClick"
                       >
-                        <template v-if="addedSuccessManual">
+                        <template v-if="isSavingManualToDb">
+                          <span class="btn-spinner" aria-hidden="true"></span>
+                          <span>ĐANG LƯU VÀO DB...</span>
+                        </template>
+                        <template v-else-if="addedSuccessManual">
                           <i class="ri-check-line"></i>
                           <span>ĐÃ THÊM</span>
                         </template>
@@ -602,6 +859,7 @@
                         <template v-else>
                           <i class="ri-add-circle-fill"></i>
                           <span>THÊM VÀO ĐƠN</span>
+                          <i :class="showManualAddOptions ? 'ri-arrow-down-s-line' : 'ri-arrow-up-s-line'" class="mv4-btn-caret"></i>
                         </template>
                       </button>
                     </div>
@@ -611,221 +869,244 @@
             </template>
           </div>
         </div>
-
-        <div class="info-row-2col">
-          <div class="customer-scroll-container">
-            <div class="box customer-box" v-show="!isMobile || activeMobileTab === 'customer'">
-
-            <h3><i class="ri-user-heart-line"></i> Thông tin khách hàng</h3>
-            <!-- customer content -->
-            <div class="hidden-field">
-              <label>Ma khach hang (an)</label>
-              <input v-model="form.maKhachHang" readonly />
-            </div>
-
-            <div class="field-row">
-              <label>Ten khách hàng</label>
-              <div class="field-control">
-                <div style="position:relative">
-                  <input 
-                    v-model="form.tenKhachHang" 
-                    list="ds-kh-ten"
-                    @input="handleTenKhachChange"
-                    style="padding-right: 70px"
-                  />
-                  <!-- Loading Spinner -->
-                  <div v-if="isLoadingCustomer" class="input-spinner"></div>
-                  <!-- Success Check (Only show when ready & empty) -->
-                  <i v-if="!isLoadingCustomer && !form.tenKhachHang" class="ri-checkbox-circle-fill input-success-icon"></i>
-
-                  <button 
-                    v-if="form.tenKhachHang" 
-                    class="btn-delete-cta"
-                    @click="xoaKhachHang"
-                    title="Xóa thông tin khách hàng"
-                  >
-                    XÓA
-                  </button>
-                </div>
-                <datalist id="ds-kh-ten">
-                  <option
-                    v-for="kh in khachHangList"
-                    :key="kh.Ma_khach_hang"
-                    :value="kh.Ten_khach_hang"
-                  />
-                </datalist>
-              </div>
-            </div>
-
-            <div class="field-row">
-              <label>Số điện thoại</label>
-              <div class="field-control">
-                <input 
-                  v-model="form.soDienThoai" 
-                  type="tel"
-                  pattern="[0-9]*"
-                  inputmode="numeric"
-                  @input="cleanPhoneInput"
-                />
-              </div>
-            </div>
-
-            <div class="field-row">
-              <label>Địa chỉ</label>
-              <div class="field-control">
-                <input v-model="form.diaChi" />
-              </div>
-            </div>
-
-            <!-- BỔ SUNG: THÔNG TIN TÓM TẮT KHÁCH -->
-            <div v-if="selectedCustomer || form.tenKhachHang" class="cust-summary-box">
-              <div class="cust-stat debt">
-                <span class="cust-stat-label">Công nợ</span>
-                <span class="cust-stat-value" :class="{ 'text-danger': customerDebt > 0 }">
-                  {{ formatWithCurrency(customerDebt, donViTienTeChung) }}
-                </span>
-              </div>
-              <div class="cust-stat spend">
-                <span class="cust-stat-label">Chi tiêu</span>
-                <span class="cust-stat-value text-primary">
-                  {{ formatWithCurrency(customerTotalSpend, donViTienTeChung) }}
-                </span>
-              </div>
-              <div class="cust-stat profit">
-                <span class="cust-stat-label">Lợi nhuận</span>
-                <span class="cust-stat-value text-success">
-                  {{ formatWithCurrency(customerProfit, donViTienTeChung) }}
-                </span>
-              </div>
-            </div>
-
-            <div class="field-row" style="margin-top: 10px">
-              <label>Ghi chú khách</label>
-              <div class="field-control">
-                <input 
-                  type="text"
-                  v-model="form.ghiChu" 
-                  class="pm-input"
-                  placeholder="Ghi chú về khách..."
-                />
-              </div>
-            </div>
-            </div>
-
-            <div class="box delivery-box" v-show="!isMobile || activeMobileTab === 'customer'">
-
-            <h3><i class="ri-truck-line"></i> Thông tin giao hàng</h3>
-
-            <div class="field-row">
-              <label>Ngày nhận</label>
-              <div class="field-control">
-                <input
-                  type="date"
-                  v-model="ngayNhanHang"
-                  class="date-input-dark"
-                />
-              </div>
-            </div>
-
-            <div class="field-row">
-              <label>Thời gian nhận</label>
-              <div class="field-control">
-                <div class="delivery-time-row">
-                  <select v-model="gioNhanHang" class="time-select">
-                    <option v-for="g in gioList" :key="g" :value="g">{{ g }}</option>
-                  </select>
-                  <span class="time-sep">:</span>
-                  <select v-model="phutNhanHang" class="time-select">
-                    <option v-for="p in phutList" :key="p" :value="p">{{ p }}</option>
-                  </select>
-                  <button class="btn-now" @click="setPlus20Min" title="Hiện tại + 20 phút">
-                    <i class="ri-flashlight-fill"></i> Làm liền
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div class="field-row">
-              <label>Ghi chú đơn</label>
-              <div class="field-control">
-                <textarea
-                  v-model="form.ghiChuDonHang"
-                  placeholder="VD: Giao giờ hành chính..."
-                  rows="2"
-                ></textarea>
-              </div>
-            </div>
-            </div>
-          </div>
-
-          <div v-if="isMobile && activeMobileTab === 'customer'" class="customer-next-wrap">
-            <button class="customer-back-btn" @click="setMobileTab('order')">
-              <i class="ri-arrow-left-line"></i>
-              <span>Quay lại</span>
-            </button>
-            <button v-if="hasCustomerData" class="customer-next-btn" @click="setMobileTab('payment')">
-              <span>Tiếp theo</span>
-              <i class="ri-arrow-right-line"></i>
-            </button>
-          </div>
-        </div>
       </div>
 
-      <div class="right-stack" v-show="!isMobile || ['order', 'payment'].includes(activeMobileTab)">
-        <div class="box order-box" v-show="!isMobile || activeMobileTab === 'order'">
+      <div
+        v-if="!isMobile"
+        class="pc-col-resizer"
+        :class="{
+          active: resizingCol === 'left',
+          disabled: pcCollapsed.left || pcCollapsed.center,
+        }"
+        title="Kéo để chỉnh độ rộng cột • Double-click để đặt lại mặc định"
+        @mousedown.prevent="startPcColResize('left', $event)"
+        @dblclick="resetPcColWidths"
+      >
+        <span class="pc-resizer-grip"></span>
+      </div>
 
-          <!-- MULTI-ORDER TABS BAR -->
-          <div class="invoice-tabs-bar">
-            <div class="invoice-tabs-scroll">
-              <button
-                v-for="(tab, idx) in invoiceTabs"
-                :key="tab.id"
-                type="button"
-                class="invoice-tab-pill"
-                :class="[
-                  {
-                    active: tab.id === activeInvoiceTabId,
-                    'is-approved': Boolean(tab.sourceOrderId),
-                  },
-                  tab.sourceOrderId ? getTabStatusClass(getTabLiveStatus(tab)) : '',
-                ]"
-                @click="switchInvoiceTab(tab.id)"
-              >
-                <span class="itp-dot"></span>
-                <span class="itp-title">{{ getTabDisplayTitle(tab, idx) }}</span>
-                <span
-                  v-if="tab.sourceOrderId"
-                  class="itp-status-tag"
-                  :class="getTabStatusClass(getTabLiveStatus(tab))"
-                >
-                  {{ getTabStatusLabel(getTabLiveStatus(tab)) }}
+      <div class="center-stack" v-show="!isMobile || activeMobileTab === 'order'">
+        <button
+          v-if="!isMobile && pcCollapsed.center"
+          type="button"
+          class="pc-col-rail pc-col-rail--center"
+          @click="pcCollapsed.center = false"
+          title="Mở bảng đơn hàng"
+        >
+          <i class="ri-expand-left-right-line pc-rail-ico"></i>
+          <span class="pc-rail-label">ĐƠN HÀNG</span>
+          <span v-if="totalItemQty > 0" class="pc-rail-badge">{{ totalItemQty }}</span>
+        </button>
+
+        <!-- MULTI-ORDER TABS RAIL (PC: CỘT DỌC GIỮA KHO HÀNG & BẢNG ĐƠN | MOBILE: THANH NGANG) -->
+        <div
+          v-show="isMobile ? activeMobileTab === 'order' : !pcCollapsed.center"
+          class="invoice-tabs-bar"
+          :class="{
+            'is-pc-vertical': !isMobile,
+            'is-rail-collapsed': !isMobile && pcTabRailCollapsed,
+          }"
+          :style="!isMobile && !pcTabRailCollapsed && pcColWidths.tabRail ? { width: pcColWidths.tabRail + 'px' } : undefined"
+        >
+          <div
+            v-if="isMobile || !pcTabRailCollapsed"
+            class="itb-source-filter"
+            role="tablist"
+            aria-label="Lọc loại tab đơn"
+          >
+            <button
+              type="button"
+              role="tab"
+              :aria-selected="tabSourceFilter === 'all'"
+              class="itb-filter-btn"
+              :class="{ active: tabSourceFilter === 'all' }"
+              @click="tabSourceFilter = 'all'"
+            >
+              <span>Tất cả</span>
+              <span class="itb-fcount">{{ invoiceTabs.length }}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              :aria-selected="tabSourceFilter === 'web'"
+              class="itb-filter-btn is-web"
+              :class="{ active: tabSourceFilter === 'web' }"
+              @click="tabSourceFilter = 'web'"
+            >
+              <span>Đơn web</span>
+              <span class="itb-fcount">{{ webInvoiceTabsCount }}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              :aria-selected="tabSourceFilter === 'admin'"
+              class="itb-filter-btn is-admin"
+              :class="{ active: tabSourceFilter === 'admin' }"
+              @click="tabSourceFilter = 'admin'"
+            >
+              <span>Đơn admin</span>
+              <span class="itb-fcount">{{ adminInvoiceTabsCount }}</span>
+            </button>
+          </div>
+          <div v-if="isMobile || !pcTabRailCollapsed" class="itb-search-wrap">
+            <i class="ri-search-line itb-search-icon"></i>
+            <input
+              v-model="tabSearchQuery"
+              type="text"
+              class="itb-search-input"
+              placeholder="Tìm tên, mã, SĐT..."
+              aria-label="Tìm kiếm tab đơn hàng"
+            />
+            <button
+              v-if="tabSearchQuery"
+              type="button"
+              class="itb-search-clear"
+              title="Xóa tìm kiếm"
+              @click="tabSearchQuery = ''"
+            >
+              <i class="ri-close-line"></i>
+            </button>
+          </div>
+          <div class="invoice-tabs-scroll">
+            <div v-if="!filteredInvoiceTabEntries.length" class="itb-filter-empty">
+              {{
+                tabSearchQuery.trim()
+                  ? `Không thấy tab khớp "${tabSearchQuery.trim()}".`
+                  : tabSourceFilter === 'web'
+                    ? 'Chưa có tab đơn web nào.'
+                    : 'Chưa có tab đơn admin nào.'
+              }}
+            </div>
+            <button
+              v-for="entry in filteredInvoiceTabEntries"
+              :key="entry.tab.id"
+              type="button"
+              class="invoice-tab-pill"
+              :class="[
+                {
+                  active: entry.tab.id === activeInvoiceTabId,
+                  'is-approved': Boolean(entry.tab.sourceOrderId || entry.tab.adminOrderStatus),
+                  'is-search-match': Boolean(tabSearchQuery.trim()),
+                },
+                getTabLiveStatus(entry.tab) ? getTabStatusClass(getTabLiveStatus(entry.tab)) : '',
+              ]"
+              :title="getTabDisplayTitle(entry.tab, entry.idx)"
+              @click="switchInvoiceTab(entry.tab.id)"
+            >
+              <span v-if="!isMobile && pcTabRailCollapsed" class="itp-compact-idx">
+                {{ entry.idx + 1 }}
+              </span>
+              <span class="itp-dot"></span>
+              <div v-if="isMobile || !pcTabRailCollapsed" class="itp-top-line">
+                <span class="itp-title">
+                  <template
+                    v-for="(seg, sIdx) in getHighlightedSegments(getTabDisplayTitle(entry.tab, entry.idx), tabSearchQuery)"
+                    :key="sIdx"
+                  >
+                    <mark v-if="seg.match" class="search-hl-mark">{{ seg.text }}</mark>
+                    <template v-else>{{ seg.text }}</template>
+                  </template>
                 </span>
-                <span v-if="getTabItemQty(tab) > 0" class="itp-count">{{ getTabItemQty(tab) }}</span>
                 <span
                   v-if="
                     invoiceTabs.length > 1 ||
-                    getTabItemQty(tab) > 0 ||
-                    tab.sourceOrderId ||
-                    tab.customer?.tenKhachHang
+                    getTabItemQty(entry.tab) > 0 ||
+                    entry.tab.sourceOrderId ||
+                    entry.tab.adminOrderStatus ||
+                    entry.tab.customer?.tenKhachHang
                   "
                   class="itp-close"
                   title="Đóng tab"
-                  @click.stop="closeInvoiceTab(tab.id)"
+                  @click.stop="requestCloseInvoiceTab(entry.tab.id)"
                 >
                   <i class="ri-close-line"></i>
                 </span>
-              </button>
-            </div>
+              </div>
+              <div
+                v-if="(getTabLiveStatus(entry.tab) || entry.tab.pendingWebUpdate?.changes?.length) && (isMobile || !pcTabRailCollapsed)"
+                class="itp-sub-line"
+              >
+                <span
+                  v-if="getTabLiveStatus(entry.tab)"
+                  class="itp-status-tag"
+                  :class="getTabStatusClass(getTabLiveStatus(entry.tab))"
+                >
+                  {{ getTabStatusLabel(getTabLiveStatus(entry.tab)) }}
+                </span>
+                <span
+                  v-if="entry.tab.pendingWebUpdate?.changes?.length"
+                  class="itp-update-tag"
+                  title="Khách vừa cập nhật thêm món / thông tin"
+                >
+                  Cập nhật ({{ entry.tab.pendingWebUpdate.changes.length }})
+                </span>
+              </div>
+              <div
+                v-if="entry.matchedHint && (isMobile || !pcTabRailCollapsed)"
+                class="itp-search-match-sub"
+              >
+                <template
+                  v-for="(seg, mIdx) in getHighlightedSegments(entry.matchedHint, tabSearchQuery)"
+                  :key="mIdx"
+                >
+                  <mark v-if="seg.match" class="search-hl-mark">{{ seg.text }}</mark>
+                  <template v-else>{{ seg.text }}</template>
+                </template>
+              </div>
+            </button>
+          </div>
+          <div class="itb-actions">
+            <button
+              v-if="!isMobile"
+              type="button"
+              class="itb-collapse-btn"
+              :title="pcTabRailCollapsed ? 'Mở rộng cột tab' : 'Thu gọn cột tab'"
+              @click="pcTabRailCollapsed = !pcTabRailCollapsed"
+            >
+              <i :class="pcTabRailCollapsed ? 'ri-sidebar-unfold-line' : 'ri-sidebar-fold-line'"></i>
+            </button>
             <button
               type="button"
               class="invoice-tab-add-btn"
               title="Mở thêm tab đơn hàng mới"
+              aria-label="Mở thêm tab đơn hàng mới"
               @click="addNewInvoiceTab"
             >
               <i class="ri-add-line"></i>
-              <span>Mở tab</span>
+            </button>
+            <button
+              type="button"
+              class="invoice-tab-bell-btn"
+              :class="{
+                'has-pending': totalBellNotificationCount > 0,
+                'is-ringing': pendingBellPulse && totalBellNotificationCount > 0,
+              }"
+              :title="bellButtonTooltip"
+              @click="handleOrderBellClick"
+            >
+              <i :class="totalBellNotificationCount > 0 ? 'ri-notification-3-fill' : 'ri-notification-3-line'"></i>
+              <span v-if="totalBellNotificationCount > 0" class="itb-badge">
+                {{ totalBellNotificationCount }}
+              </span>
             </button>
           </div>
+        </div>
+
+        <div
+          v-if="!isMobile && !pcCollapsed.center"
+          class="pc-col-resizer pc-tab-rail-resizer"
+          :class="{
+            active: resizingCol === 'tabRail',
+            disabled: pcTabRailCollapsed,
+          }"
+          title="Kéo để chỉnh độ rộng cột tab • Double-click để đặt lại mặc định"
+          @mousedown.prevent="startPcColResize('tabRail', $event)"
+          @dblclick="resetTabRailWidth"
+        >
+          <span class="pc-resizer-grip"></span>
+        </div>
+
+        <div class="box order-box" v-show="isMobile ? activeMobileTab === 'order' : !pcCollapsed.center">
 
           <div
             class="order-header"
@@ -836,11 +1117,19 @@
                 Đơn hàng của {{ form.tenKhachHang || '...' }}
               </h3>
               <span
-                v-if="isLinkedOnlineOrder"
+                v-if="isLinkedOnlineOrder || isSubmittedAdminOrder"
                 class="order-live-status-pill"
                 :class="getTabStatusClass(activeOrderStatus)"
               >
                 {{ getTabStatusLabel(activeOrderStatus) }}
+              </span>
+              <span
+                v-if="(isLinkedOnlineOrder || isSubmittedAdminOrder) && orderCreatedAt"
+                class="order-created-pill"
+                :title="isLinkedOnlineOrder ? 'Thời gian tạo đơn web' : 'Thời gian tạo đơn'"
+              >
+                <i class="ri-calendar-check-line"></i>
+                <span>Tạo: {{ orderCreatedAt }}</span>
               </span>
               <button
                 v-if="isLinkedOnlineOrder"
@@ -874,24 +1163,110 @@
                   <span>Dạng gộp</span>
                 </button>
               </div>
+              <button
+                type="button"
+                class="ov-add-member-btn"
+                @click="openAddMemberModal"
+                title="Thêm hoặc quản lý người đặt trong bảng đơn hàng"
+              >
+                <i class="ri-user-add-line"></i>
+                <span>Thêm người</span>
+                <span v-if="invoiceOrderMembers.length > 0" class="ov-member-count">
+                  {{ invoiceOrderMembers.length }}
+                </span>
+              </button>
+              <div v-if="!isMobile" class="order-col-settings-wrap" ref="colSettingsWrapRef">
+                <button
+                  type="button"
+                  class="ov-col-btn"
+                  :class="{ active: showColSettings }"
+                  @click.stop="showColSettings = !showColSettings"
+                  title="Thiết lập cột hiển thị trong bảng đơn hàng"
+                >
+                  <i class="ri-table-line"></i>
+                  <span>Hiển thị cột</span>
+                  <span class="ov-col-count">{{ visibleOrderColCount }}</span>
+                </button>
+
+                <div v-if="showColSettings" class="order-col-popover" @click.stop>
+                  <div class="ocp-header">
+                    <div class="ocp-title">
+                      <i class="ri-layout-column-line"></i>
+                      <span>Thiết lập cột bảng đơn</span>
+                    </div>
+                    <button type="button" class="ocp-close" @click="showColSettings = false" title="Đóng">
+                      <i class="ri-close-line"></i>
+                    </button>
+                  </div>
+
+                  <div class="ocp-presets">
+                    <button type="button" class="ocp-preset-btn" @click="applyOrderColPreset('sales')">
+                      Bán hàng (Gọn)
+                    </button>
+                    <button type="button" class="ocp-preset-btn" @click="applyOrderColPreset('audit')">
+                      Kiểm tra (Nội bộ)
+                    </button>
+                    <button type="button" class="ocp-preset-btn" @click="applyOrderColPreset('full')">
+                      Đầy đủ
+                    </button>
+                  </div>
+
+                  <div class="ocp-groups">
+                    <div v-for="grp in ORDER_TABLE_COL_GROUPS" :key="grp.title" class="ocp-group">
+                      <div class="ocp-group-title">{{ grp.title }}</div>
+                      <div class="ocp-check-grid">
+                        <label
+                          v-for="col in grp.items"
+                          :key="col.key"
+                          class="ocp-check-item"
+                          :class="{ checked: orderTableCols[col.key] }"
+                        >
+                          <input type="checkbox" v-model="orderTableCols[col.key]" />
+                          <span>{{ col.label }}</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="ocp-footer-switch">
+                    <button
+                      v-if="hasCustomOrderColWidths"
+                      type="button"
+                      class="ocp-reset-widths-btn"
+                      @click="resetOrderColWidths"
+                    >
+                      <i class="ri-refresh-line"></i>
+                      <span>Đặt lại độ rộng cột bảng</span>
+                    </button>
+                    <div class="ocp-locked-hint">
+                      Luôn hiện: Sản phẩm, Số lượng, Thành tiền, Xóa
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div class="order-codes">
                 <span class="code-item" style="display: flex; align-items: center; font-size: 13px; color: #64748b;">
                   <span class="status-dot-green"></span>
                   <strong>Mã: {{ maHoaDon }}</strong>
                 </span>
               </div>
+              <button
+                v-if="!isMobile"
+                type="button"
+                class="pc-col-toggle-btn"
+                @click="pcCollapsed.center = true"
+                title="Thu gọn bảng đơn hàng"
+              >
+                <i class="ri-contract-left-right-line"></i>
+              </button>
             </div>
           </div>
 
           <template v-if="isMobile">
             <div class="order-card-container">
             <div class="order-card-list">
-              <div v-if="!items.length" class="order-empty">
-                Chưa có sản phẩm trong đơn.
-              </div>
-
               <!-- MOBILE: XEM THEO TỪNG NGƯỜI -->
-              <template v-else-if="orderTableViewMode === 'by_member'">
+              <template v-if="orderTableViewMode === 'by_member' && invoiceMemberGroups.length">
                 <div
                   v-for="grp in invoiceMemberGroups"
                   :key="grp.groupKey"
@@ -904,6 +1279,7 @@
                         :class="grp.role === 'admin' ? 'ri-store-2-line' : 'ri-user-3-line'"
                       ></i>
                       <span class="omg-name">{{ grp.name }}</span>
+                      <span v-if="grp.dupTag" class="omg-dup-tag">{{ grp.dupTag }}</span>
                       <span v-if="grp.badge" class="omg-badge" :class="`role-${grp.role}`">
                         {{ grp.badge }}
                       </span>
@@ -922,14 +1298,30 @@
                       </button>
                       <span class="omg-qty">{{ grp.totalQty }} món</span>
                       <span class="omg-total">{{ formatWithCurrency(grp.subtotal, donViTienTeChung) }}</span>
+                      <button
+                        v-if="grp.entries.length === 0 && grp.isCustom"
+                        type="button"
+                        class="omg-remove-member-btn"
+                        @click.stop="removeCustomOrderMember(grp)"
+                        :title="`Xóa người đặt ${grp.name}`"
+                      >
+                        <i class="ri-close-line"></i>
+                      </button>
                     </div>
+                  </div>
+
+                  <div v-if="!grp.entries.length" class="order-member-empty-card">
+                    <span>Chưa có món nào — bấm <strong>Thêm món</strong> để chọn sản phẩm cho {{ grp.name }}.</span>
                   </div>
 
                   <div
                     v-for="entry in grp.entries"
                     :key="entry.idx"
                     class="order-card"
-                    :class="{ 'is-highlight': entry.idx === highlightedIndex }"
+                    :class="{
+                      'is-highlight': entry.idx === highlightedIndex,
+                      'card-web-updated': Boolean(getOrderItemUpdateBadge(entry)),
+                    }"
                     @click="openEditItem(entry.item, entry.idx)"
                   >
                     <button
@@ -941,7 +1333,16 @@
                     </button>
 
                     <div class="order-card-title">
-                      <div class="order-card-name">{{ entry.item.tenHang }}</div>
+                      <div class="order-card-name">
+                        <span>{{ entry.item.tenHang }}</span>
+                        <span
+                          v-if="getOrderItemUpdateBadge(entry)"
+                          class="web-update-pill"
+                          :class="`is-${getOrderItemUpdateBadge(entry).kind}`"
+                        >
+                          {{ getOrderItemUpdateBadge(entry).label }}
+                        </span>
+                      </div>
                       <div v-if="entry.item.dvt || entry.item.size" class="order-card-meta">
                         <span v-if="entry.item.dvt">ĐVT: {{ entry.item.dvt }}</span>
                         <span v-if="entry.item.size">Size: {{ entry.item.size }}</span>
@@ -954,6 +1355,9 @@
                       </span>
                       <span v-if="Number(entry.item.giamGia || 0) > 0">
                         Giảm: -{{ formatWithCurrency(getItemGiamGiaTien(entry.item), entry.item.donViTienTe) }}
+                      </span>
+                      <span v-if="Number(entry.item.Ncc_gia_tri_giam || entry.item.nccGiaTriGiam || 0) > 0" class="item-card-ncc-badge">
+                        NCC: {{ formatNccDiscountLabel(entry.item, entry.item.donViTienTe) }}
                       </span>
                     </div>
 
@@ -984,12 +1388,20 @@
               </template>
 
               <!-- MOBILE: XEM DẠNG GỘP -->
+              <template v-else-if="!items.length">
+                <div class="order-empty">
+                  Chưa có sản phẩm trong đơn.
+                </div>
+              </template>
               <template v-else>
                 <div
                   v-for="grp in groupedOrderDisplayItems"
                   :key="grp.groupKey"
                   class="order-card"
-                  :class="{ 'is-highlight': grp.entries.some((e) => e.idx === highlightedIndex) }"
+                  :class="{
+                    'is-highlight': grp.entries.some((e) => e.idx === highlightedIndex),
+                    'card-web-updated': Boolean(getOrderGroupUpdateBadge(grp)),
+                  }"
                   @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)"
                 >
                   <button
@@ -1001,7 +1413,16 @@
                   </button>
 
                   <div class="order-card-title">
-                    <div class="order-card-name">{{ grp.tenHang }}</div>
+                    <div class="order-card-name">
+                      <span>{{ grp.tenHang }}</span>
+                      <span
+                        v-if="getOrderGroupUpdateBadge(grp)"
+                        class="web-update-pill"
+                        :class="`is-${getOrderGroupUpdateBadge(grp).kind}`"
+                      >
+                        {{ getOrderGroupUpdateBadge(grp).label }}
+                      </span>
+                    </div>
                     <div v-if="grp.dvt || grp.size" class="order-card-meta">
                       <span v-if="grp.dvt">ĐVT: {{ grp.dvt }}</span>
                       <span v-if="grp.size">Size: {{ grp.size }}</span>
@@ -1029,6 +1450,9 @@
                     </span>
                     <span v-if="grp.tongGiamGiaTien > 0">
                       Giảm: -{{ formatWithCurrency(grp.tongGiamGiaTien, grp.donViTienTe) }}
+                    </span>
+                    <span v-if="Number(grp.nccGiaTriGiam || 0) > 0" class="item-card-ncc-badge">
+                      NCC: {{ formatNccDiscountLabel({ Ncc_loai_giam: grp.nccLoaiGiam, Ncc_gia_tri_giam: grp.nccGiaTriGiam }, grp.donViTienTe) }}
                     </span>
                   </div>
 
@@ -1066,27 +1490,41 @@
           </template>
 
           <div v-else class="order-table-wrap">
-            <table>
+            <table
+              ref="orderTableRef"
+              :class="{
+                'is-fixed-cols': hasCustomOrderColWidths,
+                'is-resizing-table-cols': Boolean(resizingOrderColKey),
+              }"
+            >
               <thead>
                 <tr>
-                  <th>STT</th>
-                  <th>SẢN PHẨM</th>
-                  <th>SỐ LƯỢNG</th>
-                  <th>GIÁ BÁN</th>
-                  <th>GIẢM & CK%</th>
-                  <th>THÀNH TIỀN</th>
-                  <th>XÓA</th>
+                  <th
+                    v-for="col in visibleOrderTableHeaders"
+                    :key="col.key"
+                    :data-col-key="col.key"
+                    :class="[col.align, { 'is-col-resizing': resizingOrderColKey === col.key }]"
+                    :style="getOrderColWidthStyle(col.key)"
+                  >
+                    <span class="th-label-text">{{ col.label }}</span>
+                    <span
+                      class="th-col-resizer"
+                      title="Kéo để chỉnh độ rộng cột • Double-click để đặt lại"
+                      @mousedown.stop.prevent="startOrderColResize(col.key, $event)"
+                      @dblclick.stop="resetSingleOrderColWidth(col.key)"
+                    ></span>
+                  </th>
                 </tr>
               </thead>
 
               <!-- DESKTOP: XEM THEO TỪNG NGƯỜI -->
               <tbody v-if="orderTableViewMode === 'by_member'">
-                <tr v-if="!items.length">
-                  <td colspan="7" class="order-table-empty">Chưa có sản phẩm trong đơn.</td>
+                <tr v-if="!invoiceMemberGroups.length">
+                  <td :colspan="visibleOrderColCount" class="order-table-empty">Chưa có sản phẩm trong đơn.</td>
                 </tr>
                 <template v-for="grp in invoiceMemberGroups" :key="grp.groupKey">
                   <tr class="order-group-row">
-                    <td colspan="7">
+                    <td :colspan="visibleOrderColCount">
                       <div class="ogr-inner">
                         <div class="ogr-left">
                           <i
@@ -1094,6 +1532,7 @@
                             :class="grp.role === 'admin' ? 'ri-store-2-line' : 'ri-user-3-line'"
                           ></i>
                           <span class="ogr-name">{{ grp.name }}</span>
+                          <span v-if="grp.dupTag" class="omg-dup-tag">{{ grp.dupTag }}</span>
                           <span v-if="grp.badge" class="omg-badge" :class="`role-${grp.role}`">
                             {{ grp.badge }}
                           </span>
@@ -1112,29 +1551,87 @@
                           </button>
                           <span class="ogr-qty">{{ grp.totalQty }} món</span>
                           <span class="ogr-total">{{ formatWithCurrency(grp.subtotal, donViTienTeChung) }}</span>
+                          <button
+                            v-if="grp.entries.length === 0 && grp.isCustom"
+                            type="button"
+                            class="ogr-remove-member-btn"
+                            @click.stop="removeCustomOrderMember(grp)"
+                            :title="`Xóa người đặt ${grp.name}`"
+                          >
+                            <i class="ri-close-line"></i>
+                          </button>
                         </div>
                       </div>
+                    </td>
+                  </tr>
+                  <tr v-if="!grp.entries.length" class="order-member-empty-row">
+                    <td :colspan="visibleOrderColCount">
+                      Chưa có món nào cho <strong>{{ grp.name }}</strong> — chọn người này rồi bấm sản phẩm ở cột bên trái để thêm.
                     </td>
                   </tr>
                   <tr
                     v-for="(entry, mIdx) in grp.entries"
                     :key="entry.idx"
-                    :class="{ 'row-highlight': entry.idx === highlightedIndex }"
+                    :class="{
+                      'row-highlight': entry.idx === highlightedIndex,
+                      'row-web-updated': Boolean(getOrderItemUpdateBadge(entry)),
+                    }"
                   >
-                    <td>{{ mIdx + 1 }}</td>
-                    <td>
+                    <td v-if="orderTableCols.stt" class="col-center col-bold">{{ mIdx + 1 }}</td>
+                    <td v-if="orderTableCols.maHang" class="col-center" @click="openEditItem(entry.item, entry.idx)" style="cursor:pointer">
+                      <span class="col-code-pill">{{ getOrderItemMeta(entry.item).maHang }}</span>
+                    </td>
+                    <td class="col-left">
                       <div class="prod-cell" @click="openEditItem(entry.item, entry.idx)">
-                        <div class="prod-name">{{ entry.item.tenHang }}</div>
-                        <div v-if="entry.item.size" class="prod-sub">Size: {{ entry.item.size }}</div>
-                        <div v-if="entry.item.dvt" class="prod-sub">ĐVT: {{ entry.item.dvt }}</div>
-                        <div v-if="entry.item.ghiChuHang" class="prod-note">{{ entry.item.ghiChuHang }}</div>
+                        <div class="prod-name">
+                          <span>{{ entry.item.tenHang }}</span>
+                          <span
+                            v-if="getOrderItemUpdateBadge(entry)"
+                            class="web-update-pill"
+                            :class="`is-${getOrderItemUpdateBadge(entry).kind}`"
+                          >
+                            {{ getOrderItemUpdateBadge(entry).label }}
+                          </span>
+                        </div>
+                        <template v-if="!orderTableCols.sizeDvt">
+                          <div v-if="entry.item.size" class="prod-sub">Size: {{ entry.item.size }}</div>
+                          <div v-if="entry.item.dvt" class="prod-sub">ĐVT: {{ entry.item.dvt }}</div>
+                        </template>
+                        <div v-if="!orderTableCols.ghiChu && entry.item.ghiChuHang" class="prod-note">{{ entry.item.ghiChuHang }}</div>
                       </div>
                     </td>
-                    <td @click="openEditItem(entry.item, entry.idx)" style="cursor:pointer">{{ entry.item.soLuong }}</td>
-                    <td @click="openEditItem(entry.item, entry.idx)" style="cursor:pointer">
+                    <td v-if="orderTableCols.danhMuc" class="col-center" @click="openEditItem(entry.item, entry.idx)" style="cursor:pointer">
+                      <span class="col-muted-text">{{ getOrderItemMeta(entry.item).danhMuc }}</span>
+                    </td>
+                    <td v-if="orderTableCols.sizeDvt" class="col-center" @click="openEditItem(entry.item, entry.idx)" style="cursor:pointer">
+                      <div class="col-sizedvt-cell">
+                        <span v-if="entry.item.size">S: {{ entry.item.size }}</span>
+                        <span v-if="entry.item.dvt">{{ entry.item.dvt }}</span>
+                        <span v-if="!entry.item.size && !entry.item.dvt" class="col-muted-text">—</span>
+                      </div>
+                    </td>
+                    <td v-if="orderTableCols.trangThaiKho" class="col-center" @click="openEditItem(entry.item, entry.idx)" style="cursor:pointer">
+                      <span class="col-stock-badge" :class="getOrderItemMeta(entry.item).isOut ? 'is-out' : 'is-ok'">
+                        {{ getOrderItemMeta(entry.item).trangThai }}
+                      </span>
+                    </td>
+                    <td v-if="orderTableCols.nguoiDat" class="col-center" @click="openEditItem(entry.item, entry.idx)" style="cursor:pointer">
+                      <span class="col-person-pill">{{ getOrderItemMeta(entry.item).nguoiDat }}</span>
+                    </td>
+                    <td class="col-center col-bold" @click="openEditItem(entry.item, entry.idx)" style="cursor:pointer">{{ entry.item.soLuong }}</td>
+                    <td v-if="orderTableCols.giaVon" class="col-center" @click="openEditItem(entry.item, entry.idx)" style="cursor:pointer">
+                      <span class="col-cost-val">{{ formatWithCurrency(getOrderItemMeta(entry.item).giaGoc, entry.item.donViTienTe) }}</span>
+                    </td>
+                    <td v-if="orderTableCols.tongVon" class="col-center" @click="openEditItem(entry.item, entry.idx)" style="cursor:pointer">
+                      <span class="col-cost-val">{{ formatWithCurrency(getOrderItemMeta(entry.item).tongVon, entry.item.donViTienTe) }}</span>
+                    </td>
+                    <td v-if="orderTableCols.giaBan" class="col-center col-bold" @click="openEditItem(entry.item, entry.idx)" style="cursor:pointer">
                       {{ formatWithCurrency(entry.item.giaBan, entry.item.donViTienTe) }}
                     </td>
-                    <td @click="openEditItem(entry.item, entry.idx)" style="cursor:pointer">
+                    <td v-if="orderTableCols.truocGiam" class="col-center" @click="openEditItem(entry.item, entry.idx)" style="cursor:pointer">
+                      <span class="col-muted-text">{{ formatWithCurrency(entry.item.thanhTien, entry.item.donViTienTe) }}</span>
+                    </td>
+                    <td v-if="orderTableCols.giamCk" class="col-center" @click="openEditItem(entry.item, entry.idx)" style="cursor:pointer">
                       <div class="disc-cell">
                         <span class="disc-ck">
                           CK ({{ entry.item.chietKhau || 0 }}%): -{{ formatWithCurrency(entry.item.tongChietKhauTien || 0, entry.item.donViTienTe) }}
@@ -1144,18 +1641,42 @@
                         </span>
                       </div>
                     </td>
-                    <td @click="openEditItem(entry.item, entry.idx)" class="total-cell" style="cursor:pointer">
+                    <td v-if="orderTableCols.ckNcc" class="col-center" @click.stop>
+                      <div class="table-ncc-cell">
+                        <button
+                          type="button"
+                          class="table-ncc-mode-btn"
+                          :class="{ 'is-money': (entry.item.Ncc_loai_giam ?? entry.item.nccLoaiGiam) === 'money' }"
+                          title="Bấm để đổi % / Tiền"
+                          @click="toggleRowNccType([entry.item])"
+                        >
+                          {{ (entry.item.Ncc_loai_giam ?? entry.item.nccLoaiGiam) === 'money' ? (entry.item.donViTienTe || 'P') : '%' }}
+                        </button>
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          class="table-ncc-input"
+                          :value="entry.item.Ncc_gia_tri_giam ?? entry.item.nccGiaTriGiam ?? 0"
+                          @input="updateRowNccValue([entry.item], $event.target.value)"
+                        />
+                      </div>
+                    </td>
+                    <td @click="openEditItem(entry.item, entry.idx)" class="total-cell col-center col-bold" style="cursor:pointer">
                       <span class="total-amount">
                         {{ formatWithCurrency(entry.item.thanhTien - (entry.item.tongGiamTru || 0), entry.item.donViTienTe) }}
                       </span>
-                      <div class="profit-inline">
-                        <span class="profit-arrow"><i class="app-ico ri-arrow-up-s-line"></i></span>
-                        <span class="profit-value">
-                          +{{ formatWithCurrency(entry.item.loiNhuan, entry.item.donViTienTe) }}
-                        </span>
-                      </div>
                     </td>
-                    <td>
+                    <td v-if="orderTableCols.loiNhuan" class="col-center" @click="openEditItem(entry.item, entry.idx)" style="cursor:pointer">
+                      <span class="col-profit-val" :class="{ 'is-neg': Number(entry.item.loiNhuan || 0) < 0 }">
+                        {{ Number(entry.item.loiNhuan || 0) >= 0 ? '+' : '' }}{{ formatWithCurrency(entry.item.loiNhuan, entry.item.donViTienTe) }}
+                      </span>
+                    </td>
+                    <td v-if="orderTableCols.ghiChu" class="col-left" @click="openEditItem(entry.item, entry.idx)" style="cursor:pointer">
+                      <span v-if="entry.item.ghiChuHang" class="col-note-text">{{ entry.item.ghiChuHang }}</span>
+                      <span v-else class="col-muted-text">—</span>
+                    </td>
+                    <td class="col-center">
                       <button class="btn-delete" @click="deleteItem(entry.idx)" title="Xóa hàng">
                         <i class="app-ico ri-close-line"></i>
                       </button>
@@ -1167,19 +1688,36 @@
               <!-- DESKTOP: XEM DẠNG GỘP -->
               <tbody v-else>
                 <tr v-if="!items.length">
-                  <td colspan="7" class="order-table-empty">Chưa có sản phẩm trong đơn.</td>
+                  <td :colspan="visibleOrderColCount" class="order-table-empty">Chưa có sản phẩm trong đơn.</td>
                 </tr>
                 <tr
                   v-for="(grp, gIdx) in groupedOrderDisplayItems"
                   :key="grp.groupKey"
-                  :class="{ 'row-highlight': grp.entries.some((e) => e.idx === highlightedIndex) }"
+                  :class="{
+                    'row-highlight': grp.entries.some((e) => e.idx === highlightedIndex),
+                    'row-web-updated': Boolean(getOrderGroupUpdateBadge(grp)),
+                  }"
                 >
-                  <td>{{ gIdx + 1 }}</td>
-                  <td>
+                  <td v-if="orderTableCols.stt" class="col-center col-bold">{{ gIdx + 1 }}</td>
+                  <td v-if="orderTableCols.maHang" class="col-center" @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" style="cursor:pointer">
+                    <span class="col-code-pill">{{ grp.maHang }}</span>
+                  </td>
+                  <td class="col-left">
                     <div class="prod-cell" @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)">
-                      <div class="prod-name">{{ grp.tenHang }}</div>
-                      <div v-if="grp.size" class="prod-sub">Size: {{ grp.size }}</div>
-                      <div v-if="grp.dvt" class="prod-sub">ĐVT: {{ grp.dvt }}</div>
+                      <div class="prod-name">
+                        <span>{{ grp.tenHang }}</span>
+                        <span
+                          v-if="getOrderGroupUpdateBadge(grp)"
+                          class="web-update-pill"
+                          :class="`is-${getOrderGroupUpdateBadge(grp).kind}`"
+                        >
+                          {{ getOrderGroupUpdateBadge(grp).label }}
+                        </span>
+                      </div>
+                      <template v-if="!orderTableCols.sizeDvt">
+                        <div v-if="grp.size" class="prod-sub">Size: {{ grp.size }}</div>
+                        <div v-if="grp.dvt" class="prod-sub">ĐVT: {{ grp.dvt }}</div>
+                      </template>
                       <div v-if="grp.showMemberBreakdown" class="order-member-chips">
                         <button
                           v-for="(entry, eIdx) in grp.entries"
@@ -1194,14 +1732,41 @@
                           <em v-if="entry.item.ghiChuHang">({{ entry.item.ghiChuHang }})</em>
                         </button>
                       </div>
-                      <div v-else-if="grp.combinedNotes" class="prod-note">{{ grp.combinedNotes }}</div>
+                      <div v-else-if="!orderTableCols.ghiChu && grp.combinedNotes" class="prod-note">{{ grp.combinedNotes }}</div>
                     </div>
                   </td>
-                  <td @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" style="cursor:pointer">{{ grp.totalQty }}</td>
-                  <td @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" style="cursor:pointer">
+                  <td v-if="orderTableCols.danhMuc" class="col-center" @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" style="cursor:pointer">
+                    <span class="col-muted-text">{{ grp.danhMuc }}</span>
+                  </td>
+                  <td v-if="orderTableCols.sizeDvt" class="col-center" @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" style="cursor:pointer">
+                    <div class="col-sizedvt-cell">
+                      <span v-if="grp.size">S: {{ grp.size }}</span>
+                      <span v-if="grp.dvt">{{ grp.dvt }}</span>
+                      <span v-if="!grp.size && !grp.dvt" class="col-muted-text">—</span>
+                    </div>
+                  </td>
+                  <td v-if="orderTableCols.trangThaiKho" class="col-center" @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" style="cursor:pointer">
+                    <span class="col-stock-badge" :class="grp.isOut ? 'is-out' : 'is-ok'">
+                      {{ grp.trangThai }}
+                    </span>
+                  </td>
+                  <td v-if="orderTableCols.nguoiDat" class="col-center" @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" style="cursor:pointer">
+                    <span class="col-person-pill">{{ grp.nguoiDatSummary }}</span>
+                  </td>
+                  <td class="col-center col-bold" @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" style="cursor:pointer">{{ grp.totalQty }}</td>
+                  <td v-if="orderTableCols.giaVon" class="col-center" @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" style="cursor:pointer">
+                    <span class="col-cost-val">{{ formatWithCurrency(grp.giaGoc, grp.donViTienTe) }}</span>
+                  </td>
+                  <td v-if="orderTableCols.tongVon" class="col-center" @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" style="cursor:pointer">
+                    <span class="col-cost-val">{{ formatWithCurrency(grp.tongVon, grp.donViTienTe) }}</span>
+                  </td>
+                  <td v-if="orderTableCols.giaBan" class="col-center col-bold" @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" style="cursor:pointer">
                     {{ formatWithCurrency(grp.giaBan, grp.donViTienTe) }}
                   </td>
-                  <td @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" style="cursor:pointer">
+                  <td v-if="orderTableCols.truocGiam" class="col-center" @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" style="cursor:pointer">
+                    <span class="col-muted-text">{{ formatWithCurrency(grp.thanhTien, grp.donViTienTe) }}</span>
+                  </td>
+                  <td v-if="orderTableCols.giamCk" class="col-center" @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" style="cursor:pointer">
                     <div class="disc-cell">
                       <span class="disc-ck">
                         CK: -{{ formatWithCurrency(grp.tongChietKhauTien, grp.donViTienTe) }}
@@ -1211,18 +1776,42 @@
                       </span>
                     </div>
                   </td>
-                  <td @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" class="total-cell" style="cursor:pointer">
+                  <td v-if="orderTableCols.ckNcc" class="col-center" @click.stop>
+                    <div class="table-ncc-cell">
+                      <button
+                        type="button"
+                        class="table-ncc-mode-btn"
+                        :class="{ 'is-money': grp.nccLoaiGiam === 'money' }"
+                        title="Bấm để đổi % / Tiền"
+                        @click="toggleRowNccType(grp.entries.map((e) => e.item))"
+                      >
+                        {{ grp.nccLoaiGiam === 'money' ? (grp.donViTienTe || 'P') : '%' }}
+                      </button>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        class="table-ncc-input"
+                        :value="grp.nccGiaTriGiam"
+                        @input="updateRowNccValue(grp.entries.map((e) => e.item), $event.target.value)"
+                      />
+                    </div>
+                  </td>
+                  <td @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" class="total-cell col-center col-bold" style="cursor:pointer">
                     <span class="total-amount">
                       {{ formatWithCurrency(grp.netTotal, grp.donViTienTe) }}
                     </span>
-                    <div class="profit-inline">
-                      <span class="profit-arrow"><i class="app-ico ri-arrow-up-s-line"></i></span>
-                      <span class="profit-value">
-                        +{{ formatWithCurrency(grp.loiNhuan, grp.donViTienTe) }}
-                      </span>
-                    </div>
                   </td>
-                  <td>
+                  <td v-if="orderTableCols.loiNhuan" class="col-center" @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" style="cursor:pointer">
+                    <span class="col-profit-val" :class="{ 'is-neg': Number(grp.loiNhuan || 0) < 0 }">
+                      {{ Number(grp.loiNhuan || 0) >= 0 ? '+' : '' }}{{ formatWithCurrency(grp.loiNhuan, grp.donViTienTe) }}
+                    </span>
+                  </td>
+                  <td v-if="orderTableCols.ghiChu" class="col-left" @click="openEditItem(grp.entries[0].item, grp.entries[0].idx, grp.entries)" style="cursor:pointer">
+                    <span v-if="grp.combinedNotes" class="col-note-text">{{ grp.combinedNotes }}</span>
+                    <span v-else class="col-muted-text">—</span>
+                  </td>
+                  <td class="col-center">
                     <button class="btn-delete" @click="deleteGroupedOrderItem(grp)" title="Xóa hàng">
                       <i class="app-ico ri-close-line"></i>
                     </button>
@@ -1232,215 +1821,658 @@
             </table>
           </div>
         </div>
+      </div>
 
-        <div class="bottom-row" v-show="!isMobile || activeMobileTab === 'payment'">
+      <div
+        v-if="!isMobile"
+        class="pc-col-resizer"
+        :class="{
+          active: resizingCol === 'right',
+          disabled: pcCollapsed.right || pcCollapsed.center,
+        }"
+        title="Kéo để chỉnh độ rộng cột • Double-click để đặt lại mặc định"
+        @mousedown.prevent="startPcColResize('right', $event)"
+        @dblclick="resetPcColWidths"
+      >
+        <span class="pc-resizer-grip"></span>
+      </div>
 
-          <div class="payment-scroll">
-            <div class="summary-stack">
-            <!-- CARD 1: TÓM TẮT ĐƠN -->
-            <div class="box summary-card summary-card--order">
-              <h3 class="card-title"><i class="ri-receipt-line"></i> TÓM TẮT ĐƠN</h3>
+      <div
+        class="right-stack"
+        :class="{ 'is-pc-collapsed': !isMobile && pcCollapsed.right }"
+        v-show="!isMobile || ['customer', 'payment'].includes(activeMobileTab)"
+      >
+        <button
+          v-if="!isMobile && pcCollapsed.right"
+          type="button"
+          class="pc-col-rail pc-col-rail--right"
+          @click="pcCollapsed.right = false"
+          title="Mở cột thông tin & thanh toán"
+        >
+          <i class="ri-arrow-left-double-line pc-rail-ico"></i>
+          <span class="pc-rail-label">THÔNG TIN &amp; THANH TOÁN</span>
+          <span v-if="tongCong > 0" class="pc-rail-total">{{ formatWithCurrency(tongCong, donViTienTeChung) }}</span>
+        </button>
 
-              <div class="sum-grid">
-                <div class="sum-row">
-                  <span class="sum-label" style="color: #ffffff !important; font-weight: 700;">Hàng tạm tính</span>
-                  <span class="sum-value font-mono" style="color: #ffffff !important; font-weight: 900;">{{ formatWithCurrency(tamTinh, donViTienTeChung) }}</span>
-                </div>
-                
-                <div class="sum-row" :class="{ 'has-value': tongGiamGia > 0 }">
-                  <span class="sum-label" style="color: #ffffff !important; font-weight: 700;">Giảm giá</span>
-                  <div class="sum-right-group">
-                    <button class="btn-limit-red" @click="openDiscountModal('money')">Giảm thêm</button>
-                    <span class="sum-value font-mono" style="color: #ff4d4d !important; font-weight: 900;">-{{ formatWithCurrency(tongGiamGia, donViTienTeChung) }}</span>
-                  </div>
-                </div>
-                
-                <div class="sum-row" :class="{ 'has-value': tongTienChietKhau > 0 }">
-                  <span class="sum-label" style="color: #ffffff !important; font-weight: 700;">Chiết khấu</span>
-                  <div class="sum-right-group">
-                    <button class="btn-limit-red" @click="openDiscountModal('percent')">Giảm thêm</button>
-                    <span class="sum-value font-mono" style="color: #ff4d4d !important; font-weight: 900;">-{{ formatWithCurrency(tongTienChietKhau, donViTienTeChung) }}</span>
-                  </div>
-                </div>
-
-                <div class="sum-divider"></div>
-
-                <div class="sum-row sub-info">
-                  <span class="sum-label" style="color: #ffffff !important; font-weight: 700;">Lợi nhuận dự kiến</span>
-                  <span class="sum-value font-mono" style="color: #22c55e !important; font-weight: 900;">+{{ formatWithCurrency(tongLoiNhuan, donViTienTeChung) }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- CARD 2: THANH TOÁN -->
-            <div class="box summary-card summary-card--payment">
-              <h3 class="card-title"><i class="ri-wallet-line"></i> THANH TOÁN</h3>
-
-              <div class="sum-grid">
-                <!-- Hình thức thanh toán -->
-                <div class="payment-toggle-section">
-                  <span class="pm-label">Hình thức thanh toán</span>
-                  <div class="pay-toggle">
-                    <button 
-                      class="pill-btn" 
-                      :class="{ active: hinhThucThanhToan === 'TIEN_MAT' }"
-                      @click="handlePaymentMethodChange('TIEN_MAT')"
-                    >
-                      <i class="ri-money-dollar-circle-line"></i> Tiền mặt
-                    </button>
-                    <button 
-                      class="pill-btn pill-btn--transfer" 
-                      :class="{ active: hinhThucThanhToan === 'CHUYEN_KHOAN' }"
-                      @click="handlePaymentMethodChange('CHUYEN_KHOAN')"
-                    >
-                      <i class="ri-bank-card-line"></i> Chuyển khoản
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Tỉ giá input (always visible) -->
-                <div class="exchange-rate-section">
-                  <label class="er-label">Tỉ giá</label>
-                  <div class="er-input-wrapper">
-                    <input type="number" v-model.number="tiGia" min="0" step="0.01" class="er-input" ref="tiGiaRef" />
-                    <span v-if="donViTienTeCK && donViTienTeCK !== 'VND'" class="er-badge">1 {{ donViTienTeCK }}</span>
-                  </div>
-                  
-                </div>
-
-                <div class="sum-divider"></div>
-
-                <!-- Tổng cộng -->
-                <div class="sum-row total-row">
-                  <span class="sum-label total-label">TỔNG CỘNG</span>
-                  <span class="sum-value total-value text-primary font-mono">{{ formatWithCurrency(tongCong, donViTienTeChung) }}</span>
-                </div>
-
-                <!-- Chuyển khoản (always visible if exchange rate exists) -->
-                <div class="sum-row transfer-row" v-if="tiGia && tiGia !== 1">
-                  <span class="sum-label transfer-label">CHUYỂN KHOẢN (x{{ tiGia }})</span>
-                  <span class="sum-value transfer-value font-mono">{{ formatWithCurrency(tongChuyenKhoan, donViTienTeCK) }}</span>
-                </div>
-              </div>
-            </div>
-
-          </div>
-          </div>
-
-          <div class="submit-stack" :class="{ 'mobile-scroll-submit': isMobile }">
-            <button class="btn btn-preview" :disabled="isPreviewing" @click="previewHoaDon">
-
-              <span v-if="isPreviewing" class="btn-spinner" aria-hidden="true"></span>
-              <i v-else class="app-ico ri-image-line"></i> 
-              <span>{{ isPreviewing ? 'ĐANG XUẤT...' : 'XUẤT ẢNH HÓA ĐƠN' }}</span>
-            </button>
-            <button class="btn btn-text" @click="openTextInvoice">
-              <i class="app-ico ri-file-text-line"></i> 
-              <span>XUẤT HÓA ĐƠN (CHỮ)</span>
-            </button>
-
-            <!-- ĐƠN TẠI QUẦY / TẠO MỚI -->
+        <div v-if="!isMobile && !pcCollapsed.right" class="pc-right-panel-bar">
+          <span class="prpb-title">
+            <i class="ri-layout-right-2-line"></i>
+            <span>THÔNG TIN &amp; THANH TOÁN</span>
+          </span>
+          <div class="prpb-actions">
             <button
-              v-if="!isLinkedOnlineOrder"
-              class="btn btn-complete"
-              :disabled="isSubmitting"
-              @click="hoanThanhDon"
+              v-if="pcColWidths.left !== null || pcColWidths.right !== null"
+              type="button"
+              class="pc-col-reset-btn"
+              @click="resetPcColWidths"
+              title="Khôi phục kích thước 3 cột mặc định"
             >
-              <span v-if="isSubmitting" class="btn-spinner" aria-hidden="true"></span>
-              <i v-else class="app-ico ri-checkbox-circle-line"></i>
-              <span>{{ isSubmitting ? 'ĐANG XỬ LÝ...' : 'CHỐT ĐƠN' }}</span>
+              <i class="ri-refresh-line"></i>
+              <span>Reset cột</span>
             </button>
+            <button
+              type="button"
+              class="pc-col-toggle-btn"
+              @click="pcCollapsed.right = true"
+              title="Thu gọn cột bên phải"
+            >
+              <i class="ri-arrow-right-double-line"></i>
+            </button>
+          </div>
+        </div>
 
-            <!-- ĐƠN ONLINE ĐỒNG BỘ TIẾN TRÌNH VỚI TRANG ĐƠN HÀNG -->
-            <template v-else>
-              <template v-if="activeOrderStatus === 'Chờ duyệt'">
-                <button
-                  class="btn btn-order-draft"
-                  :disabled="isSubmitting || isOrderActionLoading"
-                  @click="saveOrderDraftFromInvoice"
-                >
-                  <i class="app-ico ri-save-3-line"></i>
-                  <span>LƯU NHÁP (XÁC NHẬN)</span>
-                </button>
-                <button
-                  class="btn btn-order-approve"
-                  :disabled="isSubmitting || isOrderActionLoading"
-                  @click="approveOrderFromInvoice"
-                >
-                  <span v-if="isSubmitting || isOrderActionLoading" class="btn-spinner" aria-hidden="true"></span>
-                  <i v-else class="app-ico ri-shield-check-line"></i>
-                  <span>DUYỆT ĐƠN (XỬ LÝ)</span>
-                </button>
-              </template>
+        <div
+          v-if="!isMobile && !pcCollapsed.right"
+          class="pc-right-tabs"
+          role="tablist"
+          aria-label="Chuyển mục thông tin và thanh toán"
+        >
+          <button
+            type="button"
+            role="tab"
+            :aria-selected="pcRightTab === 'customer'"
+            class="pc-right-tab-btn"
+            :class="{ active: pcRightTab === 'customer' }"
+            @click="pcRightTab = 'customer'"
+          >
+            <i class="ri-user-heart-line"></i>
+            <span>Khách &amp; Giao</span>
+            <span v-if="form.tenKhachHang" class="pc-tab-badge is-ok" :title="form.tenKhachHang">
+              <i class="ri-check-line"></i>
+            </span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            :aria-selected="pcRightTab === 'payment'"
+            class="pc-right-tab-btn"
+            :class="{ active: pcRightTab === 'payment' }"
+            @click="pcRightTab = 'payment'"
+          >
+            <i class="ri-wallet-3-line"></i>
+            <span>Thanh toán</span>
+            <span
+              v-if="tongGiamGia > 0 || tongTienChietKhau > 0"
+              class="pc-tab-badge is-disc"
+              title="Đơn có giảm giá / chiết khấu"
+            >%</span>
+          </button>
+        </div>
 
-              <template v-else-if="activeOrderStatus === 'Đang xử lý'">
-                <button
-                  class="btn btn-order-draft"
-                  :disabled="isSubmitting || isOrderActionLoading"
-                  @click="saveApprovedOrderEdits"
-                >
-                  <i class="app-ico ri-save-3-line"></i>
-                  <span>LƯU CẬP NHẬT</span>
-                </button>
-                <button
-                  class="btn btn-order-ship"
-                  :disabled="isSubmitting || isOrderActionLoading"
-                  @click="shipOrderFromInvoice"
-                >
-                  <i class="app-ico ri-e-bike-2-line"></i>
-                  <span>SHIP ĐƠN</span>
-                </button>
-                <button
-                  class="btn btn-complete"
-                  :disabled="isSubmitting || isOrderActionLoading"
-                  @click="completeOrderFromInvoice"
-                >
-                  <span v-if="isSubmitting || isOrderActionLoading" class="btn-spinner" aria-hidden="true"></span>
-                  <i v-else class="app-ico ri-checkbox-circle-line"></i>
-                  <span>HOÀN THÀNH</span>
-                </button>
-              </template>
+        <div class="pc-right-scroll" v-show="isMobile || !pcCollapsed.right">
+          <!-- KHÁCH HÀNG & GIAO HÀNG -->
+          <div
+            class="info-row-2col"
+            v-show="isMobile ? activeMobileTab === 'customer' : pcRightTab === 'customer'"
+          >
+            <div class="customer-scroll-container">
+              <div
+                class="box customer-box"
+                v-show="!isMobile || activeMobileTab === 'customer'"
+              >
+                <h3>
+                  <span class="pc-card-title-left"><i class="ri-user-heart-line"></i> Thông tin khách hàng</span>
+                </h3>
+                <div class="pc-card-body">
+                <div class="hidden-field">
+                  <label>Ma khach hang (an)</label>
+                  <input v-model="form.maKhachHang" readonly />
+                </div>
 
-              <template v-else-if="activeOrderStatus === 'Đang ship'">
-                <button
-                  class="btn btn-order-draft"
-                  :disabled="isSubmitting || isOrderActionLoading"
-                  @click="saveApprovedOrderEdits"
-                >
-                  <i class="app-ico ri-save-3-line"></i>
-                  <span>LƯU CẬP NHẬT</span>
-                </button>
-                <button
-                  class="btn btn-complete"
-                  :disabled="isSubmitting || isOrderActionLoading"
-                  @click="completeOrderFromInvoice"
-                >
-                  <span v-if="isSubmitting || isOrderActionLoading" class="btn-spinner" aria-hidden="true"></span>
-                  <i v-else class="app-ico ri-checkbox-circle-line"></i>
-                  <span>HOÀN THÀNH</span>
-                </button>
-              </template>
+                <div class="field-row">
+                  <label>Tên khách hàng</label>
+                  <div class="field-control">
+                    <div style="position:relative">
+                      <input 
+                        v-model="form.tenKhachHang" 
+                        list="ds-kh-ten"
+                        @input="handleTenKhachChange"
+                        style="padding-right: 70px"
+                      />
+                      <!-- Loading Spinner -->
+                      <div v-if="isLoadingCustomer" class="input-spinner"></div>
+                      <!-- Success Check (Only show when ready & empty) -->
+                      <i v-if="!isLoadingCustomer && !form.tenKhachHang" class="ri-checkbox-circle-fill input-success-icon"></i>
 
+                      <button 
+                        v-if="form.tenKhachHang" 
+                        class="btn-delete-cta"
+                        @click="xoaKhachHang"
+                        title="Xóa thông tin khách hàng"
+                      >
+                        XÓA
+                      </button>
+                    </div>
+                    <datalist id="ds-kh-ten">
+                      <option
+                        v-for="kh in khachHangList"
+                        :key="kh.Ma_khach_hang"
+                        :value="kh.Ten_khach_hang"
+                      />
+                    </datalist>
+                  </div>
+                </div>
+
+                <div class="field-row">
+                  <label>Số điện thoại</label>
+                  <div class="field-control">
+                    <input 
+                      v-model="form.soDienThoai" 
+                      type="tel"
+                      pattern="[0-9]*"
+                      inputmode="numeric"
+                      @input="cleanPhoneInput"
+                    />
+                  </div>
+                </div>
+
+                <div class="field-row">
+                  <label>Địa chỉ</label>
+                  <div class="field-control">
+                    <input v-model="form.diaChi" />
+                  </div>
+                </div>
+
+                <!-- BỔ SUNG: THÔNG TIN TÓM TẮT KHÁCH -->
+                <div v-if="selectedCustomer || form.tenKhachHang" class="cust-summary-box">
+                  <div class="cust-stat debt">
+                    <span class="cust-stat-label">Công nợ</span>
+                    <span class="cust-stat-value" :class="{ 'text-danger': customerDebt > 0 }">
+                      {{ formatWithCurrency(customerDebt, donViTienTeChung) }}
+                    </span>
+                  </div>
+                  <div class="cust-stat spend">
+                    <span class="cust-stat-label">Chi tiêu</span>
+                    <span class="cust-stat-value text-primary">
+                      {{ formatWithCurrency(customerTotalSpend, donViTienTeChung) }}
+                    </span>
+                  </div>
+                  <div class="cust-stat profit">
+                    <span class="cust-stat-label">Lợi nhuận</span>
+                    <span class="cust-stat-value text-success">
+                      {{ formatWithCurrency(customerProfit, donViTienTeChung) }}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="field-row">
+                  <label>Ghi chú khách</label>
+                  <div class="field-control">
+                    <input 
+                      type="text"
+                      v-model="form.ghiChu" 
+                      class="pm-input"
+                      placeholder="Ghi chú về khách..."
+                    />
+                  </div>
+                </div>
+                </div>
+              </div>
+
+              <div
+                class="box delivery-box"
+                v-show="!isMobile || activeMobileTab === 'customer'"
+              >
+                <h3>
+                  <span class="pc-card-title-left"><i class="ri-truck-line"></i> Thông tin giao hàng</span>
+                </h3>
+
+                <div class="pc-card-body">
+
+                <div class="field-row">
+                  <label>Ngày nhận</label>
+                  <div class="field-control">
+                    <input
+                      type="date"
+                      v-model="ngayNhanHang"
+                      class="date-input-dark"
+                    />
+                  </div>
+                </div>
+
+                <div class="field-row">
+                  <label>Thời gian nhận</label>
+                  <div class="field-control">
+                    <div class="delivery-time-row">
+                      <select v-model="gioNhanHang" class="time-select">
+                        <option v-for="g in gioList" :key="g" :value="g">{{ g }}</option>
+                      </select>
+                      <span class="time-sep">:</span>
+                      <select v-model="phutNhanHang" class="time-select">
+                        <option v-for="p in phutList" :key="p" :value="p">{{ p }}</option>
+                      </select>
+                      <button class="btn-now" @click="setPlus20Min" title="Hiện tại + 20 phút">
+                        <i class="ri-flashlight-fill"></i> Làm liền
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="field-row">
+                  <label>Ghi chú đơn</label>
+                  <div class="field-control">
+                    <textarea
+                      v-model="form.ghiChuDonHang"
+                      placeholder="VD: Giao giờ hành chính..."
+                      rows="2"
+                    ></textarea>
+                  </div>
+                </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="isMobile && activeMobileTab === 'customer'" class="customer-next-wrap">
+              <button class="customer-back-btn" @click="setMobileTab('order')">
+                <i class="ri-arrow-left-line"></i>
+                <span>Quay lại</span>
+              </button>
+              <button v-if="hasCustomerData" class="customer-next-btn" @click="setMobileTab('payment')">
+                <span>Tiếp theo</span>
+                <i class="ri-arrow-right-line"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- TÓM TẮT ĐƠN & THANH TOÁN -->
+          <div
+            class="bottom-row"
+            v-show="isMobile ? activeMobileTab === 'payment' : pcRightTab === 'payment'"
+          >
+            <div class="payment-scroll">
+              <div class="summary-stack">
+                <!-- CARD 1: TÓM TẮT ĐƠN -->
+                <div class="box summary-card summary-card--order">
+                  <h3 class="card-title">
+                    <span class="pc-card-title-left"><i class="ri-receipt-line"></i> TÓM TẮT ĐƠN</span>
+                  </h3>
+
+                  <div class="sum-grid">
+                    <div class="sum-row">
+                      <span class="sum-label">Hàng tạm tính</span>
+                      <span class="sum-value font-mono sum-val-base">{{ formatWithCurrency(tamTinh, donViTienTeChung) }}</span>
+                    </div>
+                    
+                    <div class="sum-row" :class="{ 'has-value': tongGiamGia > 0 }">
+                      <span class="sum-label">Giảm giá</span>
+                      <div class="sum-right-group">
+                        <button class="btn-limit-red" @click="openDiscountModal('money')">Giảm thêm</button>
+                        <span class="sum-value font-mono sum-val-disc">-{{ formatWithCurrency(tongGiamGia, donViTienTeChung) }}</span>
+                      </div>
+                    </div>
+                    
+                    <div class="sum-row" :class="{ 'has-value': tongTienChietKhau > 0 }">
+                      <span class="sum-label">Chiết khấu</span>
+                      <div class="sum-right-group">
+                        <button class="btn-limit-red" @click="openDiscountModal('percent')">Giảm thêm</button>
+                        <span class="sum-value font-mono sum-val-disc">-{{ formatWithCurrency(tongTienChietKhau, donViTienTeChung) }}</span>
+                      </div>
+                    </div>
+
+                    <div class="sum-divider"></div>
+
+                    <div class="sum-row">
+                      <span class="sum-label" style="font-weight: 700; color: #e2e8f0;">Tiền hàng (sau giảm)</span>
+                      <span class="sum-value font-mono" style="color: #86efac; font-weight: 800;">{{ formatWithCurrency(tongCong, donViTienTeChung) }}</span>
+                    </div>
+
+                    <div class="sum-row sub-info">
+                      <span class="sum-label">Lợi nhuận dự kiến</span>
+                      <span class="sum-value font-mono sum-val-profit">+{{ formatWithCurrency(tongLoiNhuan, donViTienTeChung) }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- CARD 2: THANH TOÁN -->
+                <div class="box summary-card summary-card--payment">
+                  <h3 class="card-title">
+                    <span class="pc-card-title-left"><i class="ri-wallet-line"></i> THANH TOÁN</span>
+                  </h3>
+
+                  <div class="sum-grid">
+                    <!-- Hình thức thanh toán -->
+                    <div class="payment-toggle-section">
+                      <span class="pm-label">Hình thức thanh toán</span>
+                      <div class="pay-toggle-row">
+                        <div class="pay-toggle">
+                          <button 
+                            class="pill-btn" 
+                            :class="{ active: hinhThucThanhToan === 'TIEN_MAT' }"
+                            @click="handlePaymentMethodChange('TIEN_MAT')"
+                          >
+                            <i class="ri-money-dollar-circle-line"></i> Tiền mặt
+                          </button>
+                          <button 
+                            class="pill-btn pill-btn--transfer" 
+                            :class="{ active: hinhThucThanhToan === 'CHUYEN_KHOAN' }"
+                            @click="handlePaymentMethodChange('CHUYEN_KHOAN')"
+                          >
+                            <i class="ri-bank-card-line"></i> Chuyển khoản
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          class="pay-qr-export-btn"
+                          @click="openQrExportModal"
+                          title="Xuất mã QR chuyển khoản tự điền số tiền"
+                        >
+                          <i class="ri-qr-code-line"></i>
+                          <span>Xuất QR</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Tỉ giá input (chỉ hiện khi chọn Chuyển khoản) -->
+                    <div v-if="hinhThucThanhToan === 'CHUYEN_KHOAN'" class="exchange-rate-section">
+                      <label class="er-label">Tỉ giá</label>
+                      <div class="er-input-wrapper">
+                        <input type="number" v-model.number="tiGia" min="0" step="0.01" class="er-input" ref="tiGiaRef" />
+                        <span v-if="donViTienTeCK && donViTienTeCK !== 'VND'" class="er-badge">1 {{ donViTienTeCK }}</span>
+                      </div>
+                    </div>
+
+                    <!-- Tiền ship (chỉ áp khi xuất ảnh/text Giá bán & đồng bộ hiển thị cho khách web; không cộng doanh thu) -->
+                    <div class="exchange-rate-section shipping-fee-section">
+                      <label
+                        class="er-label"
+                        title="Chỉ áp dụng khi xuất ảnh/text (Giá bán) và đồng bộ hiển thị cho khách web — không cộng vào doanh thu"
+                      >
+                        Tiền ship
+                      </label>
+                      <div class="shipping-fee-controls">
+                        <div class="er-input-wrapper">
+                          <input
+                            type="number"
+                            v-model.number="phiShip"
+                            min="0"
+                            step="1"
+                            placeholder="0"
+                            class="er-input"
+                          />
+                          <span class="er-badge">{{ donViTienTeChung }}</span>
+                        </div>
+                        <label
+                          v-if="hinhThucThanhToan === 'CHUYEN_KHOAN'"
+                          class="ck-ship-inline-check"
+                          :class="{ active: ckBaoGomShip }"
+                          title="Chuyển khoản luôn tiền ship"
+                        >
+                          <input type="checkbox" v-model="ckBaoGomShip" />
+                          <span>CK luôn</span>
+                        </label>
+                      </div>
+                    </div>
+                    <div v-if="normalizedPhiShip > 0" class="ship-fee-hint">
+                      <i class="ri-information-line"></i>
+                      <span>Chỉ cộng khi xuất bill (Giá bán) &amp; hiển thị đơn web</span>
+                    </div>
+
+                    <template v-if="isMobile">
+                      <div class="sum-divider"></div>
+
+                      <template v-if="normalizedPhiShip > 0">
+                        <div class="sum-row">
+                          <span class="sum-label">Tiền hàng</span>
+                          <span class="sum-value font-mono">{{ formatWithCurrency(tongCong, donViTienTeChung) }}</span>
+                        </div>
+                        <div class="sum-row">
+                          <span class="sum-label" style="color: #38bdf8;">Tiền ship</span>
+                          <span class="sum-value font-mono" style="color: #38bdf8;">+{{ formatWithCurrency(normalizedPhiShip, donViTienTeChung) }}</span>
+                        </div>
+                      </template>
+
+                      <!-- Tổng cộng -->
+                      <div class="sum-row total-row">
+                        <span class="sum-label total-label">TỔNG CỘNG</span>
+                        <span class="sum-value total-value text-primary font-mono">{{ formatWithCurrency(tongCong + normalizedPhiShip, donViTienTeChung) }}</span>
+                      </div>
+
+                      <!-- Chuyển khoản (chỉ hiện khi chọn Chuyển khoản) -->
+                      <div class="sum-row transfer-row" v-if="hinhThucThanhToan === 'CHUYEN_KHOAN'">
+                        <span class="sum-label transfer-label">CHUYỂN KHOẢN (x{{ tiGia || 1 }})</span>
+                        <span class="sum-value transfer-value font-mono">{{ formatWithCurrency((tongCong + normalizedPhiShip) * Number(tiGia || 1), donViTienTeCK) }}</span>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STICKY CHECKOUT FOOTER (Always visible on PC unless right column collapsed; inside Payment tab on Mobile) -->
+        <div class="pc-checkout-footer" v-show="isMobile ? activeMobileTab === 'payment' : !pcCollapsed.right">
+          <div v-if="!isMobile" class="pc-footer-total-bar">
+            <div v-if="normalizedPhiShip > 0" class="pc-ft-breakdown-rows">
+              <div class="pc-ft-sub-row">
+                <span class="pc-ft-sub-label">Tiền hàng</span>
+                <strong class="pc-ft-sub-val font-mono">{{ formatWithCurrency(tongCong, donViTienTeChung) }}</strong>
+              </div>
+              <div class="pc-ft-sub-row is-ship">
+                <span class="pc-ft-sub-label">Tiền ship</span>
+                <strong class="pc-ft-sub-val font-mono">+{{ formatWithCurrency(normalizedPhiShip, donViTienTeChung) }}</strong>
+              </div>
+            </div>
+            <div class="pc-ft-row">
+              <div class="pc-ft-left">
+                <span class="pc-ft-label">TỔNG CỘNG</span>
+                <span
+                  class="pc-ft-pay-chip"
+                  :class="{ 'is-transfer': hinhThucThanhToan === 'CHUYEN_KHOAN' }"
+                >
+                  <i :class="hinhThucThanhToan === 'CHUYEN_KHOAN' ? 'ri-bank-card-line' : 'ri-money-dollar-circle-line'"></i>
+                  <span>{{ tenHinhThucThanhToan }}</span>
+                </span>
+              </div>
+              <span class="pc-ft-value font-mono">{{ formatWithCurrency(tongCong + normalizedPhiShip, donViTienTeChung) }}</span>
+            </div>
+            <div v-if="hinhThucThanhToan === 'CHUYEN_KHOAN'" class="pc-ft-transfer">
+              <span>CHUYỂN KHOẢN (x{{ tiGia || 1 }})</span>
+              <strong class="font-mono">{{ formatWithCurrency((tongCong + normalizedPhiShip) * Number(tiGia || 1), donViTienTeCK) }}</strong>
+            </div>
+          </div>
+
+          <!-- PHẦN 1: XUẤT HÓA ĐƠN -->
+          <div class="footer-action-block footer-export-block">
+            <div class="fab-header">
+              <span class="fab-title">
+                <i class="ri-share-forward-line"></i>
+                <span>Xuất hóa đơn</span>
+              </span>
+            </div>
+
+            <div class="footer-export-actions" :class="{ 'is-mobile-export': isMobile }">
+              <button class="btn btn-preview" :disabled="isPreviewing" @click="previewHoaDon" title="Xuất ảnh hóa đơn">
+                <span v-if="isPreviewing" class="btn-spinner" aria-hidden="true"></span>
+                <i v-else class="app-ico ri-image-line"></i> 
+                <span>{{ isPreviewing ? 'ĐANG XUẤT...' : (isMobile ? 'XUẤT ẢNH HÓA ĐƠN' : 'XUẤT ẢNH') }}</span>
+              </button>
+              <button class="btn btn-text" @click="openTextInvoice" title="Xuất hóa đơn (chữ)">
+                <i class="app-ico ri-file-text-line"></i> 
+                <span>{{ isMobile ? 'XUẤT HÓA ĐƠN (CHỮ)' : 'XUẤT CHỮ' }}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- PHẦN 2: THAO TÁC ĐƠN -->
+          <div class="footer-action-block footer-order-block">
+            <div class="fab-header">
+              <span class="fab-title">
+                <i class="ri-file-check-line"></i>
+                <span>Thao tác đơn</span>
+              </span>
+              <span
+                v-if="isLinkedOnlineOrder || isSubmittedAdminOrder"
+                class="fab-sync-pill"
+                :class="isOrderSyncedWithWeb ? 'is-synced' : 'is-unsynced'"
+              >
+                <i :class="isOrderSyncedWithWeb ? 'ri-checkbox-circle-line' : 'ri-error-warning-line'"></i>
+                <span>{{ isOrderSyncedWithWeb ? 'Đã đồng bộ' : 'Chưa đồng bộ' }}</span>
+              </span>
+            </div>
+
+            <!-- HÀNG RIÊNG: PROGRESS TRẠNG THÁI ĐƠN (WEB 4 BƯỚC / ADMIN 3 BƯỚC) -->
+            <div class="order-progress-row">
+              <div v-if="activeOrderStatus === 'Đã hủy'" class="order-progress-cancelled">
+                <i class="ri-close-circle-line"></i>
+                <span>Đơn hàng đã hủy</span>
+              </div>
+              <div
+                v-else
+                class="order-status-progress"
+                :class="{ 'is-3-steps': !isLinkedOnlineOrder }"
+                role="group"
+                aria-label="Tiến trình trạng thái đơn hàng"
+              >
+                <div class="osp-track">
+                  <div class="osp-track-fill" :style="{ width: orderProgressPercent + '%' }"></div>
+                </div>
+                <button
+                  v-for="(step, sIdx) in activeProgressSteps"
+                  :key="step.value"
+                  type="button"
+                  class="osp-step"
+                  :class="getOrderProgressStepClass(sIdx)"
+                  :disabled="isSubmitting || isOrderActionLoading"
+                  :title="`Chuyển trạng thái sang: ${step.value}`"
+                  @click="handleOrderProgressStepClick(step.value)"
+                >
+                  <span class="osp-dot">
+                    <i
+                      v-if="
+                        activeOrderStepIndex !== -1 &&
+                        (sIdx < activeOrderStepIndex ||
+                          (step.value === 'Hoàn thành' && activeOrderStatus === 'Hoàn thành'))
+                      "
+                      class="ri-check-line"
+                    ></i>
+                    <span v-else>{{ sIdx + 1 }}</span>
+                  </span>
+                  <span class="osp-label">{{ step.label }}</span>
+                </button>
+              </div>
+            </div>
+
+            <div
+              class="submit-stack"
+              :class="{
+                'mobile-scroll-submit': isMobile,
+                'pc-submit-stack': !isMobile,
+                'is-online-actions': isLinkedOnlineOrder || isSubmittedAdminOrder,
+              }"
+            >
+              <!-- ĐƠN ADMIN CHƯA CHỐT -->
+              <button
+                v-if="!isLinkedOnlineOrder && !isSubmittedAdminOrder"
+                class="btn btn-complete"
+                :disabled="isSubmitting || isOrderActionLoading"
+                @click="hoanThanhDon('Đang xử lý', false)"
+              >
+                <span v-if="isSubmitting || isOrderActionLoading" class="btn-spinner" aria-hidden="true"></span>
+                <i v-else class="app-ico ri-checkbox-circle-line"></i>
+                <span>{{ isSubmitting ? 'ĐANG XỬ LÝ...' : 'CHỐT ĐƠN' }}</span>
+              </button>
+
+              <!-- ĐƠN WEB HOẶC ĐƠN ADMIN ĐÃ CHỐT: LƯU/ĐỒNG BỘ + HỦY / ĐÓNG TAB -->
               <template v-else>
                 <button
-                  class="btn btn-order-draft"
+                  v-if="isLinkedOnlineOrder && activeOrderStatus !== 'Đã hủy'"
+                  type="button"
+                  class="btn btn-sync-web"
+                  :class="isOrderSyncedWithWeb ? 'is-synced' : 'is-unsynced'"
+                  :disabled="isSubmitting || isOrderActionLoading"
+                  :title="isOrderSyncedWithWeb ? 'Đã đồng bộ dữ liệu lên web (bấm để đồng bộ lại)' : 'Có thay đổi chưa đồng bộ — bấm để đồng bộ lên web'"
+                  @click="syncOrderToWebFromInvoice"
+                >
+                  <span v-if="isSubmitting || isOrderActionLoading" class="btn-spinner" aria-hidden="true"></span>
+                  <i v-else :class="['app-ico', isOrderSyncedWithWeb ? 'ri-cloud-line' : 'ri-refresh-line']"></i>
+                  <span>ĐỒNG BỘ WEB</span>
+                </button>
+
+                <button
+                  v-else-if="!isLinkedOnlineOrder && activeOrderStatus !== 'Đã hủy'"
+                  type="button"
+                  class="btn btn-sync-web"
+                  :class="isOrderSyncedWithWeb ? 'is-synced' : 'is-unsynced'"
+                  :disabled="isSubmitting || isOrderActionLoading"
+                  :title="isOrderSyncedWithWeb ? 'Dữ liệu đơn đã lưu đồng bộ (bấm để lưu lại)' : 'Có thay đổi chưa lưu — bấm để cập nhật đơn hàng'"
+                  @click="saveAdminOrderEdits"
+                >
+                  <span v-if="isSubmitting || isOrderActionLoading" class="btn-spinner" aria-hidden="true"></span>
+                  <i v-else :class="['app-ico', isOrderSyncedWithWeb ? 'ri-cloud-line' : 'ri-refresh-line']"></i>
+                  <span>LƯU CẬP NHẬT</span>
+                </button>
+
+                <button
+                  v-if="activeOrderStatus !== 'Hoàn thành' && activeOrderStatus !== 'Đã hủy'"
+                  type="button"
+                  class="btn btn-order-cancel"
+                  :disabled="isSubmitting || isOrderActionLoading"
+                  @click="cancelOrderFromInvoice"
+                >
+                  <i class="app-ico ri-close-circle-line"></i>
+                  <span>HỦY ĐƠN</span>
+                </button>
+
+                <button
+                  v-else
+                  type="button"
+                  class="btn btn-order-draft btn-close-order-tab"
                   @click="closeInvoiceTab(activeInvoiceTabId)"
                 >
                   <i class="app-ico ri-close-circle-line"></i>
-                  <span>ĐÓNG TAB ĐƠN NÀY</span>
+                  <span>ĐÓNG TAB</span>
                 </button>
               </template>
+            </div>
 
-              <button
-                v-if="activeOrderStatus !== 'Hoàn thành' && activeOrderStatus !== 'Đã hủy'"
-                class="btn btn-order-cancel"
-                :disabled="isSubmitting || isOrderActionLoading"
-                @click="cancelOrderFromInvoice"
-              >
-                <i class="app-ico ri-close-circle-line"></i>
-                <span>HỦY ĐƠN</span>
-              </button>
-            </template>
+            <!-- KHỐI XÁC NHẬN & CHI TIẾT KHÁCH UPDATE -->
+            <div v-if="activePendingWebUpdate?.changes?.length" class="web-update-action-box">
+              <div class="wuab-head">
+                <i class="ri-notification-badge-fill"></i>
+                <span>
+                  Khách vừa cập nhật đơn ({{ activePendingWebUpdate.changes.length }} thay đổi)
+                </span>
+              </div>
+              <div class="wuab-btns">
+                <button
+                  type="button"
+                  class="btn-wuab-confirm"
+                  @click="confirmWebOrderUpdate"
+                >
+                  <i class="ri-check-double-line"></i>
+                  <span>Xác nhận update</span>
+                </button>
+                <button
+                  type="button"
+                  class="btn-wuab-detail"
+                  @click="openWebUpdateDetailModal"
+                >
+                  <i class="ri-file-list-3-line"></i>
+                  <span>Xem chi tiết update</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1503,7 +2535,7 @@
       <div class="hd-meta">
         <span class="hd-code">{{ maHoaDon }}</span>
         <span class="hd-separator">•</span>
-        <span class="hd-date">{{ formatDateTimeVN(new Date()) }}</span>
+        <span class="hd-date">{{ orderCreatedAt || formatDateTimeVN(new Date()) }}</span>
       </div>
     </div>
 
@@ -1554,32 +2586,78 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(i, idx) in items" :key="idx">
-          <td class="text-center">{{ idx + 1 }}</td>
-          <td class="text-left">
-            <div class="product-name">{{ i.tenHang }}</div>
-            <div v-if="i.ghiChuHang" class="product-note">{{ i.ghiChuHang }}</div>
-          </td>
-          <td v-if="hasAnySize" class="text-center">{{ i.size }}</td>
-          <td v-if="hasAnyDvt" class="text-center">{{ i.dvt }}</td>
-          <td class="text-center">{{ i.soLuong }}</td>
-          <td class="text-right">{{ formatWithCurrency(i.giaBan, i.donViTienTe) }}</td>
-          <td class="text-right price-highlight">{{ formatWithCurrency(i.thanhTien - (i.tongGiamTru || 0), i.donViTienTe) }}</td>
-        </tr>
+        <template v-if="isExportByMember">
+          <template v-for="sec in exportMemberSections" :key="sec.groupKey">
+            <tr class="hd-member-group-row">
+              <td :colspan="exportTableColSpan">
+                <div class="hd-mg-inner">
+                  <span class="hd-mg-name">
+                    {{ sec.name }}
+                    <span v-if="sec.badge" class="hd-mg-badge">({{ sec.badge }})</span>
+                  </span>
+                  <span class="hd-mg-meta">{{ sec.totalQty }} món • {{ formatWithCurrency(sec.sectionTotal, donViTienTeChung) }}</span>
+                </div>
+              </td>
+            </tr>
+            <tr v-for="(i, mIdx) in sec.rows" :key="`${sec.groupKey}-${mIdx}`">
+              <td class="text-center">{{ mIdx + 1 }}</td>
+              <td class="text-left">
+                <div class="product-name">{{ i.tenHang }}</div>
+                <div v-if="i.ghiChuHang" class="product-note">{{ i.ghiChuHang }}</div>
+              </td>
+              <td v-if="hasAnySize" class="text-center">{{ i.size }}</td>
+              <td v-if="hasAnyDvt" class="text-center">{{ i.dvt }}</td>
+              <td class="text-center">{{ i.soLuong }}</td>
+              <td class="text-right">{{ formatWithCurrency(i.unitPrice, i.donViTienTe) }}</td>
+              <td class="text-right price-highlight">{{ formatWithCurrency(i.lineTotal, i.donViTienTe) }}</td>
+            </tr>
+          </template>
+        </template>
+        <template v-else>
+          <tr v-for="(i, idx) in exportGroupedRows" :key="i.groupKey || idx">
+            <td class="text-center">{{ idx + 1 }}</td>
+            <td class="text-left">
+              <div class="product-name">{{ i.tenHang }}</div>
+              <div v-if="i.ghiChuHang" class="product-note">{{ i.ghiChuHang }}</div>
+            </td>
+            <td v-if="hasAnySize" class="text-center">{{ i.size }}</td>
+            <td v-if="hasAnyDvt" class="text-center">{{ i.dvt }}</td>
+            <td class="text-center">{{ i.soLuong }}</td>
+            <td class="text-right">{{ formatWithCurrency(i.unitPrice, i.donViTienTe) }}</td>
+            <td class="text-right price-highlight">{{ formatWithCurrency(i.lineTotal, i.donViTienTe) }}</td>
+          </tr>
+        </template>
       </tbody>
     </table>
 
     <!-- ===== TỔNG KẾT ===== -->
-    <div class="hd-summary-row">
-      <!-- LEFT: THÔNG TIN CHUYỂN KHOẢN -->
-      <div class="hd-bank-box" v-if="ckInfoList && ckInfoList.length">
+    <div
+      class="hd-summary-row"
+      :class="{ 'is-no-bank': hinhThucThanhToan !== 'CHUYEN_KHOAN' || !(ckInfoList && ckInfoList.length) }"
+    >
+      <!-- LEFT: THÔNG TIN CHUYỂN KHOẢN (chỉ hiện khi chọn Chuyển khoản) -->
+      <div class="hd-bank-box" v-if="hinhThucThanhToan === 'CHUYEN_KHOAN' && ckInfoList && ckInfoList.length">
         <div class="bank-title">THÔNG TIN CHUYỂN KHOẢN</div>
 
         <div class="bank-list-stack">
           <div class="bank-minicard" v-for="(info, idx) in ckInfoList" :key="idx">
             <div class="bank-body">
-              <div class="bank-qr" v-if="info.QR_IMG_base64 || info.QR_IMG">
-                <img :src="info.QR_IMG_base64 || info.QR_IMG" alt="QR" />
+              <div
+                class="bank-qr"
+                v-if="getBankDynamicQrPayload(info) || info.QR_IMG_base64 || info.QR_IMG"
+              >
+                <QrcodeVue
+                  v-if="getBankDynamicQrPayload(info)"
+                  :value="getBankDynamicQrPayload(info)"
+                  :size="102"
+                  level="M"
+                  render-as="svg"
+                  :margin="1"
+                  foreground="#0f172a"
+                  background="#ffffff"
+                  class="bank-qr-svg"
+                />
+                <img v-else :src="info.QR_IMG_base64 || info.QR_IMG" alt="QR" />
               </div>
 
               <div class="bank-text" v-if="info.ThongTin">
@@ -1593,8 +2671,13 @@
 
         <div class="bank-amount">
           <div class="ba-label">SỐ TIỀN CHUYỂN KHOẢN</div>
-          <div class="ba-value">{{ formatWithCurrency(tongChuyenKhoan, donViTienTeCK) }}</div>
-          <div class="ba-sub" v-if="tiGia"></div>
+          <div class="ba-value">{{ formatWithCurrency(exportTongChuyenKhoan, donViTienTeCK) }}</div>
+          <div
+            class="ba-sub"
+            :class="exportShippingFee > 0 ? 'is-ship-included' : 'is-ship-excluded'"
+          >
+            ({{ exportShippingFee > 0 ? 'Đã tính ship' : 'Chưa tính ship' }})
+          </div>
         </div>
       </div>
 
@@ -1602,15 +2685,26 @@
       <div class="summary-title">TỔNG KẾT THANH TOÁN</div>
       <div class="summary-row subtotal">
         <span class="summary-label">Tạm tính:</span>
-        <span class="summary-value">{{ formatWithCurrency(tamTinh, donViTienTeChung) }}</span>
+        <span class="summary-value">{{ formatWithCurrency(exportTamTinh, donViTienTeChung) }}</span>
       </div>
-      <div class="summary-row discount" v-if="tongGiamGia > 0">
+      <div class="summary-row discount" v-if="!isExportCostMode && tongGiamGia > 0">
         <span class="summary-label">Giảm giá:</span>
         <span class="summary-value">-{{ formatWithCurrency(tongGiamGia, donViTienTeChung) }}</span>
       </div>
-      <div class="summary-row discount" v-if="tongTienChietKhau > 0">
+      <div class="summary-row discount" v-if="!isExportCostMode && tongTienChietKhau > 0">
         <span class="summary-label">Chiết khấu:</span>
         <span class="summary-value">-{{ formatWithCurrency(tongTienChietKhau, donViTienTeChung) }}</span>
+      </div>
+      <div
+        class="summary-row goods-total"
+        v-if="!isExportCostMode && exportShippingFee > 0"
+      >
+        <span class="summary-label">{{ (tongGiamGia > 0 || tongTienChietKhau > 0) ? 'Tiền hàng (sau giảm):' : 'Tiền hàng:' }}</span>
+        <span class="summary-value">{{ formatWithCurrency(tongCong, donViTienTeChung) }}</span>
+      </div>
+      <div class="summary-row shipping" v-if="exportShippingFee > 0">
+        <span class="summary-label">Tiền ship:</span>
+        <span class="summary-value">+{{ formatWithCurrency(exportShippingFee, donViTienTeChung) }}</span>
       </div>
       <div class="summary-row payment">
         <span class="summary-label">Hình thức thanh toán:</span>
@@ -1618,10 +2712,14 @@
       </div>
       <div class="summary-row total">
         <span class="summary-label">TỔNG CỘNG:</span>
-        <span class="summary-value">{{ formatWithCurrency(tongCong, donViTienTeChung) }}</span>
+        <span class="summary-value">{{ formatWithCurrency(exportTongCong, donViTienTeChung) }}</span>
       </div>
-      <div v-if="khuyenMaiText" class="hd-promo">
-        <span class="hd-promo-text">{{ khuyenMaiText }}</span>
+      <div v-if="khuyenMaiText" class="summary-row promo">
+        <span class="summary-label">Ưu đãi :</span>
+        <span class="summary-value">{{ khuyenMaiText }}</span>
+      </div>
+      <div v-if="nextMilestoneHintText" class="hd-promo-next">
+        <span class="hd-promo-next-text">{{ nextMilestoneHintText }}</span>
       </div>
     </div>
     </div>
@@ -1677,6 +2775,56 @@
         <button class="grab-sheet-close" @click="showTextInvoice = false" aria-label="Đóng">
           <i class="ri-close-line"></i>
         </button>
+      </div>
+
+      <div class="text-invoice-mode-stack">
+        <div class="text-invoice-mode-bar" role="group" aria-label="Chọn kiểu hiển thị hóa đơn văn bản">
+          <span class="epm-label">Kiểu xuất:</span>
+          <div class="epm-options">
+            <button
+              type="button"
+              class="epm-btn"
+              :class="{ active: exportGroupMode === 'grouped' }"
+              @click="selectExportGroupMode('grouped')"
+            >
+              <i class="ri-stack-line"></i>
+              <span>Dạng gộp</span>
+            </button>
+            <button
+              type="button"
+              class="epm-btn"
+              :class="{ active: exportGroupMode === 'by_member' }"
+              @click="selectExportGroupMode('by_member')"
+            >
+              <i class="ri-group-line"></i>
+              <span>Từng người</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="text-invoice-mode-bar" role="group" aria-label="Chọn loại giá hóa đơn văn bản">
+          <span class="epm-label">Loại giá:</span>
+          <div class="epm-options">
+            <button
+              type="button"
+              class="epm-btn"
+              :class="{ active: exportPriceMode === 'giaBan' }"
+              @click="selectExportPriceMode('giaBan')"
+            >
+              <i class="ri-price-tag-3-line"></i>
+              <span>Giá bán</span>
+            </button>
+            <button
+              type="button"
+              class="epm-btn is-cost"
+              :class="{ active: exportPriceMode === 'giaGoc' }"
+              @click="selectExportPriceMode('giaGoc')"
+            >
+              <i class="ri-coins-line"></i>
+              <span>Giá gốc</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <textarea readonly rows="14" ref="textInvoiceRef">
@@ -1948,6 +3096,7 @@
                   :class="m.role === 'admin' ? 'ri-store-2-line' : 'ri-user-3-line'"
                 ></i>
                 <span>{{ m.name }}</span>
+                <span v-if="m.dupTag" class="omg-dup-tag">{{ m.dupTag }}</span>
               </button>
             </div>
           </div>
@@ -1990,10 +3139,16 @@
             </div>
           </div>
           <div class="pmv4-field-group">
-            <label class="pmv4-label">Giá vốn <i class="ri-lock-line" style="opacity:0.5; font-weight:normal"></i></label>
-            <div class="pmv4-static-field">
-              {{ editItem.giaGoc?.toLocaleString() }} 
-              <span class="pmv4-static-unit">{{ editItem.donViTienTe || 'VND' }}</span>
+            <label class="pmv4-label">Giá vốn</label>
+            <div class="pmv4-input-wrap">
+              <input
+                type="number"
+                v-model.number="editItem.giaGoc"
+                min="0"
+                step="any"
+                class="pmv4-input"
+              />
+              <span class="pmv4-input-unit">{{ editItem.donViTienTe || 'VND' }}</span>
             </div>
           </div>
 
@@ -2008,6 +3163,39 @@
             <label class="pmv4-label text-subtle">Chiết khấu %</label>
             <div class="pmv4-input-wrap">
               <input type="number" v-model.number="editItem.chietKhau" class="pmv4-input text-danger-soft" />
+            </div>
+          </div>
+
+          <!-- Row 3b: CK NCC -->
+          <div class="pmv4-field-group span-full">
+            <label class="pmv4-label">CK NCC (% giá gốc hoặc Tiền trực tiếp)</label>
+            <div class="ncc-inline-control">
+              <div class="ncc-type-toggle" role="group">
+                <button
+                  type="button"
+                  class="ncc-type-btn"
+                  :class="{ active: editItem.nccLoaiGiam !== 'money' }"
+                  @click="editItem.nccLoaiGiam = 'percent'"
+                >
+                  %
+                </button>
+                <button
+                  type="button"
+                  class="ncc-type-btn"
+                  :class="{ active: editItem.nccLoaiGiam === 'money' }"
+                  @click="editItem.nccLoaiGiam = 'money'"
+                >
+                  Tiền ({{ editItem.donViTienTe || 'P' }})
+                </button>
+              </div>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                v-model.number="editItem.nccGiaTriGiam"
+                placeholder="0"
+                class="ncc-inline-input"
+              />
             </div>
           </div>
 
@@ -2105,6 +3293,776 @@
       </div>
     </div>
   </div>
+
+  <!-- ================= MODAL CHỌN LOẠI GIÁ XUẤT HÓA ĐƠN ================= -->
+  <div
+    v-if="showExportPriceChoiceModal"
+    class="modal modal-overlay-blur grab-modal-overlay"
+    @click.self="closeExportPriceChoiceModal"
+  >
+    <div class="modal-box premium-modal-v4 grab-sheet" style="max-width: 500px">
+      <div class="grab-sheet-handle" @click="closeExportPriceChoiceModal"></div>
+      <div class="pmv4-header">
+        <div class="pmv4-header-info">
+          <div class="pmv4-icon-box">
+            <i :class="pendingExportAction === 'text' ? 'ri-file-text-line' : 'ri-image-line'"></i>
+          </div>
+          <div>
+            <h3 class="pmv4-title">Chọn kiểu &amp; giá xuất hóa đơn</h3>
+            <p class="pmv4-subtitle">
+              {{ pendingExportAction === 'text' ? 'Xuất hóa đơn (chữ)' : 'Xuất ảnh hóa đơn' }} — chọn trực tiếp 1 tùy chọn bên dưới
+            </p>
+          </div>
+        </div>
+        <button class="pmv4-close" @click="closeExportPriceChoiceModal">
+          <i class="ri-close-line"></i>
+        </button>
+      </div>
+
+      <div class="pmv4-body">
+        <div class="export-choice-sections">
+          <div class="export-choice-section">
+            <div class="ecs-title">
+              <i class="ri-stack-line"></i>
+              <span>Dạng gộp</span>
+              <span class="ecs-sub">Gộp các món giống nhau thành 1 dòng</span>
+            </div>
+            <div class="ecs-row">
+              <button type="button" class="export-choice-card is-sell" @click="confirmExportOptions('grouped', 'giaBan')">
+                <div class="ecc-head">
+                  <i class="ri-price-tag-3-line"></i>
+                  <span>Giá bán</span>
+                </div>
+                <div class="ecc-total font-mono">{{ formatWithCurrency(tongCong + normalizedPhiShip, donViTienTeChung) }}</div>
+              </button>
+              <button type="button" class="export-choice-card is-cost" @click="confirmExportOptions('grouped', 'giaGoc')">
+                <div class="ecc-head">
+                  <i class="ri-coins-line"></i>
+                  <span>Giá gốc</span>
+                </div>
+                <div class="ecc-total font-mono">{{ formatWithCurrency(totalCostAmount, donViTienTeChung) }}</div>
+              </button>
+            </div>
+          </div>
+
+          <div class="export-choice-section">
+            <div class="ecs-title">
+              <i class="ri-group-line"></i>
+              <span>Theo từng người</span>
+              <span class="ecs-sub">Tách nhóm theo từng người đặt ({{ exportMemberSections.length }} nhóm)</span>
+            </div>
+            <div class="ecs-row">
+              <button type="button" class="export-choice-card is-sell" @click="confirmExportOptions('by_member', 'giaBan')">
+                <div class="ecc-head">
+                  <i class="ri-price-tag-3-line"></i>
+                  <span>Giá bán</span>
+                </div>
+                <div class="ecc-total font-mono">{{ formatWithCurrency(tongCong + normalizedPhiShip, donViTienTeChung) }}</div>
+              </button>
+              <button type="button" class="export-choice-card is-cost" @click="confirmExportOptions('by_member', 'giaGoc')">
+                <div class="ecc-head">
+                  <i class="ri-coins-line"></i>
+                  <span>Giá gốc</span>
+                </div>
+                <div class="ecc-total font-mono">{{ formatWithCurrency(totalCostAmount, donViTienTeChung) }}</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pmv4-footer">
+        <button class="pmv4-btn-ghost" @click="closeExportPriceChoiceModal">Hủy</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL THÊM / QUẢN LÝ NGƯỜI ĐẶT ================= -->
+  <div
+    v-if="showAddMemberModal"
+    class="modal modal-overlay-blur grab-modal-overlay"
+    @click.self="closeAddMemberModal"
+  >
+    <div class="modal-box premium-modal-v4 grab-sheet" style="max-width: 480px">
+      <div class="grab-sheet-handle" @click="closeAddMemberModal"></div>
+      <div class="pmv4-header">
+        <div class="pmv4-header-info">
+          <div class="pmv4-icon-box">
+            <i class="ri-user-add-line"></i>
+          </div>
+          <div>
+            <h3 class="pmv4-title">Thêm người đặt vào đơn</h3>
+            <p class="pmv4-subtitle">Nhập tên từng người hoặc nhiều tên cách nhau bởi dấu phẩy (,)</p>
+          </div>
+        </div>
+        <button class="pmv4-close" @click="closeAddMemberModal">
+          <i class="ri-close-line"></i>
+        </button>
+      </div>
+
+      <div class="pmv4-body">
+        <div class="add-member-form">
+          <input
+            ref="newMemberInputRef"
+            v-model="newMemberNameInput"
+            type="text"
+            class="amf-input"
+            placeholder="Ví dụ: Lan, Hùng, Phòng KT..."
+            @keyup.enter="submitAddMembers(false)"
+          />
+          <button
+            type="button"
+            class="amf-add-btn"
+            :disabled="!String(newMemberNameInput || '').trim()"
+            @click="submitAddMembers(false)"
+          >
+            <i class="ri-add-line"></i>
+            <span>Thêm</span>
+          </button>
+        </div>
+
+        <!-- CẢNH BÁO TRÙNG TÊN & TÙY CHỌN XỬ LÝ -->
+        <div v-if="activeDuplicatePrompt" class="amf-dup-alert">
+          <div class="amf-dup-head">
+            <i class="ri-alert-line"></i>
+            <div class="amf-dup-text">
+              <div class="amf-dup-title">
+                Tên <strong>"{{ activeDuplicatePrompt.rawName }}"</strong> đã có trong đơn
+                <span class="amf-dup-meta">
+                  ({{ activeDuplicatePrompt.existingMember.totalQty }} món ·
+                  {{ formatWithCurrency(activeDuplicatePrompt.existingMember.subtotal, donViTienTeChung) }})
+                </span>
+              </div>
+              <div class="amf-dup-sub">
+                Nếu đây là <strong>người khác trùng tên</strong>, bạn có muốn vẫn thêm tách riêng không?
+              </div>
+            </div>
+          </div>
+          <div class="amf-dup-actions">
+            <button
+              type="button"
+              class="amf-dup-btn is-confirm"
+              @click="resolveDuplicateMemberPrompt('new')"
+            >
+              <i class="ri-user-add-line"></i>
+              <span>Vẫn thêm người mới</span>
+            </button>
+            <button
+              type="button"
+              class="amf-dup-btn is-existing"
+              @click="resolveDuplicateMemberPrompt('existing')"
+            >
+              <i class="ri-user-follow-line"></i>
+              <span>Chọn người đã có</span>
+            </button>
+            <button
+              type="button"
+              class="amf-dup-btn is-rename"
+              @click="resolveDuplicateMemberPrompt('rename')"
+            >
+              <i class="ri-edit-line"></i>
+              <span>Đặt tên khác</span>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="invoiceOrderMembers.length" class="amf-members-section">
+          <div class="amf-section-title">
+            <span>Người trong đơn ({{ invoiceOrderMembers.length }})</span>
+            <small>Chọn một người để gán món khi bấm sản phẩm</small>
+          </div>
+          <div class="amf-member-list">
+            <div
+              v-for="m in invoiceOrderMembers"
+              :key="m.groupKey"
+              class="amf-member-row"
+              :class="{ active: activeTargetMemberKey === m.groupKey }"
+            >
+              <template v-if="editingMemberKey === m.groupKey">
+                <input
+                  v-model="editingMemberName"
+                  type="text"
+                  class="amf-rename-input"
+                  placeholder="Tên mới..."
+                  @keyup.enter="saveRenameOrderMember(m)"
+                  @keyup.esc="cancelRenameOrderMember"
+                />
+                <div class="amf-row-actions">
+                  <button
+                    type="button"
+                    class="amf-icon-btn is-save"
+                    @click="saveRenameOrderMember(m)"
+                    title="Lưu tên"
+                  >
+                    <i class="ri-check-line"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="amf-icon-btn"
+                    @click="cancelRenameOrderMember"
+                    title="Hủy"
+                  >
+                    <i class="ri-close-line"></i>
+                  </button>
+                </div>
+              </template>
+              <template v-else>
+                <div class="amf-member-info" @click="selectMemberFromModal(m.groupKey)">
+                  <i
+                    class="app-ico"
+                    :class="m.role === 'admin' ? 'ri-store-2-line' : 'ri-user-3-line'"
+                  ></i>
+                  <div class="amf-member-text">
+                    <div class="amf-member-name">
+                      <span>{{ m.name }}</span>
+                      <span v-if="m.dupTag" class="omg-dup-tag">{{ m.dupTag }}</span>
+                      <span v-if="m.badge" class="omg-badge" :class="`role-${m.role}`">{{ m.badge }}</span>
+                    </div>
+                    <div class="amf-member-meta">
+                      {{ m.totalQty }} món · {{ formatWithCurrency(m.subtotal, donViTienTeChung) }}
+                    </div>
+                  </div>
+                </div>
+                <div class="amf-row-actions">
+                  <button
+                    type="button"
+                    class="amf-select-btn"
+                    :class="{ active: activeTargetMemberKey === m.groupKey }"
+                    @click="selectMemberFromModal(m.groupKey)"
+                  >
+                    {{ activeTargetMemberKey === m.groupKey ? 'Đang chọn' : 'Chọn' }}
+                  </button>
+                  <button
+                    v-if="m.role !== 'admin'"
+                    type="button"
+                    class="amf-icon-btn"
+                    @click="startRenameOrderMember(m)"
+                    title="Đổi tên người đặt"
+                  >
+                    <i class="ri-edit-line"></i>
+                  </button>
+                  <button
+                    v-if="m.entries.length === 0 && m.isCustom"
+                    type="button"
+                    class="amf-icon-btn is-del"
+                    @click="removeCustomOrderMember(m)"
+                    title="Xóa người đặt này"
+                  >
+                    <i class="ri-delete-bin-line"></i>
+                  </button>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pmv4-footer">
+        <button class="pmv4-btn-ghost" @click="closeAddMemberModal">Đóng</button>
+        <button
+          v-if="String(newMemberNameInput || '').trim()"
+          class="pmv4-btn-primary"
+          @click="submitAddMembers(true)"
+        >
+          Thêm &amp; Chọn món
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL ĐƠN ĐANG CHỜ DUYỆT (CHUÔNG) ================= -->
+  <div
+    v-if="showPendingOrdersModal"
+    class="modal modal-overlay-blur grab-modal-overlay"
+    @click.self="closePendingOrdersModal"
+  >
+    <div class="modal-box premium-modal-v4 grab-sheet" style="max-width: 560px">
+      <div class="grab-sheet-handle" @click="closePendingOrdersModal"></div>
+      <div class="pmv4-header">
+        <div class="pmv4-header-info">
+          <div class="pmv4-icon-box" :class="{ 'is-alert-red': totalBellNotificationCount > 0 }">
+            <i class="ri-notification-3-fill"></i>
+          </div>
+          <div>
+            <h3 class="pmv4-title">Thông báo đơn web ({{ totalBellNotificationCount }})</h3>
+            <p class="pmv4-subtitle">
+              {{
+                totalBellNotificationCount > 0
+                  ? 'Chọn đơn cập nhật để đi tới tab hoặc đưa đơn mới vào bảng'
+                  : 'Tất cả đơn chờ duyệt đã đồng bộ và chưa có cập nhật mới'
+              }}
+            </p>
+          </div>
+        </div>
+        <button class="pmv4-close" @click="closePendingOrdersModal">
+          <i class="ri-close-line"></i>
+        </button>
+      </div>
+
+      <div class="pmv4-body">
+        <!-- PHẦN 1: ĐƠN ĐÃ MỞ TAB NHƯNG KHÁCH VỪA CẬP NHẬT -->
+        <div v-if="tabsWithPendingUpdate.length" class="po-update-section">
+          <div class="po-section-label is-update">
+            <i class="ri-refresh-line"></i>
+            <span>Khách vừa cập nhật món ({{ tabsWithPendingUpdate.length }})</span>
+          </div>
+          <div class="po-list">
+            <div
+              v-for="uTab in tabsWithPendingUpdate"
+              :key="'upd-' + uTab.id"
+              class="po-card is-update-card"
+              style="cursor: pointer;"
+              @click="navigateToUpdatedOrderTab(uTab.id)"
+            >
+              <div class="po-card-top">
+                <div class="po-code-group">
+                  <span class="po-code">#{{ uTab.sourceOrderId || uTab.maHoaDon }}</span>
+                  <span class="po-badge-updated">Khách vừa cập nhật</span>
+                </div>
+                <span class="po-total">
+                  {{ uTab.pendingWebUpdate.changes.length }} thay đổi
+                </span>
+              </div>
+
+              <div class="po-customer-row">
+                <strong><i class="ri-user-3-line"></i> {{ uTab.customer?.tenKhachHang || 'Khách web' }}</strong>
+                <span v-if="uTab.customer?.soDienThoai" class="po-phone">· {{ uTab.customer.soDienThoai }}</span>
+              </div>
+
+              <div class="po-update-preview-list">
+                <div
+                  v-for="(ch, cIdx) in uTab.pendingWebUpdate.changes.slice(0, 4)"
+                  :key="cIdx"
+                  class="po-update-preview-item"
+                  :class="`is-${ch.type}`"
+                >
+                  {{ ch.summary }}
+                </div>
+                <div v-if="uTab.pendingWebUpdate.changes.length > 4" class="po-update-more">
+                  + {{ uTab.pendingWebUpdate.changes.length - 4 }} thay đổi khác...
+                </div>
+              </div>
+
+              <div class="po-card-actions">
+                <button
+                  type="button"
+                  class="po-import-btn is-jump-update"
+                  @click.stop="navigateToUpdatedOrderTab(uTab.id)"
+                >
+                  <i class="ri-arrow-right-circle-line"></i>
+                  <span>Đi tới tab &amp; xem món mới</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PHẦN 2: ĐƠN MỚI CHƯA ĐƯA VÀO BẢNG -->
+        <div v-if="tabsWithPendingUpdate.length && unopenedPendingOrders.length" class="po-section-label">
+          <i class="ri-inbox-unarchive-line"></i>
+          <span>Đơn mới chờ duyệt ({{ unopenedPendingOrders.length }})</span>
+        </div>
+
+        <div v-if="!unopenedPendingOrders.length && !tabsWithPendingUpdate.length" class="po-empty">
+          <i class="ri-checkbox-circle-line"></i>
+          <span>Hiện không có đơn chờ duyệt hoặc cập nhật mới từ khách.</span>
+        </div>
+
+        <div v-else-if="unopenedPendingOrders.length" class="po-list">
+          <div
+            v-for="ord in unopenedPendingOrders"
+            :key="ord.maHoaDon"
+            class="po-card"
+          >
+            <div class="po-card-top">
+              <div class="po-code-group">
+                <span class="po-code">#{{ ord.maHoaDon }}</span>
+                <span class="po-badge-waiting">Chờ duyệt</span>
+              </div>
+              <span class="po-total font-mono">
+                {{ formatWithCurrency(ord.tongCong, ord.donViTienTe) }}
+              </span>
+            </div>
+
+            <div class="po-customer-row">
+              <strong><i class="ri-user-3-line"></i> {{ ord.tenKhach }}</strong>
+              <span v-if="ord.soDienThoai" class="po-phone">· {{ ord.soDienThoai }}</span>
+            </div>
+
+            <div v-if="ord.diaChi" class="po-sub-row">
+              <i class="ri-map-pin-line"></i>
+              <span>{{ ord.diaChi }}</span>
+            </div>
+
+            <div v-if="ord.ngayTao" class="po-sub-row">
+              <i class="ri-calendar-check-line"></i>
+              <span>Tạo đơn: {{ ord.ngayTao }}</span>
+            </div>
+
+            <div class="po-sub-row">
+              <i class="ri-time-line"></i>
+              <span>
+                <template v-if="ord.thoiGianNhanHang">Nhận: {{ ord.thoiGianNhanHang }} · </template>
+                {{ ord.hinhThucTT }}
+              </span>
+            </div>
+
+            <div v-if="ord.itemsPreview || ord.totalQty > 0" class="po-items-preview">
+              <i class="ri-shopping-basket-2-line"></i>
+              <span>
+                <strong v-if="ord.totalQty > 0">{{ ord.totalQty }} món:</strong>
+                {{ ord.itemsPreview || 'Đang đồng bộ chi tiết món...' }}
+              </span>
+            </div>
+
+            <div class="po-card-actions">
+              <button
+                type="button"
+                class="po-import-btn"
+                :class="{ 'is-open-tab': ord.isOpenedInTab }"
+                :disabled="importingPendingOrderId === ord.maHoaDon"
+                @click="importPendingOrderToTable(ord.maHoaDon)"
+              >
+                <span v-if="importingPendingOrderId === ord.maHoaDon" class="btn-spinner" aria-hidden="true"></span>
+                <i v-else :class="ord.isOpenedInTab ? 'ri-arrow-right-circle-line' : 'ri-download-2-line'"></i>
+                <span>{{ ord.isOpenedInTab ? 'Mở tab đang có' : 'Đưa vào bảng' }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pmv4-footer">
+        <button class="pmv4-btn-ghost" @click="closePendingOrdersModal">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL CHI TIẾT KHÁCH UPDATE ĐƠN ================= -->
+  <div
+    v-if="showWebUpdateDetailModal && activePendingWebUpdate"
+    class="modal modal-overlay-blur grab-modal-overlay"
+    @click.self="showWebUpdateDetailModal = false"
+  >
+    <div class="modal-box premium-modal-v4 grab-sheet" style="max-width: 560px">
+      <div class="grab-sheet-handle" @click="showWebUpdateDetailModal = false"></div>
+      <div class="pmv4-header">
+        <div class="pmv4-header-info">
+          <div class="pmv4-icon-box is-alert-amber">
+            <i class="ri-history-line"></i>
+          </div>
+          <div>
+            <h3 class="pmv4-title">
+              Chi tiết khách cập nhật đơn #{{ activePendingWebUpdate.orderId || maHoaDon }}
+            </h3>
+            <p class="pmv4-subtitle">
+              Tổng cộng {{ activePendingWebUpdate.changes.length }} thay đổi mới nhất từ khách hàng
+            </p>
+          </div>
+        </div>
+        <button class="pmv4-close" @click="showWebUpdateDetailModal = false">
+          <i class="ri-close-line"></i>
+        </button>
+      </div>
+
+      <div class="pmv4-body">
+        <div class="wud-change-list">
+          <div
+            v-for="(ch, cIdx) in activePendingWebUpdate.changes"
+            :key="cIdx"
+            class="wud-change-card"
+            :class="`is-${ch.type}`"
+          >
+            <span class="wud-type-badge" :class="`is-${ch.type}`">
+              {{ getWebUpdateTypeLabel(ch.type) }}
+            </span>
+            <div class="wud-change-content">
+              <div class="wud-change-summary">{{ ch.summary }}</div>
+              <div v-if="ch.detail" class="wud-change-sub">{{ ch.detail }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pmv4-footer">
+        <button class="pmv4-btn-ghost" @click="showWebUpdateDetailModal = false">Đóng</button>
+        <button class="pmv4-btn-primary is-confirm-update" @click="confirmWebOrderUpdate">
+          <i class="ri-check-double-line"></i> Xác nhận update
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL XÁC NHẬN ĐÓNG TAB -->
+  <div
+    v-if="closeTabConfirmState"
+    class="modal modal-overlay-blur grab-modal-overlay"
+    @click.self="cancelCloseTabConfirm"
+  >
+    <div class="modal-box premium-modal-v4 grab-sheet ctc-modal-box" style="max-width: 480px">
+      <div class="grab-sheet-handle" @click="cancelCloseTabConfirm"></div>
+      <div class="pmv4-header">
+        <div class="pmv4-header-info">
+          <div
+            class="pmv4-icon-box"
+            :class="closeTabConfirmState.mode === 'active_order' ? 'is-ctc-warn' : 'is-alert-red'"
+          >
+            <i :class="closeTabConfirmState.mode === 'active_order' ? 'ri-question-line' : 'ri-error-warning-line'"></i>
+          </div>
+          <div>
+            <h3 class="pmv4-title">
+              {{
+                closeTabConfirmState.mode === 'active_order'
+                  ? 'Xác nhận đóng tab đơn hàng'
+                  : 'Đóng tab đơn nháp?'
+              }}
+            </h3>
+            <p class="pmv4-subtitle">
+              {{ closeTabConfirmState.title }}
+              <template v-if="closeTabConfirmState.maHoaDon"> · #{{ closeTabConfirmState.maHoaDon }}</template>
+            </p>
+          </div>
+        </div>
+        <button
+          class="pmv4-close"
+          :disabled="isClosingTabCancelling"
+          @click="cancelCloseTabConfirm"
+        >
+          <i class="ri-close-line"></i>
+        </button>
+      </div>
+
+      <div class="pmv4-body ctc-body">
+        <div v-if="closeTabConfirmState.status" class="ctc-status-row">
+          <span class="ctc-meta-label">Trạng thái hiện tại:</span>
+          <span
+            class="itp-status-tag"
+            :class="getTabStatusClass(closeTabConfirmState.status)"
+          >
+            {{ getTabStatusLabel(closeTabConfirmState.status) }}
+          </span>
+          <span v-if="closeTabConfirmState.isWeb" class="ctc-source-chip is-web">Đơn web</span>
+          <span v-else class="ctc-source-chip is-admin">Đơn admin</span>
+        </div>
+
+        <p v-if="closeTabConfirmState.mode === 'active_order'" class="ctc-desc">
+          <template v-if="closeTabConfirmState.status === 'Chờ duyệt'">
+            <strong>Chỉ đóng tab</strong> sẽ ẩn tab khỏi bảng và đưa đơn quay lại chuông
+            <strong>Đơn chờ duyệt (🔔)</strong> để xử lý sau. Phía khách vẫn giữ trạng thái chờ duyệt.<br />
+            Chọn <strong>Hủy đơn này</strong> nếu bạn muốn chuyển đơn sang <strong>Đã hủy</strong> và báo hủy cho khách.
+          </template>
+          <template v-else>
+            <strong>Chỉ đóng tab</strong> sẽ thu gọn khỏi màn hình nhập hóa đơn, đơn vẫn giữ nguyên trạng thái
+            <strong>{{ getTabStatusLabel(closeTabConfirmState.status) }}</strong> trên hệ thống và phía khách.<br />
+            Chọn <strong>Hủy đơn này</strong> nếu bạn muốn hủy hẳn đơn khỏi danh sách{{ closeTabConfirmState.isWeb ? ' và báo Đã hủy cho khách' : '' }}.
+          </template>
+        </p>
+
+        <p v-else class="ctc-desc">
+          Tab đang có <strong>{{ closeTabConfirmState.qty }} món</strong> hoặc thông tin khách chưa chốt đơn. Nếu đóng tab, dữ liệu nháp trên tab này sẽ bị xóa.
+        </p>
+
+        <div v-if="closeTabConfirmState.unsynced" class="ctc-unsynced-warn">
+          <i class="ri-alert-line"></i>
+          <span>Lưu ý: Tab này đang có chỉnh sửa chưa lưu / chưa đồng bộ!</span>
+        </div>
+      </div>
+
+      <div class="pmv4-footer ctc-footer">
+        <button
+          type="button"
+          class="pmv4-btn-ghost"
+          :disabled="isClosingTabCancelling"
+          @click="cancelCloseTabConfirm"
+        >
+          Ở lại
+        </button>
+
+        <template v-if="closeTabConfirmState.mode === 'active_order'">
+          <button
+            type="button"
+            class="ctc-btn-keep"
+            :disabled="isClosingTabCancelling"
+            @click="confirmKeepOrderCloseTab"
+          >
+            <i class="ri-eye-off-line"></i>
+            <span>Chỉ đóng tab (giữ đơn)</span>
+          </button>
+          <button
+            type="button"
+            class="ctc-btn-cancel-order"
+            :disabled="isClosingTabCancelling"
+            @click="confirmCancelAndCloseTab"
+          >
+            <span v-if="isClosingTabCancelling" class="btn-spinner" aria-hidden="true"></span>
+            <i v-else class="ri-close-circle-line"></i>
+            <span>Hủy đơn này</span>
+          </button>
+        </template>
+
+        <button
+          v-else
+          type="button"
+          class="ctc-btn-cancel-order"
+          @click="confirmKeepOrderCloseTab"
+        >
+          <i class="ri-delete-bin-line"></i>
+          <span>Xác nhận đóng tab</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL XUẤT MÃ QR CHUYỂN KHOẢN TỰ ĐIỀN ================= -->
+  <div
+    v-if="showQrExportModal"
+    class="modal modal-overlay-blur grab-modal-overlay"
+    @click.self="showQrExportModal = false"
+  >
+    <div class="modal-box premium-modal-v4 grab-sheet qr-export-modal-box" style="max-width: 460px">
+      <div class="grab-sheet-handle" @click="showQrExportModal = false"></div>
+      <div class="pmv4-header">
+        <div class="pmv4-header-info">
+          <div class="pmv4-icon-box is-qr-amber">
+            <i class="ri-qr-code-line"></i>
+          </div>
+          <div>
+            <h3 class="pmv4-title">Xuất mã QR chuyển khoản</h3>
+            <p class="pmv4-subtitle">
+              {{
+                activeQrBankAccount?.isValidVietQr
+                  ? 'QR động: khách quét bằng app ngân hàng VN sẽ tự điền số tiền'
+                  : 'QR tĩnh: khách quét mã và nhập số tiền bên dưới'
+              }}
+            </p>
+          </div>
+        </div>
+        <button class="pmv4-close" @click="showQrExportModal = false">
+          <i class="ri-close-line"></i>
+        </button>
+      </div>
+
+      <div class="pmv4-body qr-export-modal-body" v-if="activeQrBankAccount">
+        <div class="qr-bank-selector-wrap">
+          <div class="qr-bank-selector-label">Chọn tài khoản chuyển khoản:</div>
+          <div class="qr-bank-selector">
+            <button
+              v-for="(acc, idx) in qrExportAccounts"
+              :key="acc.id || acc.stk || idx"
+              type="button"
+              class="qr-bank-chip"
+              :class="{ active: selectedQrBankIndex === idx }"
+              @click="selectedQrBankIndex = idx"
+            >
+              <span>{{ acc.bankName || acc.title }}{{ acc.stk ? ` · ${acc.stk}` : '' }}</span>
+              <span class="qr-type-tag" :class="acc.isValidVietQr ? 'is-dynamic' : 'is-static'">
+                {{ acc.isValidVietQr ? 'Tự điền' : 'Tĩnh' }}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div class="qr-export-card" ref="qrModalCardRef">
+          <div class="qec-top-badge">
+            <span class="qec-brand" :class="{ 'is-static': !activeQrBankAccount.isValidVietQr }">
+              {{ activeQrBankAccount.isValidVietQr ? 'VIETQR · TỰ ĐIỀN SỐ TIỀN' : 'QR CHUYỂN KHOẢN' }}
+            </span>
+            <span class="qec-bank-name">{{ activeQrBankAccount.bankName || activeQrBankAccount.title }}</span>
+          </div>
+
+          <div class="qec-qr-frame" ref="qrModalWrapRef">
+            <QrcodeVue
+              v-if="activeQrBankAccount.isValidVietQr"
+              :value="qrModalPayload"
+              :size="210"
+              level="M"
+              render-as="svg"
+              :margin="2"
+              foreground="#0f172a"
+              background="#ffffff"
+              class="qec-qr-svg"
+            />
+            <img
+              v-else
+              :src="activeQrBankAccount.qrImgSrc"
+              alt="QR Chuyển khoản"
+              class="qec-static-qr-img"
+              crossorigin="anonymous"
+            />
+          </div>
+
+          <div class="qec-amount-box">
+            <div class="qec-amount-lbl">SỐ TIỀN CHUYỂN KHOẢN</div>
+            <div class="qec-amount-val font-mono">
+              {{ formatWithCurrency(qrExportDisplayAmount, qrExportCurrency) }}
+            </div>
+            <div class="qec-ship-status" :class="qrExportShipIncluded ? 'is-included' : 'is-excluded'">
+              {{ qrExportShipStatusText }}
+            </div>
+          </div>
+
+          <div class="qec-meta-list">
+            <div class="qec-meta-row" v-if="activeQrBankAccount.ownerName">
+              <span>Chủ TK:</span>
+              <strong>{{ activeQrBankAccount.ownerName }}</strong>
+            </div>
+            <div class="qec-meta-row" v-if="activeQrBankAccount.stk">
+              <span>Số TK:</span>
+              <strong class="font-mono">{{ activeQrBankAccount.stk }}</strong>
+            </div>
+            <div class="qec-meta-row" v-if="activeQrBankAccount.isValidVietQr && qrExportMemo">
+              <span>Nội dung:</span>
+              <strong class="font-mono">{{ qrExportMemo }}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="qr-export-controls">
+          <label
+            v-if="normalizedPhiShip > 0"
+            class="qr-ship-toggle"
+            :class="{ active: ckBaoGomShip }"
+          >
+            <input type="checkbox" v-model="ckBaoGomShip" />
+            <span>Tính luôn tiền ship (+{{ formatWithCurrency(normalizedPhiShip, donViTienTeChung) }})</span>
+          </label>
+
+          <div v-if="activeQrBankAccount.isValidVietQr" class="qr-memo-field">
+            <label>Nội dung CK tự điền:</label>
+            <input
+              v-model="qrExportMemo"
+              type="text"
+              maxlength="50"
+              placeholder="VD: HD..."
+              class="qr-memo-input"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="pmv4-footer qr-export-footer">
+        <button class="pmv4-btn-ghost" @click="showQrExportModal = false">Đóng</button>
+        <button
+          type="button"
+          class="qr-action-btn is-copy"
+          :disabled="isExportingQrPng"
+          @click="copyQrExportPng"
+        >
+          <i :class="isQrImageCopied ? 'ri-check-line' : 'ri-file-copy-line'"></i>
+          <span>{{ isQrImageCopied ? 'Đã copy ảnh' : 'Copy ảnh QR' }}</span>
+        </button>
+        <button
+          type="button"
+          class="qr-action-btn is-download"
+          :disabled="isExportingQrPng"
+          @click="downloadQrExportPng"
+        >
+          <i class="ri-download-2-line"></i>
+          <span>Tải ảnh QR</span>
+        </button>
+      </div>
+    </div>
+  </div>
 </template>
 
 
@@ -2129,6 +4087,7 @@ import {
   getSheets,
   getOneSheet,
   subscribeSheet,
+  subscribeAllLiveOrders,
   getOrderForInvoice,
   adminSyncOrderItems,
   dispatchAction,
@@ -2138,20 +4097,524 @@ import {
   localizeProduct,
   productMatchesKeyword,
   resolveNoticeText,
+  syncProductWithI18n,
 } from '@/utils/i18nData'
+import {
+  normalizeNccDiscountType,
+  normalizeNccDiscountValue,
+  calcOrderLineProfit,
+  formatNccDiscountLabel,
+} from '@/utils/nccDiscount'
+import {
+  parseBankAccountInfo,
+  buildVietQrPayload,
+  toAsciiClean,
+} from '@/utils/vietQr'
 const router = useRouter() // Initialize router
 const route = useRoute()
 
 
 
-/* ================= MOBILE STATE ================= */
+/* ================= MOBILE & PC COLLAPSE STATE ================= */
 const isMobile = ref(false)
 const activeMobileTab = ref('entry') // 'entry', 'order', 'customer', 'payment'
 const showMobileEntryMenu = ref(false)
 
+const pcCollapsed = reactive({
+  left: false,
+  center: false,
+  right: false,
+})
+const pcTabRailCollapsed = ref(false)
+
+/* ================= PC COLUMN DRAG RESIZE ================= */
+const PC_COL_WIDTHS_KEY = 'nhaphoadon_pc_col_widths_v1'
+const layoutGridRef = ref(null)
+const resizingCol = ref(null) // 'left' | 'right' | 'tabRail' | null
+
+function loadPcColWidths() {
+  try {
+    const raw = localStorage.getItem(PC_COL_WIDTHS_KEY)
+    if (!raw) return { left: null, right: null, tabRail: null }
+    const parsed = JSON.parse(raw)
+    const left = Number.isFinite(Number(parsed?.left)) && Number(parsed.left) >= 240 ? Number(parsed.left) : null
+    const right = Number.isFinite(Number(parsed?.right)) && Number(parsed.right) >= 245 ? Number(parsed.right) : null
+    const tabRail =
+      Number.isFinite(Number(parsed?.tabRail)) && Number(parsed.tabRail) >= 104 && Number(parsed.tabRail) <= 300
+        ? Number(parsed.tabRail)
+        : null
+    return { left, right, tabRail }
+  } catch {
+    return { left: null, right: null, tabRail: null }
+  }
+}
+
+const pcColWidths = reactive(loadPcColWidths())
+
+function savePcColWidths() {
+  try {
+    localStorage.setItem(
+      PC_COL_WIDTHS_KEY,
+      JSON.stringify({ left: pcColWidths.left, right: pcColWidths.right, tabRail: pcColWidths.tabRail }),
+    )
+  } catch {
+    // ignore storage errors
+  }
+}
+
+const pcGridStyle = computed(() => {
+  if (isMobile.value) return undefined
+  const style = {}
+  if (pcColWidths.left !== null && !pcCollapsed.left && !pcCollapsed.center) {
+    style['--col-left'] = `${Math.round(pcColWidths.left)}px`
+  }
+  if (pcColWidths.right !== null && !pcCollapsed.right) {
+    style['--col-right'] = `${Math.round(pcColWidths.right)}px`
+  }
+  return style
+})
+
+let colDragState = null
+
+function onPcColResizeMove(e) {
+  if (!colDragState) return
+  const dx = e.clientX - colDragState.startX
+  const minLeft = 240
+  const minCenter = pcTabRailCollapsed.value ? 300 : 380
+  const minRight = 245
+  const resizerReserve = 20
+
+  if (colDragState.side === 'tabRail') {
+    const minTab = 104
+    const maxTab = Math.min(300, Math.max(minTab, colDragState.centerWidth - 260))
+    pcColWidths.tabRail = Math.round(Math.min(maxTab, Math.max(minTab, colDragState.startTabRail + dx)))
+    return
+  }
+
+  if (colDragState.side === 'left') {
+    const rightW = pcCollapsed.right ? 44 : colDragState.startRight
+    const maxLeft = Math.max(minLeft, colDragState.gridWidth - rightW - minCenter - resizerReserve)
+    pcColWidths.left = Math.round(Math.min(maxLeft, Math.max(minLeft, colDragState.startLeft + dx)))
+  } else if (colDragState.side === 'right') {
+    const leftW = pcCollapsed.left ? 44 : colDragState.startLeft
+    const maxRight = Math.max(minRight, colDragState.gridWidth - leftW - minCenter - resizerReserve)
+    pcColWidths.right = Math.round(Math.min(maxRight, Math.max(minRight, colDragState.startRight - dx)))
+  }
+}
+
+function stopPcColResize() {
+  if (!colDragState && !resizingCol.value) return
+  colDragState = null
+  resizingCol.value = null
+  window.removeEventListener('mousemove', onPcColResizeMove)
+  window.removeEventListener('mouseup', stopPcColResize)
+  savePcColWidths()
+}
+
+function startPcColResize(side, e) {
+  if (isMobile.value || pcCollapsed.center) return
+  if (side === 'left' && pcCollapsed.left) return
+  if (side === 'right' && pcCollapsed.right) return
+  if (side === 'tabRail' && pcTabRailCollapsed.value) return
+
+  const gridEl = layoutGridRef.value
+  if (!gridEl) return
+
+  if (side === 'tabRail') {
+    const centerEl = gridEl.querySelector('.center-stack')
+    const tabEl = gridEl.querySelector('.invoice-tabs-bar')
+    if (!centerEl || !tabEl) return
+    resizingCol.value = 'tabRail'
+    colDragState = {
+      side: 'tabRail',
+      startX: e.clientX,
+      centerWidth: centerEl.clientWidth,
+      startTabRail: tabEl.getBoundingClientRect().width,
+    }
+    window.addEventListener('mousemove', onPcColResizeMove)
+    window.addEventListener('mouseup', stopPcColResize)
+    return
+  }
+
+  const leftEl = gridEl.querySelector('.left-stack')
+  const rightEl = gridEl.querySelector('.right-stack')
+  if (!leftEl || !rightEl) return
+
+  resizingCol.value = side
+  colDragState = {
+    side,
+    startX: e.clientX,
+    gridWidth: gridEl.clientWidth,
+    startLeft: leftEl.getBoundingClientRect().width,
+    startRight: rightEl.getBoundingClientRect().width,
+  }
+
+  window.addEventListener('mousemove', onPcColResizeMove)
+  window.addEventListener('mouseup', stopPcColResize)
+}
+
+function resetTabRailWidth() {
+  pcColWidths.tabRail = null
+  savePcColWidths()
+  toast('info', 'Đã đặt lại độ rộng cột tab mặc định')
+}
+
+function resetPcColWidths() {
+  pcColWidths.left = null
+  pcColWidths.right = null
+  pcColWidths.tabRail = null
+  savePcColWidths()
+  toast('info', 'Đã đặt lại kích thước các cột mặc định')
+}
+
+function clampPcColWidthsToViewport() {
+  if (isMobile.value) return
+  const gridEl = layoutGridRef.value
+  if (!gridEl || !gridEl.clientWidth) return
+  const gridWidth = gridEl.clientWidth
+  const minCenter = pcTabRailCollapsed.value ? 300 : 380
+  const resizerReserve = 20
+  const maxCombined = gridWidth - minCenter - resizerReserve
+  if (maxCombined <= 0) return
+
+  const leftVal = pcColWidths.left ?? 0
+  const rightVal = pcColWidths.right ?? 0
+  if (leftVal && rightVal && leftVal + rightVal > maxCombined) {
+    const scale = maxCombined / (leftVal + rightVal)
+    pcColWidths.left = Math.max(240, Math.round(leftVal * scale))
+    pcColWidths.right = Math.max(245, Math.round(rightVal * scale))
+  } else if (leftVal && !rightVal && leftVal > maxCombined - 260) {
+    pcColWidths.left = Math.max(240, Math.round(maxCombined - 260))
+  } else if (rightVal && !leftVal && rightVal > maxCombined - 260) {
+    pcColWidths.right = Math.max(245, Math.round(maxCombined - 260))
+  }
+
+  if (pcColWidths.tabRail !== null) {
+    const centerEl = gridEl.querySelector('.center-stack')
+    if (centerEl && centerEl.clientWidth > 0) {
+      const maxTab = Math.min(300, Math.max(104, centerEl.clientWidth - 260))
+      if (pcColWidths.tabRail > maxTab) {
+        pcColWidths.tabRail = Math.round(maxTab)
+      }
+    }
+  }
+}
+
+/* ================= ORDER TABLE INDIVIDUAL COLUMN DRAG RESIZE ================= */
+const ORDER_TABLE_COL_WIDTHS_KEY = 'sa_nhaphoadon_order_col_widths_v1'
+const orderTableRef = ref(null)
+const resizingOrderColKey = ref('')
+
+const ORDER_TABLE_HEADERS = [
+  { key: 'stt', label: 'STT', align: 'col-center', toggleKey: 'stt', minWidth: 38, defaultWidth: 44 },
+  { key: 'maHang', label: 'MÃ HÀNG', align: 'col-center', toggleKey: 'maHang', minWidth: 64, defaultWidth: 92 },
+  { key: 'sanPham', label: 'SẢN PHẨM', align: 'col-left', toggleKey: null, minWidth: 110, defaultWidth: 210 },
+  { key: 'danhMuc', label: 'DANH MỤC', align: 'col-center', toggleKey: 'danhMuc', minWidth: 72, defaultWidth: 108 },
+  { key: 'sizeDvt', label: 'SIZE / ĐVT', align: 'col-center', toggleKey: 'sizeDvt', minWidth: 68, defaultWidth: 90 },
+  { key: 'trangThaiKho', label: 'KHO', align: 'col-center', toggleKey: 'trangThaiKho', minWidth: 62, defaultWidth: 82 },
+  { key: 'nguoiDat', label: 'NGƯỜI ĐẶT', align: 'col-center', toggleKey: 'nguoiDat', minWidth: 76, defaultWidth: 112 },
+  { key: 'soLuong', label: 'SỐ LƯỢNG', align: 'col-center', toggleKey: null, minWidth: 62, defaultWidth: 78 },
+  { key: 'giaVon', label: 'GIÁ VỐN', align: 'col-center', toggleKey: 'giaVon', minWidth: 70, defaultWidth: 92 },
+  { key: 'tongVon', label: 'TỔNG VỐN', align: 'col-center', toggleKey: 'tongVon', minWidth: 72, defaultWidth: 96 },
+  { key: 'giaBan', label: 'GIÁ BÁN', align: 'col-center', toggleKey: 'giaBan', minWidth: 70, defaultWidth: 96 },
+  { key: 'truocGiam', label: 'TRƯỚC GIẢM', align: 'col-center', toggleKey: 'truocGiam', minWidth: 76, defaultWidth: 98 },
+  { key: 'giamCk', label: 'GIẢM & CK%', align: 'col-center', toggleKey: 'giamCk', minWidth: 86, defaultWidth: 116 },
+  { key: 'ckNcc', label: 'CK NCC', align: 'col-center', toggleKey: 'ckNcc', minWidth: 84, defaultWidth: 108 },
+  { key: 'thanhTien', label: 'THÀNH TIỀN', align: 'col-center', toggleKey: null, minWidth: 80, defaultWidth: 110 },
+  { key: 'loiNhuan', label: 'LỢI NHUẬN', align: 'col-center', toggleKey: 'loiNhuan', minWidth: 74, defaultWidth: 96 },
+  { key: 'ghiChu', label: 'GHI CHÚ', align: 'col-left', toggleKey: 'ghiChu', minWidth: 80, defaultWidth: 140 },
+  { key: 'xoa', label: 'XÓA', align: 'col-center', toggleKey: null, minWidth: 44, defaultWidth: 52 },
+]
+
+function loadOrderTableColWidths() {
+  try {
+    const raw = localStorage.getItem(ORDER_TABLE_COL_WIDTHS_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return {}
+    const clean = {}
+    for (const col of ORDER_TABLE_HEADERS) {
+      const val = Number(parsed[col.key])
+      if (Number.isFinite(val) && val >= col.minWidth && val <= 640) {
+        clean[col.key] = Math.round(val)
+      }
+    }
+    return clean
+  } catch {
+    return {}
+  }
+}
+
+const orderTableColWidths = reactive(loadOrderTableColWidths())
+
+function saveOrderTableColWidths() {
+  try {
+    localStorage.setItem(ORDER_TABLE_COL_WIDTHS_KEY, JSON.stringify({ ...orderTableColWidths }))
+  } catch {}
+}
+
+const visibleOrderTableHeaders = computed(() =>
+  ORDER_TABLE_HEADERS.filter((col) => !col.toggleKey || Boolean(orderTableCols[col.toggleKey])),
+)
+
+const hasCustomOrderColWidths = computed(() =>
+  Object.keys(orderTableColWidths).some((k) => Number(orderTableColWidths[k]) > 0),
+)
+
+function getOrderColWidthStyle(colKey) {
+  if (!hasCustomOrderColWidths.value) return undefined
+  const def = ORDER_TABLE_HEADERS.find((c) => c.key === colKey)
+  const w = Number(orderTableColWidths[colKey]) || def?.defaultWidth || 96
+  return {
+    width: `${w}px`,
+    minWidth: `${w}px`,
+  }
+}
+
+let orderColDragState = null
+
+function onOrderColResizeMove(e) {
+  if (!orderColDragState) return
+  const dx = e.clientX - orderColDragState.startX
+  const nextW = Math.round(
+    Math.min(640, Math.max(orderColDragState.minWidth, orderColDragState.startWidth + dx)),
+  )
+  orderTableColWidths[orderColDragState.colKey] = nextW
+}
+
+function stopOrderColResize() {
+  if (!orderColDragState && !resizingOrderColKey.value) return
+  orderColDragState = null
+  resizingOrderColKey.value = ''
+  window.removeEventListener('mousemove', onOrderColResizeMove)
+  window.removeEventListener('mouseup', stopOrderColResize)
+  saveOrderTableColWidths()
+}
+
+function startOrderColResize(colKey, e) {
+  if (isMobile.value) return
+  const tableEl = orderTableRef.value
+  if (!tableEl) return
+
+  const thEls = tableEl.querySelectorAll('thead th[data-col-key]')
+  for (const th of thEls) {
+    const k = th.getAttribute('data-col-key')
+    if (!k) continue
+    if (!Number(orderTableColWidths[k])) {
+      const def = ORDER_TABLE_HEADERS.find((c) => c.key === k)
+      const measured = Math.round(th.getBoundingClientRect().width)
+      orderTableColWidths[k] = Math.max(def?.minWidth || 40, measured || def?.defaultWidth || 90)
+    }
+  }
+
+  const targetDef = ORDER_TABLE_HEADERS.find((c) => c.key === colKey)
+  const startWidth = Number(orderTableColWidths[colKey]) || targetDef?.defaultWidth || 96
+
+  resizingOrderColKey.value = colKey
+  orderColDragState = {
+    colKey,
+    startX: e.clientX,
+    startWidth,
+    minWidth: targetDef?.minWidth || 44,
+  }
+
+  window.addEventListener('mousemove', onOrderColResizeMove)
+  window.addEventListener('mouseup', stopOrderColResize)
+}
+
+function resetSingleOrderColWidth(colKey) {
+  const def = ORDER_TABLE_HEADERS.find((c) => c.key === colKey)
+  if (!def) return
+  if (hasCustomOrderColWidths.value) {
+    orderTableColWidths[colKey] = def.defaultWidth
+    saveOrderTableColWidths()
+  }
+}
+
+function resetOrderColWidths() {
+  for (const k of Object.keys(orderTableColWidths)) {
+    delete orderTableColWidths[k]
+  }
+  saveOrderTableColWidths()
+  toast('info', 'Đã đặt lại độ rộng các cột bảng báo giá')
+}
+
+const pcRightTab = ref('customer') // 'customer' | 'payment' (PC 2-tab switch)
+
+/* ================= ORDER TABLE COLUMN VISIBILITY ================= */
+const ORDER_COL_STORAGE_KEY = 'nhaphoadon_order_table_cols_v1'
+const showColSettings = ref(false)
+const colSettingsWrapRef = ref(null)
+
+const DEFAULT_ORDER_TABLE_COLS = {
+  stt: true,
+  maHang: false,
+  danhMuc: false,
+  sizeDvt: false,
+  trangThaiKho: false,
+  nguoiDat: false,
+  giaVon: false,
+  tongVon: false,
+  giaBan: true,
+  truocGiam: false,
+  giamCk: true,
+  ckNcc: true,
+  loiNhuan: false,
+  ghiChu: false,
+}
+
+const ORDER_TABLE_COL_GROUPS = [
+  {
+    title: 'Thông tin sản phẩm',
+    items: [
+      { key: 'stt', label: 'STT' },
+      { key: 'maHang', label: 'Mã hàng' },
+      { key: 'danhMuc', label: 'Danh mục' },
+      { key: 'sizeDvt', label: 'Size / ĐVT (cột riêng)' },
+      { key: 'trangThaiKho', label: 'Trạng thái kho' },
+      { key: 'nguoiDat', label: 'Người đặt' },
+      { key: 'ghiChu', label: 'Ghi chú món (cột riêng)' },
+    ],
+  },
+  {
+    title: 'Giá, vốn & lợi nhuận',
+    items: [
+      { key: 'giaVon', label: 'Giá vốn' },
+      { key: 'tongVon', label: 'Tổng vốn' },
+      { key: 'giaBan', label: 'Giá bán' },
+      { key: 'truocGiam', label: 'Tiền trước giảm' },
+      { key: 'giamCk', label: 'Giảm & CK%' },
+      { key: 'ckNcc', label: 'CK NCC (% / Tiền)' },
+      { key: 'loiNhuan', label: 'Cột Lợi nhuận' },
+    ],
+  },
+]
+
+function loadOrderTableCols() {
+  try {
+    const raw = localStorage.getItem(ORDER_COL_STORAGE_KEY)
+    if (!raw) return { ...DEFAULT_ORDER_TABLE_COLS }
+    const parsed = JSON.parse(raw)
+    return { ...DEFAULT_ORDER_TABLE_COLS, ...(parsed && typeof parsed === 'object' ? parsed : {}) }
+  } catch {
+    return { ...DEFAULT_ORDER_TABLE_COLS }
+  }
+}
+
+const orderTableCols = reactive(loadOrderTableCols())
+
+watch(
+  orderTableCols,
+  (val) => {
+    try {
+      localStorage.setItem(ORDER_COL_STORAGE_KEY, JSON.stringify(val))
+    } catch {
+      // ignore storage quota errors
+    }
+  },
+  { deep: true },
+)
+
+function applyOrderColPreset(preset) {
+  if (preset === 'sales') {
+    Object.assign(orderTableCols, {
+      stt: true,
+      maHang: false,
+      danhMuc: false,
+      sizeDvt: false,
+      trangThaiKho: false,
+      nguoiDat: false,
+      giaVon: false,
+      tongVon: false,
+      giaBan: true,
+      truocGiam: false,
+      giamCk: true,
+      loiNhuan: false,
+      ghiChu: false,
+    })
+  } else if (preset === 'audit') {
+    Object.assign(orderTableCols, {
+      stt: true,
+      maHang: true,
+      danhMuc: false,
+      sizeDvt: false,
+      trangThaiKho: true,
+      nguoiDat: true,
+      giaVon: true,
+      tongVon: false,
+      giaBan: true,
+      truocGiam: false,
+      giamCk: true,
+      loiNhuan: true,
+      ghiChu: true,
+    })
+  } else if (preset === 'full') {
+    Object.assign(orderTableCols, {
+      stt: true,
+      maHang: true,
+      danhMuc: true,
+      sizeDvt: true,
+      trangThaiKho: true,
+      nguoiDat: true,
+      giaVon: true,
+      tongVon: true,
+      giaBan: true,
+      truocGiam: true,
+      giamCk: true,
+      loiNhuan: true,
+      ghiChu: true,
+    })
+  }
+}
+
+const activeOptionalColCount = computed(() => {
+  return ORDER_TABLE_COL_GROUPS.reduce(
+    (sum, grp) => sum + grp.items.filter((it) => Boolean(orderTableCols[it.key])).length,
+    0,
+  )
+})
+
+const visibleOrderColCount = computed(() => 4 + activeOptionalColCount.value)
+
+function handleDocClickForColSettings(e) {
+  if (showColSettings.value) {
+    const el = colSettingsWrapRef.value
+    if (el && !el.contains(e.target)) {
+      showColSettings.value = false
+    }
+  }
+  if (showManualAddOptions.value) {
+    const wrapEl = manualAddWrapRef.value
+    if (wrapEl && !wrapEl.contains(e.target)) {
+      showManualAddOptions.value = false
+    }
+  }
+}
+
+/** Split text into matched/unmatched segments for safe search keyword highlighting. */
+function getHighlightedSegments(text, rawKeyword) {
+  const raw = String(text ?? '')
+  const kw = String(rawKeyword ?? '').trim()
+  if (!raw || !kw) return [{ text: raw, match: false }]
+
+  const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const regex = new RegExp(`(${escaped})`, 'gi')
+  const parts = raw.split(regex).filter(Boolean)
+  if (!parts.length) return [{ text: raw, match: false }]
+
+  const kwLower = kw.toLowerCase()
+  return parts.map((part) => ({
+    text: part,
+    match: part.toLowerCase() === kwLower,
+  }))
+}
+
 function checkMobile() {
   if (typeof window !== 'undefined') {
-    isMobile.value = window.innerWidth < 1024 
+    isMobile.value = window.innerWidth < 1024
+    if (!isMobile.value) {
+      nextTick(clampPcColWidthsToViewport)
+    }
   }
 }
 
@@ -2196,6 +4659,15 @@ const donViTienTeCK = ref('VND')
 /* ================= CATALOG SẢN PHẨM ================= */
 const entryMode = ref('catalog') // 'catalog' | 'manual'
 const addedSuccessManual = ref(false) // Trạng thái nút thêm thủ công
+const showManualAddOptions = ref(false)
+const isSavingManualToDb = ref(false)
+const manualAddWrapRef = ref(null)
+
+watch(entryMode, (m) => {
+  if (m !== 'manual') {
+    showManualAddOptions.value = false
+  }
+})
 const searchProduct = ref('')
 // PHẦN BỔ SUNG: CATALOG FILTERS
 const selectedLang = ref('vi')
@@ -2247,6 +4719,10 @@ const toasts = ref([])
 const showSuccessModal = ref(false)
 const successMessage = ref('')
 const isPreviewing = ref(false) // State for preview button loading
+const exportPriceMode = ref('') // '' | 'giaBan' | 'giaGoc' (không mặc định sẵn)
+const exportGroupMode = ref('') // '' | 'grouped' | 'by_member' (không mặc định sẵn)
+const showExportPriceChoiceModal = ref(false)
+const pendingExportAction = ref('') // 'image' | 'text' | ''
 const isPrinting = ref(false) // Logic state for printing
 const isLoadingProducts = ref(true) // Loading state for skeleton
 
@@ -2259,6 +4735,7 @@ const barcodeRef = ref(null)
 
 const maHoaDon = ref('')
 const soHoaDon = ref('')
+const orderCreatedAt = ref('')
 const thoiGianNhanHang = ref('')
 const ngayNhanHang = ref('')
 const gioNhanHang = ref('')
@@ -2270,33 +4747,524 @@ const INVOICE_TABS_STORAGE_KEY = 'sa_admin_invoice_tabs_v1'
 const invoiceTabs = ref([])
 const activeInvoiceTabId = ref('')
 const orderTableViewMode = ref('grouped')
+const syncedOrderDigest = ref('')
+const customOrderMembers = ref([])
+const showAddMemberModal = ref(false)
+const newMemberNameInput = ref('')
+const newMemberInputRef = ref(null)
+const editingMemberKey = ref('')
+const editingMemberName = ref('')
+const duplicateMemberQueue = ref([])
+const activeDuplicatePrompt = computed(() => duplicateMemberQueue.value[0] || null)
 const selectedTargetMemberKey = ref('')
 const editItemMemberKey = ref('')
 const editModalSiblings = ref([])
 const hasLoadedDonHang = ref(false)
+const liveOrdersById = ref({})
+const showPendingOrdersModal = ref(false)
+const showWebUpdateDetailModal = ref(false)
+const importingPendingOrderId = ref('')
+const closeTabConfirmState = ref(null)
+const isClosingTabCancelling = ref(false)
+const pendingBellPulse = ref(false)
+const knownPendingOrderIds = new Set()
+let hasInitPendingBellWatch = false
+let pendingBellPulseTimer = null
 const isOrderActionLoading = ref(false)
 let unsubDonHangRealtime = null
+let unsubLiveOrdersRealtime = null
 let isSwitchingTab = false
 let tabSeq = 0
 let maHoaDonSeq = 0
+let localMemberSeq = 0
+
+function genLocalMemberId() {
+  localMemberSeq += 1
+  return `local_${Date.now()}_${localMemberSeq}_${Math.random().toString(36).slice(2, 6)}`
+}
 
 const activeTabObj = computed(
   () => invoiceTabs.value.find((t) => t.id === activeInvoiceTabId.value) || null,
 )
 const isLinkedOnlineOrder = computed(() => Boolean(activeTabObj.value?.sourceOrderId))
+const isSubmittedAdminOrder = computed(
+  () => !isLinkedOnlineOrder.value && Boolean(activeTabObj.value?.adminOrderStatus),
+)
+
+const tabSourceFilter = ref('all') // 'all' | 'web' | 'admin'
+const tabSearchQuery = ref('')
+const webInvoiceTabsCount = computed(
+  () => invoiceTabs.value.filter((t) => Boolean(t?.sourceOrderId)).length,
+)
+const adminInvoiceTabsCount = computed(
+  () => invoiceTabs.value.filter((t) => !t?.sourceOrderId).length,
+)
+
+function getTabMatchedHint(tab, idx, kwLower) {
+  if (!kwLower) return ''
+  const title = getTabDisplayTitle(tab, idx).toLowerCase()
+  const isActive = tab?.id === activeInvoiceTabId.value
+  const maHD = String(tab?.sourceOrderId || (isActive ? maHoaDon.value : tab?.maHoaDon) || '').trim()
+  const phone = String(isActive ? form.soDienThoai : tab?.customer?.soDienThoai || '').trim()
+  const custName = String(isActive ? form.tenKhachHang : tab?.customer?.tenKhachHang || '').trim()
+  const tabItems = isActive ? items.value : tab?.items || []
+
+  const titleMatches = title.includes(kwLower)
+  if (phone && phone.toLowerCase().includes(kwLower)) return `SĐT: ${phone}`
+  if (maHD && maHD.toLowerCase().includes(kwLower) && !titleMatches) return `Mã: ${maHD}`
+  if (custName && custName.toLowerCase().includes(kwLower) && !titleMatches) return custName
+
+  for (const it of tabItems) {
+    const tenHang = String(it?.tenHang || it?.Ten_hang || '').trim()
+    const maHang = String(it?.maHang || it?.Ma_hang || '').trim()
+    if (tenHang && tenHang.toLowerCase().includes(kwLower)) return `Món: ${tenHang}`
+    if (maHang && maHang.toLowerCase().includes(kwLower)) return `Mã món: ${maHang}`
+  }
+
+  return titleMatches ? '' : null
+}
+
+const filteredInvoiceTabEntries = computed(() => {
+  const mode = tabSourceFilter.value
+  const kwLower = String(tabSearchQuery.value || '').trim().toLowerCase()
+  const result = []
+  invoiceTabs.value.forEach((tab, idx) => {
+    if (mode === 'web' && !tab?.sourceOrderId) return
+    if (mode === 'admin' && tab?.sourceOrderId) return
+    if (!kwLower) {
+      result.push({ tab, idx, matchedHint: '' })
+      return
+    }
+    const hint = getTabMatchedHint(tab, idx, kwLower)
+    if (hint !== null) {
+      result.push({ tab, idx, matchedHint: hint })
+    }
+  })
+  return result
+})
+
+const pendingApprovalOrders = computed(() => {
+  const result = []
+  const seenIds = new Set()
+  const liveMap = liveOrdersById.value || {}
+
+  const findLiveSnap = (maHD) =>
+    liveMap[maHD] ||
+    Object.values(liveMap).find(
+      (v) => String(v?.meta?.Ma_hoa_don || v?.orderId || '').trim() === maHD,
+    ) ||
+    null
+
+  const buildPendingEntry = (maHD, dhRow, liveSnap) => {
+    const liveMeta = liveSnap?.submittedMeta || liveSnap?.meta || {}
+    const itemsList = Array.isArray(liveSnap?.submittedItemsList)
+      ? liveSnap.submittedItemsList
+      : Array.isArray(liveSnap?.itemsList)
+        ? liveSnap.itemsList
+        : []
+    const totalQty = itemsList.reduce((s, it) => s + Number(it?.So_luong || 0), 0)
+    const itemsPreview =
+      itemsList
+        .slice(0, 4)
+        .map((it) => `${Number(it?.So_luong || 0)}x ${String(it?.Ten_hang || '').trim()}`)
+        .filter(Boolean)
+        .join(', ') + (itemsList.length > 4 ? ` (+${itemsList.length - 4})` : '')
+    const rawPay = String(
+      liveMeta.Hinh_thuc_thanh_toan || dhRow?.Hinh_thuc_thanh_toan || 'TIEN_MAT',
+    ).trim()
+    return {
+      maHoaDon: maHD,
+      tenKhach: String(liveMeta.Ten_khach_hang || dhRow?.Ten_khach_hang || 'Khách lẻ').trim(),
+      soDienThoai: String(liveMeta.So_dien_thoai || dhRow?.So_dien_thoai || '').trim(),
+      diaChi: String(liveMeta.Dia_chi || dhRow?.Dia_chi || '').trim(),
+      thoiGianNhanHang: String(
+        liveMeta.Thoi_gian_nhan_hang || dhRow?.Thoi_gian_nhan_hang || '',
+      ).trim(),
+      ngayTao: String(liveMeta.Ngay_tao_duong_lich || dhRow?.Ngay_tao_duong_lich || '').trim(),
+      hinhThucTT: rawPay === 'CHUYEN_KHOAN' ? 'Chuyển khoản' : 'Tiền mặt',
+      donViTienTe: String(liveMeta.Don_vi_tien_te || dhRow?.Don_vi_tien_te || 'P').trim() || 'P',
+      tongCong: Number(liveMeta.Tong_cong ?? dhRow?.Tong_gia_ban ?? 0),
+      totalQty,
+      itemsPreview,
+      submittedAt: Number(liveMeta.Submitted_at || liveMeta.Updated_at || 0),
+      isOpenedInTab: invoiceTabs.value.some(
+        (t) => t.sourceOrderId === maHD || t.maHoaDon === maHD,
+      ),
+    }
+  }
+
+  for (const dh of donHangList.value || []) {
+    const maHD = String(dh?.Ma_hoa_don || '').trim()
+    if (!maHD || seenIds.has(maHD)) continue
+    const liveSnap = findLiveSnap(maHD)
+    const effectiveStatus = String(liveSnap?.meta?.Trang_thai || dh?.Trang_thai || '').trim()
+    if (effectiveStatus !== 'Chờ duyệt') continue
+    seenIds.add(maHD)
+    result.push(buildPendingEntry(maHD, dh, liveSnap))
+  }
+
+  for (const liveSnap of Object.values(liveMap)) {
+    if (!liveSnap?.exists) continue
+    const maHD = String(liveSnap?.meta?.Ma_hoa_don || liveSnap?.orderId || '').trim()
+    if (!maHD || seenIds.has(maHD)) continue
+    const st = String(liveSnap?.meta?.Trang_thai || '').trim()
+    if (st !== 'Chờ duyệt') continue
+    seenIds.add(maHD)
+    result.push(buildPendingEntry(maHD, null, liveSnap))
+  }
+
+  return result.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0))
+})
+
+const unopenedPendingOrders = computed(
+  () => pendingApprovalOrders.value.filter((ord) => !ord.isOpenedInTab),
+)
+
+const unopenedPendingApprovalCount = computed(
+  () => unopenedPendingOrders.value.length,
+)
+
+const tabsWithPendingUpdate = computed(() =>
+  invoiceTabs.value.filter((t) => Boolean(t?.pendingWebUpdate?.changes?.length)),
+)
+
+const totalBellNotificationCount = computed(
+  () => unopenedPendingApprovalCount.value + tabsWithPendingUpdate.value.length,
+)
+
+const bellButtonTooltip = computed(() => {
+  const newCount = unopenedPendingApprovalCount.value
+  const updCount = tabsWithPendingUpdate.value.length
+  if (updCount > 0 && newCount > 0) {
+    return `Có ${updCount} đơn khách vừa cập nhật & ${newCount} đơn chờ duyệt mới — bấm để xem`
+  }
+  if (updCount > 0) {
+    return `Khách vừa cập nhật ${updCount} đơn trong bảng — bấm chuông để xem danh sách & đi tới tab`
+  }
+  if (newCount > 0) {
+    return `Có ${newCount} đơn chờ duyệt chưa có trong bảng — bấm để xem & đưa vào bảng`
+  }
+  if (pendingApprovalOrders.value.length > 0) {
+    return `Tất cả ${pendingApprovalOrders.value.length} đơn chờ duyệt đã được đưa vào bảng`
+  }
+  return 'Không có đơn đang chờ duyệt'
+})
+
+const activePendingWebUpdate = computed(
+  () => activeTabObj.value?.pendingWebUpdate || null,
+)
+
+function getWebUpdateTypeLabel(type) {
+  if (type === 'added') return 'Thêm'
+  if (type === 'qty_up') return 'Tăng'
+  if (type === 'qty_down') return 'Giảm'
+  if (type === 'removed') return 'Xóa món'
+  if (type === 'note') return 'Đổi ghi chú món'
+  return 'Thông tin đơn'
+}
+
+function getOrderItemDiffKey(item) {
+  const lineId = String(item?.lineId || '').trim()
+  if (lineId) return `line:${lineId}`
+  const maHang = String(item?.maHang || item?.Ma_hang || '').trim()
+  const person = String(item?.nguoiDatId || item?.nguoiDat || '').trim()
+  return `code:${maHang}__${person}`
+}
+
+function buildCustomerOrderUpdateDiff(oldItems = [], oldMeta = {}, newItems = [], newMeta = {}) {
+  const oldMap = new Map()
+  for (const it of oldItems || []) {
+    if (!it) continue
+    oldMap.set(getOrderItemDiffKey(it), it)
+  }
+
+  const newMap = new Map()
+  for (const it of newItems || []) {
+    if (!it) continue
+    newMap.set(getOrderItemDiffKey(it), it)
+  }
+
+  const addedLineIds = []
+  const addedMaHangs = []
+  const qtyUpLineIds = []
+  const qtyUpMaHangs = []
+  const noteLineIds = []
+  const noteMaHangs = []
+  const changes = []
+
+  for (const [k, nextIt] of newMap.entries()) {
+    const prevIt = oldMap.get(k)
+    const lineId = String(nextIt.lineId || '').trim()
+    const maHang = String(nextIt.maHang || nextIt.Ma_hang || '').trim()
+    const tenHang = String(nextIt.tenHang || nextIt.Ten_hang || maHang).trim()
+    const nguoiDat = String(nextIt.nguoiDat || '').trim()
+    const personTag = nguoiDat ? ` (${nguoiDat})` : ''
+    const nextQty = Number(nextIt.soLuong ?? nextIt.So_luong ?? 1)
+    const nextNote = String(nextIt.ghiChuHang ?? nextIt.Ghi_chu ?? '').trim()
+
+    if (!prevIt) {
+      if (lineId) addedLineIds.push(lineId)
+      if (maHang) addedMaHangs.push(maHang)
+      changes.push({
+        type: 'added',
+        lineId,
+        maHang,
+        tenHang,
+        summary: `Thêm ${nextQty} ${tenHang}`,
+        detail: nextNote ? `Ghi chú: ${nextNote}` : '',
+      })
+      continue
+    }
+
+    const prevQty = Number(prevIt.soLuong ?? prevIt.So_luong ?? 1)
+    const prevNote = String(prevIt.ghiChuHang ?? prevIt.Ghi_chu ?? '').trim()
+
+    if (nextQty > prevQty) {
+      if (lineId) qtyUpLineIds.push(lineId)
+      if (maHang) qtyUpMaHangs.push(maHang)
+      changes.push({
+        type: 'qty_up',
+        lineId,
+        maHang,
+        tenHang,
+        summary: `Tăng ${nextQty - prevQty} ${tenHang}`,
+        detail: '',
+      })
+    } else if (nextQty < prevQty) {
+      changes.push({
+        type: 'qty_down',
+        lineId,
+        maHang,
+        tenHang,
+        summary: `Giảm ${prevQty - nextQty} ${tenHang}`,
+        detail: '',
+      })
+    }
+
+    if (nextNote !== prevNote) {
+      if (lineId) noteLineIds.push(lineId)
+      if (maHang) noteMaHangs.push(maHang)
+      changes.push({
+        type: 'note',
+        lineId,
+        maHang,
+        tenHang,
+        summary: `✎ Đổi ghi chú món ${tenHang}${personTag}`,
+        detail: `${prevNote || '(trống)'} → ${nextNote || '(trống)'}`,
+      })
+    }
+  }
+
+  for (const [k, prevIt] of oldMap.entries()) {
+    if (newMap.has(k)) continue
+    const maHang = String(prevIt.maHang || prevIt.Ma_hang || '').trim()
+    const tenHang = String(prevIt.tenHang || prevIt.Ten_hang || maHang).trim()
+    const nguoiDat = String(prevIt.nguoiDat || '').trim()
+    const personTag = nguoiDat ? ` (${nguoiDat})` : ''
+    const prevQty = Number(prevIt.soLuong ?? prevIt.So_luong ?? 1)
+    changes.push({
+      type: 'removed',
+      lineId: String(prevIt.lineId || '').trim(),
+      maHang,
+      tenHang,
+      summary: `Xóa ${prevQty} ${tenHang}`,
+      detail: '',
+    })
+  }
+
+  const prevCust = oldMeta?.customer || {}
+  const nextCust = newMeta?.customer || {}
+  const metaFields = [
+    ['Tên khách hàng', prevCust.tenKhachHang, nextCust.tenKhachHang],
+    ['Số điện thoại', prevCust.soDienThoai, nextCust.soDienThoai],
+    ['Địa chỉ giao', prevCust.diaChi, nextCust.diaChi],
+    ['Ghi chú đơn', prevCust.ghiChuDonHang, nextCust.ghiChuDonHang],
+    ['Thời gian nhận', oldMeta?.thoiGianNhanHang, newMeta?.thoiGianNhanHang],
+    [
+      'Thanh toán',
+      oldMeta?.hinhThucThanhToan === 'CHUYEN_KHOAN' ? 'Chuyển khoản' : 'Tiền mặt',
+      newMeta?.hinhThucThanhToan === 'CHUYEN_KHOAN' ? 'Chuyển khoản' : 'Tiền mặt',
+    ],
+  ]
+  for (const [label, oldVal, newVal] of metaFields) {
+    const o = String(oldVal || '').trim()
+    const n = String(newVal || '').trim()
+    if (o !== n) {
+      changes.push({
+        type: 'meta',
+        summary: `✎ Cập nhật ${label}`,
+        detail: `${o || '(trống)'} → ${n || '(trống)'}`,
+      })
+    }
+  }
+
+  return {
+    addedLineIds: [...new Set(addedLineIds)],
+    addedMaHangs: [...new Set(addedMaHangs)],
+    qtyUpLineIds: [...new Set(qtyUpLineIds)],
+    qtyUpMaHangs: [...new Set(qtyUpMaHangs)],
+    noteLineIds: [...new Set(noteLineIds)],
+    noteMaHangs: [...new Set(noteMaHangs)],
+    changes,
+  }
+}
+
+function getOrderItemUpdateBadge(entry) {
+  const upd = activePendingWebUpdate.value
+  const item = entry?.item
+  if (!upd || !item) return null
+  const lineId = String(item.lineId || '').trim()
+  const maHang = String(item.maHang || item.Ma_hang || '').trim()
+
+  if ((lineId && upd.addedLineIds?.includes(lineId)) || (!lineId && maHang && upd.addedMaHangs?.includes(maHang))) {
+    return { kind: 'added', label: 'MỚI THÊM' }
+  }
+  if ((lineId && upd.qtyUpLineIds?.includes(lineId)) || (!lineId && maHang && upd.qtyUpMaHangs?.includes(maHang))) {
+    return { kind: 'qty_up', label: 'TĂNG SL' }
+  }
+  if ((lineId && upd.noteLineIds?.includes(lineId)) || (!lineId && maHang && upd.noteMaHangs?.includes(maHang))) {
+    return { kind: 'note', label: 'ĐỔI GHI CHÚ' }
+  }
+  return null
+}
+
+function getOrderGroupUpdateBadge(grp) {
+  const entries = Array.isArray(grp?.entries) ? grp.entries : []
+  let best = null
+  for (const entry of entries) {
+    const badge = getOrderItemUpdateBadge(entry)
+    if (!badge) continue
+    if (badge.kind === 'added') return badge
+    if (!best || (best.kind === 'note' && badge.kind === 'qty_up')) {
+      best = badge
+    }
+  }
+  return best
+}
+
+function scrollFirstUpdatedRowIntoView() {
+  nextTick(() => {
+    setTimeout(() => {
+      const targetEl = document.querySelector('.row-web-updated, .card-web-updated')
+      if (targetEl && typeof targetEl.scrollIntoView === 'function') {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }, 80)
+  })
+}
+
+function navigateToUpdatedOrderTab(tabId) {
+  const target = invoiceTabs.value.find((t) => t.id === tabId)
+  if (!target) return
+  showPendingOrdersModal.value = false
+  pendingBellPulse.value = false
+  if (tabSourceFilter.value === 'admin') {
+    tabSourceFilter.value = 'all'
+  }
+  if (activeInvoiceTabId.value !== target.id) {
+    switchInvoiceTab(target.id)
+  }
+  if (isMobile.value) {
+    activeMobileTab.value = 'order'
+  }
+  scrollFirstUpdatedRowIntoView()
+}
+
+function handleOrderBellClick() {
+  pendingBellPulse.value = false
+  showPendingOrdersModal.value = true
+}
+
+function confirmWebOrderUpdate() {
+  const tab = activeTabObj.value
+  if (!tab) return
+  tab.pendingWebUpdate = null
+  tab.updateBaselineItems = null
+  tab.updateBaselineMeta = null
+  showWebUpdateDetailModal.value = false
+  saveTabsToStorage()
+  toast('success', `✅ Đã xác nhận cập nhật cho đơn #${tab.sourceOrderId || tab.maHoaDon}`)
+}
+
+function openWebUpdateDetailModal() {
+  if (!activePendingWebUpdate.value?.changes?.length) return
+  showWebUpdateDetailModal.value = true
+}
+
+function checkNewPendingOrdersNotification() {
+  if (!hasLoadedDonHang.value) return
+  const list = pendingApprovalOrders.value
+  if (!hasInitPendingBellWatch) {
+    hasInitPendingBellWatch = true
+    for (const ord of list) {
+      knownPendingOrderIds.add(ord.maHoaDon)
+    }
+    return
+  }
+
+  const newOrders = []
+  for (const ord of list) {
+    if (!knownPendingOrderIds.has(ord.maHoaDon)) {
+      knownPendingOrderIds.add(ord.maHoaDon)
+      if (!ord.isOpenedInTab) {
+        newOrders.push(ord)
+      }
+    }
+  }
+
+  if (newOrders.length > 0) {
+    pendingBellPulse.value = true
+    if (pendingBellPulseTimer) clearTimeout(pendingBellPulseTimer)
+    pendingBellPulseTimer = setTimeout(() => {
+      pendingBellPulse.value = false
+    }, 4500)
+
+    const newest = newOrders[0]
+    toast(
+      'info',
+      newOrders.length === 1
+        ? `🔔 Có đơn mới #${newest.maHoaDon} (${newest.tenKhach}) đang chờ duyệt!`
+        : `🔔 Có ${newOrders.length} đơn mới đang chờ duyệt!`,
+      4000,
+    )
+  }
+}
+
+function openPendingOrdersModal() {
+  handleOrderBellClick()
+}
+
+function closePendingOrdersModal() {
+  showPendingOrdersModal.value = false
+}
 
 function getTabLiveStatus(tab) {
-  if (!tab?.sourceOrderId) return ''
-  if (hasLoadedDonHang.value) {
-    const dh = donHangList.value.find(
-      (d) => String(d?.Ma_hoa_don || '').trim() === String(tab.sourceOrderId).trim(),
-    )
-    if (dh) {
-      return String(dh.Trang_thai || '').trim() || 'Chờ duyệt'
+  if (!tab) return ''
+  if (tab.sourceOrderId) {
+    if (hasLoadedDonHang.value) {
+      const dh = donHangList.value.find(
+        (d) => String(d?.Ma_hoa_don || '').trim() === String(tab.sourceOrderId).trim(),
+      )
+      if (dh) {
+        return String(dh.Trang_thai || '').trim() || 'Chờ duyệt'
+      }
+      return tab.sourceOrderStatus || 'Đã hủy'
     }
-    return tab.sourceOrderStatus || 'Đã hủy'
+    return tab.sourceOrderStatus || 'Chờ duyệt'
   }
-  return tab.sourceOrderStatus || 'Chờ duyệt'
+  if (tab.adminOrderStatus) {
+    if (hasLoadedDonHang.value) {
+      const dh = donHangList.value.find(
+        (d) => String(d?.Ma_hoa_don || '').trim() === String(tab.maHoaDon || '').trim(),
+      )
+      if (dh) {
+        return String(dh.Trang_thai || '').trim() || tab.adminOrderStatus
+      }
+      if (tab.adminSeenInDonHang) return 'Đã hủy'
+    }
+    return tab.adminOrderStatus
+  }
+  return ''
 }
 
 const activeOrderStatus = computed(() => getTabLiveStatus(activeTabObj.value))
@@ -2325,17 +5293,190 @@ function syncTabsStatusFromDonHang() {
   if (!hasLoadedDonHang.value) return
   let changed = false
   for (const tab of invoiceTabs.value) {
-    if (!tab?.sourceOrderId) continue
-    const dh = donHangList.value.find(
-      (d) => String(d?.Ma_hoa_don || '').trim() === String(tab.sourceOrderId).trim(),
-    )
-    const nextSt = dh ? String(dh.Trang_thai || '').trim() || 'Chờ duyệt' : 'Đã hủy'
-    if (tab.sourceOrderStatus !== nextSt) {
-      tab.sourceOrderStatus = nextSt
-      changed = true
+    if (!tab) continue
+    if (tab.sourceOrderId) {
+      const dh = donHangList.value.find(
+        (d) => String(d?.Ma_hoa_don || '').trim() === String(tab.sourceOrderId).trim(),
+      )
+      const nextSt = dh ? String(dh.Trang_thai || '').trim() || 'Chờ duyệt' : 'Đã hủy'
+      if (tab.sourceOrderStatus !== nextSt) {
+        tab.sourceOrderStatus = nextSt
+        changed = true
+      }
+      continue
+    }
+    if (tab.adminOrderStatus) {
+      const dh = donHangList.value.find(
+        (d) => String(d?.Ma_hoa_don || '').trim() === String(tab.maHoaDon || '').trim(),
+      )
+      if (dh) {
+        if (!tab.adminSeenInDonHang) {
+          tab.adminSeenInDonHang = true
+          changed = true
+        }
+        const nextSt = String(dh.Trang_thai || '').trim() || 'Đang xử lý'
+        if (tab.adminOrderStatus !== nextSt) {
+          tab.adminOrderStatus = nextSt
+          changed = true
+        }
+      } else if (tab.adminSeenInDonHang && tab.adminOrderStatus !== 'Đã hủy') {
+        tab.adminOrderStatus = 'Đã hủy'
+        changed = true
+      }
     }
   }
   if (changed) saveTabsToStorage()
+}
+
+function syncTabsFromLiveOrders(liveMap = {}) {
+  if (!liveMap || typeof liveMap !== 'object') return
+  if (isOrderActionLoading.value || isSubmitting.value) return
+
+  let changed = false
+  let activeTabUpdated = null
+
+  for (let i = 0; i < invoiceTabs.value.length; i++) {
+    const tab = invoiceTabs.value[i]
+    const orderId = String(tab?.sourceOrderId || '').trim()
+    if (!orderId) continue
+
+    const snap =
+      liveMap[orderId] ||
+      Object.values(liveMap).find(
+        (v) => String(v?.meta?.Ma_hoa_don || v?.orderId || '').trim() === orderId,
+      )
+    if (!snap || !snap.exists) continue
+
+    const meta = snap.submittedMeta || snap.meta || {}
+    const st = String(snap.meta?.Trang_thai || meta.Trang_thai || '').trim()
+    if (st && tab.sourceOrderStatus !== st) {
+      tab.sourceOrderStatus = st
+      changed = true
+    }
+
+    // Chỉ tự động kéo dữ liệu đơn web về tab khi đơn vẫn ở trạng thái "Chờ duyệt" và cập nhật xuất phát từ phía khách
+    if (st !== 'Chờ duyệt') continue
+    if (meta.Synced_by_admin && meta.Last_source !== 'web') continue
+
+    const submittedAt = Number(meta.Submitted_at || 0)
+    if (!submittedAt) continue
+
+    const prevSubmittedAt = tab.lastWebSubmittedAt
+    if (prevSubmittedAt !== undefined && submittedAt <= Number(prevSubmittedAt || 0)) {
+      continue
+    }
+
+    const maHD = String(meta.Ma_hoa_don || tab.maHoaDon || orderId).trim()
+    const soHD = String(meta.So_hoa_don || tab.soHoaDon || '').trim()
+    const nowStr = formatDateTimeVN()
+    const sourceItems = Array.isArray(snap.submittedItemsList)
+      ? snap.submittedItemsList
+      : snap.itemsList || []
+    const mappedItems = sourceItems.map((it) =>
+      mapServerOrderItemToPosRow(it, maHD, soHD, nowStr),
+    )
+    const delivery = parseDeliveryToInputs(meta.Thoi_gian_nhan_hang)
+    const nextPay = meta.Hinh_thuc_thanh_toan === 'CHUYEN_KHOAN' ? 'CHUYEN_KHOAN' : 'TIEN_MAT'
+    const nextCustomer = {
+      maKhachHang: tab.customer?.maKhachHang || meta.Ma_khach_hang || '',
+      tenKhachHang: meta.Ten_khach_hang ?? tab.customer?.tenKhachHang ?? '',
+      soDienThoai: meta.So_dien_thoai ?? tab.customer?.soDienThoai ?? '',
+      diaChi: meta.Dia_chi ?? tab.customer?.diaChi ?? '',
+      ghiChu: tab.customer?.ghiChu || '',
+      ghiChuDonHang: String(meta.Ghi_chu ?? tab.customer?.ghiChuDonHang ?? '')
+        .replace(/\s*\[KM ĐẠT ĐƯỢC:[^\]]*\]/gi, '')
+        .trim(),
+      isExistingCustomer: Boolean(tab.customer?.isExistingCustomer || meta.Ma_khach_hang),
+    }
+
+    const nextShipFee =
+      meta.Phi_ship !== undefined
+        ? Math.max(0, Number(meta.Phi_ship || 0))
+        : Math.max(0, Number(tab.phiShip || 0))
+
+    const nextDigest = computeOrderSyncFingerprint({
+      items: mappedItems,
+      customer: nextCustomer,
+      ngayNhanHang: delivery.ngayNhanHang,
+      gioNhanHang: delivery.gioNhanHang,
+      phutNhanHang: delivery.phutNhanHang,
+      hinhThucThanhToan: nextPay,
+      globalGiamGia: Number(tab.globalGiamGia || 0),
+      globalChietKhauPercent: Number(tab.globalChietKhauPercent || 0),
+      phiShip: nextShipFee,
+    })
+
+    // Nếu dữ liệu tab hiện tại đã trùng khớp với bản web mới nhất -> chỉ cập nhật mốc thời gian
+    if (nextDigest === tab.syncedDigest) {
+      tab.lastWebSubmittedAt = submittedAt
+      changed = true
+      continue
+    }
+
+    const baselineItems = Array.isArray(tab.updateBaselineItems)
+      ? tab.updateBaselineItems
+      : JSON.parse(JSON.stringify(tab.items || []))
+    const baselineMeta = tab.updateBaselineMeta || {
+      customer: JSON.parse(JSON.stringify(tab.customer || {})),
+      thoiGianNhanHang: tab.thoiGianNhanHang || '',
+      hinhThucThanhToan: tab.hinhThucThanhToan || 'TIEN_MAT',
+    }
+    const diff = buildCustomerOrderUpdateDiff(baselineItems, baselineMeta, mappedItems, {
+      customer: nextCustomer,
+      thoiGianNhanHang: delivery.thoiGianNhanHang,
+      hinhThucThanhToan: nextPay,
+    })
+
+    tab.items = mappedItems
+    tab.customer = nextCustomer
+    tab.orderCreatedAt = String(meta.Ngay_tao_duong_lich || tab.orderCreatedAt || '').trim()
+    tab.ngayNhanHang = delivery.ngayNhanHang
+    tab.gioNhanHang = delivery.gioNhanHang
+    tab.phutNhanHang = delivery.phutNhanHang
+    tab.thoiGianNhanHang = delivery.thoiGianNhanHang
+    tab.hinhThucThanhToan = nextPay
+    tab.phiShip = nextShipFee
+    tab.lastWebSubmittedAt = submittedAt
+    tab.syncedDigest = nextDigest
+    tab.orderTableViewMode =
+      detectHasMultipleOrderMembers(mappedItems) || (tab.customOrderMembers?.length || 0) > 0
+        ? 'by_member'
+        : 'grouped'
+
+    if (diff.changes.length > 0) {
+      if (!tab.updateBaselineItems) {
+        tab.updateBaselineItems = baselineItems
+        tab.updateBaselineMeta = baselineMeta
+      }
+      tab.pendingWebUpdate = {
+        updatedAt: submittedAt,
+        orderId: maHD,
+        ...diff,
+      }
+      pendingBellPulse.value = true
+      if (pendingBellPulseTimer) clearTimeout(pendingBellPulseTimer)
+      pendingBellPulseTimer = setTimeout(() => {
+        pendingBellPulse.value = false
+      }, 6000)
+      toast(
+        'info',
+        `🔔 Khách vừa cập nhật đơn #${maHD} (${diff.changes.length} thay đổi) — bấm chuông để kiểm tra!`,
+        4500,
+      )
+    }
+
+    changed = true
+
+    if (tab.id === activeInvoiceTabId.value) {
+      activeTabUpdated = tab
+    }
+  }
+
+  if (activeTabUpdated) {
+    applyTabToEditor(activeTabUpdated)
+  } else if (changed) {
+    saveTabsToStorage()
+  }
 }
 
 function goBackToOrdersPage() {
@@ -2362,7 +5503,7 @@ function detectHasMultipleOrderMembers(list = []) {
     const name = String(it.Nguoi_dat || '').trim().toLowerCase()
     if (id) {
       ids.add(id)
-      if (name) namesWithId.add(name)
+      if (name && !id.startsWith('local_')) namesWithId.add(name)
     } else if (name) {
       namesWithoutId.add(name)
     }
@@ -2465,22 +5606,79 @@ function genMaHoaDon() {
   return `${base}_${maHoaDonSeq}`
 }
 
+function computeOrderSyncFingerprint(source = null) {
+  const srcItems = source ? (Array.isArray(source.items) ? source.items : []) : items.value || []
+  const srcCust = source ? (source.customer || {}) : form
+  const srcNgay = source ? source.ngayNhanHang : ngayNhanHang.value
+  const srcGio = source ? source.gioNhanHang : gioNhanHang.value
+  const srcPhut = source ? source.phutNhanHang : phutNhanHang.value
+  const srcPay = source ? source.hinhThucThanhToan : hinhThucThanhToan.value
+  const srcGiam = source ? source.globalGiamGia : globalGiamGia.value
+  const srcCk = source ? source.globalChietKhauPercent : globalChietKhauPercent.value
+  const srcShip = source ? source.phiShip : phiShip.value
+
+  return JSON.stringify({
+    items: srcItems.map((it) => ({
+      maHang: String(it?.maHang ?? it?.Ma_hang ?? '').trim(),
+      tenHang: String(it?.tenHang ?? it?.Ten_hang ?? '').trim(),
+      size: String(it?.size ?? it?.Size ?? '').trim(),
+      dvt: String(it?.dvt ?? it?.Dvt ?? '').trim(),
+      soLuong: Number(it?.soLuong ?? it?.So_luong ?? 0),
+      giaBan: Number(it?.giaBan ?? it?.Gia_ban ?? 0),
+      giaGoc: Number(it?.giaGoc ?? it?.Gia_goc ?? 0),
+      giamGia: Number(it?.giamGia ?? it?.Giam_gia ?? 0),
+      chietKhau: Number(it?.chietKhau ?? 0),
+      ghiChu: String(it?.ghiChuHang ?? it?.Ghi_chu ?? '').trim(),
+      nguoiDat: String(it?.Nguoi_dat ?? '').trim(),
+      role: String(it?.Added_by_role ?? '').trim(),
+    })),
+    customer: {
+      tenKhachHang: String(srcCust.tenKhachHang || '').trim(),
+      soDienThoai: String(srcCust.soDienThoai || '').trim(),
+      diaChi: String(srcCust.diaChi || '').trim(),
+      ghiChuDonHang: String(srcCust.ghiChuDonHang || '').trim(),
+    },
+    ngayNhanHang: String(srcNgay || ''),
+    gioNhanHang: String(srcGio || ''),
+    phutNhanHang: String(srcPhut || ''),
+    hinhThucThanhToan: String(srcPay || 'TIEN_MAT'),
+    globalGiamGia: Number(srcGiam || 0),
+    globalChietKhauPercent: Number(srcCk || 0),
+    phiShip: Math.max(0, Number(srcShip || 0)),
+  })
+}
+
 function createBlankTabSnapshot(overrides = {}) {
   const delivery = getDefaultDeliveryParts()
   return {
     id: overrides.id || genTabId(),
     sourceOrderId: overrides.sourceOrderId || '',
     sourceOrderStatus: overrides.sourceOrderStatus || '',
+    adminOrderStatus: overrides.adminOrderStatus || '',
+    adminSeenInDonHang: Boolean(overrides.adminSeenInDonHang),
+    syncedDigest: overrides.syncedDigest || '',
+    pendingWebUpdate: overrides.pendingWebUpdate || null,
+    updateBaselineItems: overrides.updateBaselineItems || null,
+    updateBaselineMeta: overrides.updateBaselineMeta || null,
+    lastWebSubmittedAt:
+      overrides.lastWebSubmittedAt !== undefined ? Number(overrides.lastWebSubmittedAt || 0) : 0,
     maHoaDon: overrides.maHoaDon || genMaHoaDon(),
     soHoaDon: overrides.soHoaDon || genSoHoaDon(),
+    orderCreatedAt: overrides.orderCreatedAt || '',
     ngayNhanHang: overrides.ngayNhanHang || delivery.ngayNhanHang,
     gioNhanHang: overrides.gioNhanHang || delivery.gioNhanHang,
     phutNhanHang: overrides.phutNhanHang || delivery.phutNhanHang,
     thoiGianNhanHang: overrides.thoiGianNhanHang || delivery.thoiGianNhanHang,
     hinhThucThanhToan: overrides.hinhThucThanhToan || 'TIEN_MAT',
+    ckBaoGomShip: Boolean(overrides.ckBaoGomShip),
+    exportPriceMode: overrides.exportPriceMode || '',
     orderTableViewMode: overrides.orderTableViewMode || 'grouped',
+    customOrderMembers: Array.isArray(overrides.customOrderMembers)
+      ? JSON.parse(JSON.stringify(overrides.customOrderMembers))
+      : [],
     globalGiamGia: Number(overrides.globalGiamGia || 0),
     globalChietKhauPercent: Number(overrides.globalChietKhauPercent || 0),
+    phiShip: Math.max(0, Number(overrides.phiShip || 0)),
     items: Array.isArray(overrides.items) ? JSON.parse(JSON.stringify(overrides.items)) : [],
     customer: {
       maKhachHang: overrides.customer?.maKhachHang || '',
@@ -2511,16 +5709,31 @@ function captureCurrentEditorSnapshot(existingTab = {}) {
     id: existingTab.id || activeInvoiceTabId.value || genTabId(),
     sourceOrderId: existingTab.sourceOrderId || '',
     sourceOrderStatus: existingTab.sourceOrderStatus || '',
+    adminOrderStatus: existingTab.adminOrderStatus || '',
+    adminSeenInDonHang: Boolean(existingTab.adminSeenInDonHang),
+    syncedDigest: syncedOrderDigest.value || existingTab.syncedDigest || '',
+    pendingWebUpdate: existingTab.pendingWebUpdate || null,
+    updateBaselineItems: existingTab.updateBaselineItems || null,
+    updateBaselineMeta: existingTab.updateBaselineMeta || null,
+    lastWebSubmittedAt:
+      existingTab.lastWebSubmittedAt !== undefined
+        ? Number(existingTab.lastWebSubmittedAt || 0)
+        : 0,
     maHoaDon: maHoaDon.value,
     soHoaDon: soHoaDon.value,
+    orderCreatedAt: orderCreatedAt.value || existingTab.orderCreatedAt || '',
     ngayNhanHang: ngayNhanHang.value,
     gioNhanHang: gioNhanHang.value,
     phutNhanHang: phutNhanHang.value,
     thoiGianNhanHang: thoiGianNhanHang.value,
     hinhThucThanhToan: hinhThucThanhToan.value,
+    ckBaoGomShip: Boolean(ckBaoGomShip.value),
+    exportPriceMode: exportPriceMode.value || '',
     orderTableViewMode: orderTableViewMode.value,
+    customOrderMembers: JSON.parse(JSON.stringify(customOrderMembers.value || [])),
     globalGiamGia: Number(globalGiamGia.value || 0),
     globalChietKhauPercent: Number(globalChietKhauPercent.value || 0),
+    phiShip: Math.max(0, Number(phiShip.value || 0)),
     items: JSON.parse(JSON.stringify(items.value || [])),
     customer: {
       maKhachHang: form.maKhachHang || '',
@@ -2548,6 +5761,7 @@ function applyTabToEditor(tab) {
   activeInvoiceTabId.value = tab.id
   maHoaDon.value = tab.maHoaDon || genMaHoaDon()
   soHoaDon.value = tab.soHoaDon || genSoHoaDon()
+  orderCreatedAt.value = String(tab.orderCreatedAt || '').trim()
 
   const delivery =
     tab.ngayNhanHang && tab.gioNhanHang && tab.phutNhanHang
@@ -2560,13 +5774,21 @@ function applyTabToEditor(tab) {
     tab.thoiGianNhanHang || `${delivery.ngayNhanHang}T${delivery.gioNhanHang}:${delivery.phutNhanHang}`
 
   hinhThucThanhToan.value = tab.hinhThucThanhToan || 'TIEN_MAT'
+  ckBaoGomShip.value = Boolean(tab.ckBaoGomShip)
+  exportPriceMode.value = tab.exportPriceMode === 'giaBan' || tab.exportPriceMode === 'giaGoc' ? tab.exportPriceMode : ''
   globalGiamGia.value = Number(tab.globalGiamGia || 0)
   globalChietKhauPercent.value = Number(tab.globalChietKhauPercent || 0)
+  phiShip.value = Math.max(0, Number(tab.phiShip || 0))
   const loadedItems = Array.isArray(tab.items) ? JSON.parse(JSON.stringify(tab.items)) : []
   items.value = loadedItems
+  customOrderMembers.value = Array.isArray(tab.customOrderMembers)
+    ? JSON.parse(JSON.stringify(tab.customOrderMembers))
+    : []
   orderTableViewMode.value =
     tab.orderTableViewMode ||
-    (detectHasMultipleOrderMembers(loadedItems) ? 'by_member' : 'grouped')
+    (detectHasMultipleOrderMembers(loadedItems) || customOrderMembers.value.length > 0
+      ? 'by_member'
+      : 'grouped')
 
   const cust = tab.customer || {}
   isExistingCustomer = Boolean(cust.isExistingCustomer || cust.maKhachHang)
@@ -2577,6 +5799,21 @@ function applyTabToEditor(tab) {
   form.ghiChu = cust.ghiChu || ''
   form.ghiChuDonHang = cust.ghiChuDonHang || ''
   lastCheckedName = form.tenKhachHang || ''
+  syncedOrderDigest.value =
+    tab.syncedDigest ||
+    (tab.sourceOrderId || tab.adminOrderStatus
+      ? computeOrderSyncFingerprint({
+          items: loadedItems,
+          customer: cust,
+          ngayNhanHang: delivery.ngayNhanHang,
+          gioNhanHang: delivery.gioNhanHang,
+          phutNhanHang: delivery.phutNhanHang,
+          hinhThucThanhToan: tab.hinhThucThanhToan || 'TIEN_MAT',
+          globalGiamGia: tab.globalGiamGia,
+          globalChietKhauPercent: tab.globalChietKhauPercent,
+          phiShip: tab.phiShip,
+        })
+      : '')
   selectedTargetMemberKey.value = ''
   highlightedIndex.value = -1
   saveTabsToStorage()
@@ -2594,6 +5831,9 @@ function switchInvoiceTab(tabId) {
 
 function addNewInvoiceTab() {
   syncActiveTabSnapshot()
+  if (tabSourceFilter.value === 'web') {
+    tabSourceFilter.value = 'all'
+  }
   const newTab = createBlankTabSnapshot()
   invoiceTabs.value.push(newTab)
   applyTabToEditor(newTab)
@@ -2621,10 +5861,101 @@ function closeInvoiceTab(tabId) {
   }
 }
 
+function isTabUnsynced(tab) {
+  if (!tab) return false
+  if (!tab.sourceOrderId && !tab.adminOrderStatus) return false
+  if (tab.id === activeInvoiceTabId.value) return !isOrderSyncedWithWeb.value
+  if (!tab.syncedDigest) return true
+  return computeOrderSyncFingerprint(tab) !== tab.syncedDigest
+}
+
+function requestCloseInvoiceTab(tabId) {
+  syncActiveTabSnapshot()
+  const idx = invoiceTabs.value.findIndex((t) => t.id === tabId)
+  if (idx === -1) return
+  const tab = invoiceTabs.value[idx]
+  const st = getTabLiveStatus(tab)
+
+  if (isTabUntouchedDraft(tab) || st === 'Hoàn thành' || st === 'Đã hủy') {
+    closeInvoiceTab(tabId)
+    return
+  }
+
+  const isActiveOrder = Boolean(tab.sourceOrderId || tab.adminOrderStatus)
+  closeTabConfirmState.value = {
+    tabId: tab.id,
+    mode: isActiveOrder ? 'active_order' : 'draft',
+    title: getTabDisplayTitle(tab, idx),
+    maHoaDon: String(tab.sourceOrderId || tab.maHoaDon || '').trim(),
+    status: st || (tab.sourceOrderId ? 'Chờ duyệt' : ''),
+    isWeb: Boolean(tab.sourceOrderId),
+    qty: getTabItemQty(tab),
+    unsynced: isTabUnsynced(tab),
+  }
+}
+
+function cancelCloseTabConfirm() {
+  if (isClosingTabCancelling.value) return
+  closeTabConfirmState.value = null
+}
+
+function confirmKeepOrderCloseTab() {
+  const st = closeTabConfirmState.value
+  if (!st || isClosingTabCancelling.value) return
+  const targetId = st.tabId
+  closeTabConfirmState.value = null
+  closeInvoiceTab(targetId)
+}
+
+async function confirmCancelAndCloseTab() {
+  const st = closeTabConfirmState.value
+  if (!st || isClosingTabCancelling.value) return
+  const targetTab = invoiceTabs.value.find((t) => t.id === st.tabId)
+  if (!targetTab) {
+    closeTabConfirmState.value = null
+    return
+  }
+
+  const maHD = String(targetTab.sourceOrderId || targetTab.maHoaDon || '').trim()
+  if (!maHD) {
+    closeTabConfirmState.value = null
+    closeInvoiceTab(targetTab.id)
+    return
+  }
+
+  isClosingTabCancelling.value = true
+  try {
+    const res = await dispatchAction({
+      action: 'huyDonHang',
+      Ma_hoa_don: maHD,
+    })
+    if (res?.success) {
+      if (targetTab.sourceOrderId) {
+        targetTab.sourceOrderStatus = 'Đã hủy'
+      } else {
+        targetTab.adminOrderStatus = 'Đã hủy'
+      }
+      saveTabsToStorage()
+      toast('success', `Đã hủy đơn #${maHD}`)
+      const targetId = targetTab.id
+      closeTabConfirmState.value = null
+      closeInvoiceTab(targetId)
+    } else {
+      toast('error', '❌ Lỗi: ' + (res?.message || 'Không thể hủy đơn'))
+    }
+  } catch (e) {
+    console.error(e)
+    toast('error', '❌ Lỗi kết nối Firebase khi hủy đơn')
+  } finally {
+    isClosingTabCancelling.value = false
+  }
+}
+
 function isTabUntouchedDraft(tab) {
   if (!tab) return false
-  if (tab.sourceOrderId) return false
+  if (tab.sourceOrderId || tab.adminOrderStatus) return false
   if (Array.isArray(tab.items) && tab.items.length > 0) return false
+  if (Array.isArray(tab.customOrderMembers) && tab.customOrderMembers.length > 0) return false
   const cust = tab.customer || {}
   return !cust.tenKhachHang && !cust.soDienThoai && !cust.diaChi && !cust.ghiChuDonHang
 }
@@ -2647,19 +5978,39 @@ function getTabDisplayTitle(tab, idx) {
 }
 
 function mapServerOrderItemToPosRow(raw, maHD, soHD, ngayTaoStr) {
-  const giaGoc = Number(raw?.Gia_goc ?? 0) || 0
+  const rawCode = String(raw?.Ma_hang || '').trim()
+  const prod = rawCode ? hangHoaByMaMap.value.get(rawCode) : null
+  const rawGiaGoc = Number(raw?.Gia_goc ?? 0) || 0
+  const giaGoc = rawGiaGoc > 0 ? rawGiaGoc : Number(prod?.Gia_goc ?? 0) || 0
   const giaBan = Number(raw?.Gia_ban ?? 0) || 0
   const qty = Math.max(1, Number(raw?.So_luong ?? 1) || 1)
   const giamGia = Number(raw?.Giam_gia ?? 0) || 0
   const chietKhau = Number(raw?.Chiet_khau ?? 0) || 0
   const d = calcDiscount(giaBan, qty, giamGia, chietKhau)
   const thanhTien = Number(raw?.Thanh_tien) || giaBan * qty
+  const hasExplicitNccType = raw?.Ncc_loai_giam !== undefined || raw?.nccLoaiGiam !== undefined
+  const hasExplicitNccVal = raw?.Ncc_gia_tri_giam !== undefined || raw?.nccGiaTriGiam !== undefined
+  const nccLoaiGiam = normalizeNccDiscountType(
+    hasExplicitNccType ? (raw?.Ncc_loai_giam ?? raw?.nccLoaiGiam) : prod?.Ncc_loai_giam,
+  )
+  const nccGiaTriGiam = normalizeNccDiscountValue(
+    hasExplicitNccVal ? (raw?.Ncc_gia_tri_giam ?? raw?.nccGiaTriGiam) : prod?.Ncc_gia_tri_giam,
+  )
   const loiNhuan =
     raw?.Loi_nhuan !== undefined
       ? Number(raw.Loi_nhuan)
-      : (giaBan - d.ck1sp - giaGoc - giamGia) * qty
+      : calcOrderLineProfit({
+          giaBan,
+          giaGoc,
+          soLuong: qty,
+          giamGia,
+          ck1sp: d.ck1sp,
+          nccLoaiGiam,
+          nccGiaTriGiam,
+        })
   const currency = raw?.Don_vi_tien_te || 'P'
   return {
+    lineId: raw?.lineId || '',
     Ma_hoa_don: maHD,
     So_hoa_don: soHD,
     Ngay_tao_duong_lich: ngayTaoStr || formatDateTimeVN(),
@@ -2676,6 +6027,10 @@ function mapServerOrderItemToPosRow(raw, maHD, soHD, ngayTaoStr) {
     Gia_ban: giaBan,
     Giam_gia: giamGia,
     Tien_chiet_khau: Number(raw?.Tien_chiet_khau ?? d.chietKhauTien) || 0,
+    Ncc_loai_giam: nccLoaiGiam,
+    Ncc_gia_tri_giam: nccGiaTriGiam,
+    nccLoaiGiam,
+    nccGiaTriGiam,
     Thanh_tien: thanhTien,
     Loi_nhuan: loiNhuan,
     Ghi_chu: raw?.Ghi_chu || '',
@@ -2730,14 +6085,9 @@ function initTabsFromStorage() {
 }
 
 let isImportingOrderQuery = false
-async function openApprovedOrdersFromQuery() {
-  const singleId = String(route.query?.orderId || '').trim()
-  const multiIds = String(route.query?.orderIds || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
-  const targetIds = [...new Set([...(singleId ? [singleId] : []), ...multiIds])]
-  if (!targetIds.length || isImportingOrderQuery) return
+async function importOrderIdsIntoTabs(targetIds = [], { replaceRoute = false } = {}) {
+  const cleanIds = [...new Set((targetIds || []).map((id) => String(id || '').trim()).filter(Boolean))]
+  if (!cleanIds.length || isImportingOrderQuery) return false
 
   isImportingOrderQuery = true
   try {
@@ -2745,7 +6095,7 @@ async function openApprovedOrdersFromQuery() {
     let lastActivatedId = ''
     let importedCount = 0
 
-    for (const orderId of targetIds) {
+    for (const orderId of cleanIds) {
       const existingTab = invoiceTabs.value.find(
         (t) => t.sourceOrderId === orderId || t.maHoaDon === orderId,
       )
@@ -2772,30 +6122,51 @@ async function openApprovedOrdersFromQuery() {
       const itemGiamGiaSum = mappedItems.reduce((s, it) => s + (it.tongGiamGiaTien || 0), 0)
       const globalMoneyDiscount = Math.max(0, Number(ord.Tong_giam_gia || 0) - itemGiamGiaSum)
 
+      const customerObj = {
+        maKhachHang: ord.Ma_khach_hang || '',
+        tenKhachHang: ord.Ten_khach_hang || '',
+        soDienThoai: ord.So_dien_thoai || '',
+        diaChi: ord.Dia_chi || '',
+        ghiChu: '',
+        ghiChuDonHang: String(ord.Ghi_chu || '')
+          .replace(/\s*\[KM ĐẠT ĐƯỢC:[^\]]*\]/gi, '')
+          .trim(),
+        isExistingCustomer: Boolean(ord.Ma_khach_hang),
+      }
+      const initialPay =
+        ord.Hinh_thuc_thanh_toan === 'CHUYEN_KHOAN' ? 'CHUYEN_KHOAN' : 'TIEN_MAT'
+      const initialShipFee = Math.max(0, Number(ord.Phi_ship || 0))
+      const initialSyncedDigest = computeOrderSyncFingerprint({
+        items: mappedItems,
+        customer: customerObj,
+        ngayNhanHang: delivery.ngayNhanHang,
+        gioNhanHang: delivery.gioNhanHang,
+        phutNhanHang: delivery.phutNhanHang,
+        hinhThucThanhToan: initialPay,
+        globalGiamGia: globalMoneyDiscount,
+        globalChietKhauPercent: 0,
+        phiShip: initialShipFee,
+      })
+
       const tabData = createBlankTabSnapshot({
         sourceOrderId: maHD,
         sourceOrderStatus: ord.Trang_thai || 'Chờ duyệt',
+        syncedDigest: initialSyncedDigest,
+        lastWebSubmittedAt: Number(ord.Submitted_at || 0),
         maHoaDon: maHD,
         soHoaDon: soHD,
+        orderCreatedAt: String(ord.Ngay_tao_duong_lich || '').trim(),
         ngayNhanHang: delivery.ngayNhanHang,
         gioNhanHang: delivery.gioNhanHang,
         phutNhanHang: delivery.phutNhanHang,
         thoiGianNhanHang: delivery.thoiGianNhanHang,
-        hinhThucThanhToan:
-          ord.Hinh_thuc_thanh_toan === 'CHUYEN_KHOAN' ? 'CHUYEN_KHOAN' : 'TIEN_MAT',
+        hinhThucThanhToan: initialPay,
         orderTableViewMode: detectHasMultipleOrderMembers(mappedItems) ? 'by_member' : 'grouped',
         globalGiamGia: globalMoneyDiscount,
         globalChietKhauPercent: 0,
+        phiShip: initialShipFee,
         items: mappedItems,
-        customer: {
-          maKhachHang: ord.Ma_khach_hang || '',
-          tenKhachHang: ord.Ten_khach_hang || '',
-          soDienThoai: ord.So_dien_thoai || '',
-          diaChi: ord.Dia_chi || '',
-          ghiChu: '',
-          ghiChuDonHang: ord.Ghi_chu || '',
-          isExistingCustomer: Boolean(ord.Ma_khach_hang),
-        },
+        customer: customerObj,
       })
 
       const currentTab = invoiceTabs.value.find((t) => t.id === activeInvoiceTabId.value)
@@ -2811,6 +6182,9 @@ async function openApprovedOrdersFromQuery() {
     }
 
     if (lastActivatedId) {
+      if (tabSourceFilter.value === 'admin') {
+        tabSourceFilter.value = 'all'
+      }
       const targetTab = invoiceTabs.value.find((t) => t.id === lastActivatedId)
       if (targetTab) applyTabToEditor(targetTab)
       if (isMobile.value) {
@@ -2820,18 +6194,63 @@ async function openApprovedOrdersFromQuery() {
         toast(
           'success',
           importedCount === 1
-            ? `Đã nạp đơn #${targetIds[targetIds.length - 1]} vào tab hóa đơn`
+            ? `Đã nạp đơn #${cleanIds[cleanIds.length - 1]} vào tab hóa đơn`
             : `Đã mở ${importedCount} tab đơn hàng`,
         )
       }
     }
 
-    await router.replace({ name: 'nhap-hoa-don' })
+    if (replaceRoute) {
+      await router.replace({ name: 'nhap-hoa-don' })
+    }
+    return true
   } catch (err) {
-    console.error('openApprovedOrdersFromQuery failed:', err)
+    console.error('importOrderIdsIntoTabs failed:', err)
     toast('error', 'Không thể mở đơn hàng sang Nhập hóa đơn')
+    return false
   } finally {
     isImportingOrderQuery = false
+  }
+}
+
+async function openApprovedOrdersFromQuery() {
+  const focusOrderId = String(route.query?.focusOrderId || '').trim()
+  if (focusOrderId) {
+    const existingTab = invoiceTabs.value.find(
+      (t) =>
+        String(t?.sourceOrderId || '').trim() === focusOrderId ||
+        String(t?.maHoaDon || '').trim() === focusOrderId,
+    )
+    if (existingTab) {
+      navigateToUpdatedOrderTab(existingTab.id)
+      await router.replace({ name: 'nhap-hoa-don' })
+      return
+    }
+    await importOrderIdsIntoTabs([focusOrderId], { replaceRoute: true })
+    return
+  }
+
+  const singleId = String(route.query?.orderId || '').trim()
+  const multiIds = String(route.query?.orderIds || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const targetIds = [...new Set([...(singleId ? [singleId] : []), ...multiIds])]
+  if (!targetIds.length) return
+  await importOrderIdsIntoTabs(targetIds, { replaceRoute: true })
+}
+
+async function importPendingOrderToTable(orderId) {
+  const cleanId = String(orderId || '').trim()
+  if (!cleanId) return
+  importingPendingOrderId.value = cleanId
+  try {
+    const ok = await importOrderIdsIntoTabs([cleanId], { replaceRoute: false })
+    if (ok) {
+      showPendingOrdersModal.value = false
+    }
+  } finally {
+    importingPendingOrderId.value = ''
   }
 }
 
@@ -2882,16 +6301,16 @@ async function confirmSuccessReload() {
 }
 
 watch(
-  () => [route.query?.orderId, route.query?.orderIds],
-  ([orderId, orderIds]) => {
-    if (orderId || orderIds) {
+  () => [route.query?.orderId, route.query?.orderIds, route.query?.focusOrderId],
+  ([orderId, orderIds, focusOrderId]) => {
+    if (orderId || orderIds || focusOrderId) {
       openApprovedOrdersFromQuery()
     }
   },
 )
 
 onActivated(() => {
-  if (route.query?.orderId || route.query?.orderIds) {
+  if (route.query?.orderId || route.query?.orderIds || route.query?.focusOrderId) {
     openApprovedOrdersFromQuery()
   }
 })
@@ -2907,6 +6326,7 @@ watch(
 onMounted(async () => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
+  document.addEventListener('click', handleDocClickForColSettings)
 
   isLoadingProducts.value = true
   isLoadingCustomer.value = true // Start loading customer data
@@ -2934,7 +6354,10 @@ onMounted(async () => {
     soThuChiList.value = json.data.so_thu_chi || []
     thongTinChuyenKhoanList.value = json.data.thong_tin_chuyen_khoan || []
 
-    const firstCK = thongTinChuyenKhoanList.value[0]
+    const firstCK =
+      thongTinChuyenKhoanList.value.find(
+        (r) => r?.Show_in_invoice === true || r?.Show_in_invoice === 'YES',
+      ) || thongTinChuyenKhoanList.value[0]
     if (firstCK) {
       tiGia.value = Number(firstCK.Ti_gia || 1)
       donViTienTeCK.value = firstCK.Don_vi_tien_te || 'VND'
@@ -2968,6 +6391,12 @@ onMounted(async () => {
       donHangList.value = rows || []
       hasLoadedDonHang.value = true
       syncTabsStatusFromDonHang()
+      checkNewPendingOrdersNotification()
+    })
+    unsubLiveOrdersRealtime = subscribeAllLiveOrders((liveMap) => {
+      liveOrdersById.value = liveMap || {}
+      syncTabsFromLiveOrders(liveMap)
+      checkNewPendingOrdersNotification()
     })
   } catch (error) {
     console.error('Error fetching data:', error)
@@ -2983,9 +6412,20 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
+  document.removeEventListener('click', handleDocClickForColSettings)
+  stopPcColResize()
+  stopOrderColResize()
   if (typeof unsubDonHangRealtime === 'function') {
     unsubDonHangRealtime()
     unsubDonHangRealtime = null
+  }
+  if (pendingBellPulseTimer) {
+    clearTimeout(pendingBellPulseTimer)
+    pendingBellPulseTimer = null
+  }
+  if (typeof unsubLiveOrdersRealtime === 'function') {
+    unsubLiveOrdersRealtime()
+    unsubLiveOrdersRealtime = null
   }
 })
 
@@ -3121,6 +6561,8 @@ const form = reactive({
   giaGoc: 0,
   chietKhau: 0,
   giamGia: 0,
+  nccLoaiGiam: 'percent',
+  nccGiaTriGiam: 0,
   giaBan: 0,
   soLuong: 1,
   trangThai: '',
@@ -3128,7 +6570,24 @@ const form = reactive({
 })
 
 /* ================= TỈ GIÁ & CHUYỂN KHOẢN (AUTO) ================= */
-const ckInfoList = computed(() => thongTinChuyenKhoanList.value)
+const ckInfoList = computed(() => {
+  const list = thongTinChuyenKhoanList.value || []
+  if (!list.length) return []
+  const hasExplicitFlag = list.some(
+    (r) =>
+      r &&
+      r.Show_in_invoice !== undefined &&
+      r.Show_in_invoice !== null &&
+      r.Show_in_invoice !== '',
+  )
+  if (!hasExplicitFlag) {
+    // Dữ liệu cũ chưa cấu hình cờ -> chỉ hiện 1 QR đầu tiên để không vỡ layout hóa đơn ảnh
+    return list.slice(0, 1)
+  }
+  return list
+    .filter((r) => r?.Show_in_invoice === true || r?.Show_in_invoice === 'YES')
+    .slice(0, 1)
+})
 
 const tongChuyenKhoan = computed(() => {
   const rate = Number(tiGia.value || 1)
@@ -3177,6 +6636,8 @@ function xoaHang() {
   form.giaGoc = 0
   form.chietKhau = 0
   form.giamGia = 0
+  form.nccLoaiGiam = 'percent'
+  form.nccGiaTriGiam = 0
   form.giaBan = 0
   form.soLuong = 1
   form.trangThai = ''
@@ -3217,6 +6678,8 @@ watch(
     form.size = h.Size
     form.dvt = h.Dvt
     form.giaGoc = Number(h.Gia_goc) || 0
+    form.nccLoaiGiam = normalizeNccDiscountType(h.Ncc_loai_giam)
+    form.nccGiaTriGiam = normalizeNccDiscountValue(h.Ncc_gia_tri_giam)
     
     if (h.Gia_Giam && Number(h.Gia_Giam) > 0) {
       form.giaBan = Number(h.Gia_Giam)
@@ -3286,9 +6749,11 @@ function resolveMemberGroupKeyForItem(item, hint = getOrderPrimaryMemberHint()) 
 }
 
 const invoiceMemberGroups = computed(() => {
-  const hasMultiplePeople = detectHasMultipleOrderMembers(items.value)
   const hint = getOrderPrimaryMemberHint(items.value)
   const groupsMap = new Map()
+  const customKeysSet = new Set(
+    (customOrderMembers.value || []).map((cm) => String(cm?.groupKey || '').trim()).filter(Boolean),
+  )
 
   items.value.forEach((item, idx) => {
     const qty = Number(item?.soLuong ?? item?.So_luong ?? 0)
@@ -3303,6 +6768,7 @@ const invoiceMemberGroups = computed(() => {
           name: 'Quán thêm / Phụ phí',
           role: 'admin',
           badge: 'Quán thêm',
+          isCustom: false,
           totalQty: 0,
           subtotal: 0,
           entries: [],
@@ -3329,7 +6795,8 @@ const invoiceMemberGroups = computed(() => {
         memberId: mId || (isHostLine ? hint.primaryId : ''),
         name: rawName || (isHostLine ? hint.primaryName : 'Thành viên'),
         role,
-        badge: hasMultiplePeople ? (role === 'host' ? 'Trưởng nhóm' : 'Thành viên') : '',
+        badge: '',
+        isCustom: customKeysSet.has(gKey),
         totalQty: 0,
         subtotal: 0,
         entries: [],
@@ -3346,14 +6813,87 @@ const invoiceMemberGroups = computed(() => {
     grp.subtotal += net
   })
 
+  for (const cm of customOrderMembers.value || []) {
+    const cmName = String(cm?.name || '').trim()
+    if (!cmName) continue
+    const cmId = String(cm?.memberId || '').trim()
+    const cmKey = String(cm?.groupKey || (cmId ? `m:${cmId}` : `name:${cmName.toLowerCase()}`)).trim()
+    const existingByKey = groupsMap.get(cmKey)
+    if (existingByKey) {
+      existingByKey.isCustom = true
+      continue
+    }
+    if (!cmId) {
+      const existingByName = Array.from(groupsMap.values()).find(
+        (g) =>
+          g.role !== 'admin' &&
+          !g.memberId &&
+          String(g.name || '').trim().toLowerCase() === cmName.toLowerCase(),
+      )
+      if (existingByName) {
+        existingByName.isCustom = true
+        continue
+      }
+    }
+    groupsMap.set(cmKey, {
+      groupKey: cmKey,
+      memberId: cmId,
+      name: cmName,
+      role: cm?.role === 'host' ? 'host' : 'guest',
+      badge: '',
+      isCustom: true,
+      totalQty: 0,
+      subtotal: 0,
+      entries: [],
+    })
+  }
+
+  const hasMultiplePeople =
+    detectHasMultipleOrderMembers(items.value) || groupsMap.size > 1
+  for (const grp of groupsMap.values()) {
+    if (grp.role === 'admin') {
+      grp.badge = 'Quán thêm'
+    } else if (hasMultiplePeople) {
+      grp.badge = grp.role === 'host' ? 'Trưởng nhóm' : 'Thành viên'
+    } else {
+      grp.badge = ''
+    }
+  }
+
   const rank = { host: 0, guest: 1, admin: 2 }
-  return Array.from(groupsMap.values()).sort(
+  const sorted = Array.from(groupsMap.values()).sort(
     (a, b) => (rank[a.role] ?? 1) - (rank[b.role] ?? 1),
   )
+
+  const nameTotals = new Map()
+  for (const grp of sorted) {
+    if (grp.role === 'admin') continue
+    const lower = String(grp.name || '').trim().toLowerCase()
+    if (lower) nameTotals.set(lower, (nameTotals.get(lower) || 0) + 1)
+  }
+  const nameSeen = new Map()
+  for (const grp of sorted) {
+    if (grp.role === 'admin') {
+      grp.dupTag = ''
+      continue
+    }
+    const lower = String(grp.name || '').trim().toLowerCase()
+    if (lower && (nameTotals.get(lower) || 0) > 1) {
+      const seq = (nameSeen.get(lower) || 0) + 1
+      nameSeen.set(lower, seq)
+      grp.dupTag = `#${seq}`
+    } else {
+      grp.dupTag = ''
+    }
+  }
+
+  return sorted
 })
 
 const invoiceOrderMembers = computed(() => invoiceMemberGroups.value)
-const showMemberTargetBar = computed(() => invoiceOrderMembers.value.length > 1)
+const showMemberTargetBar = computed(
+  () => invoiceOrderMembers.value.length > 1 || customOrderMembers.value.length > 0,
+)
 
 const activeTargetMemberKey = computed(() => {
   const members = invoiceOrderMembers.value
@@ -3368,6 +6908,267 @@ function selectTargetMember(groupKey, options = {}) {
   if (options.goToEntry && isMobile.value) {
     setMobileTab('entry')
   }
+}
+
+function openAddMemberModal() {
+  newMemberNameInput.value = ''
+  editingMemberKey.value = ''
+  editingMemberName.value = ''
+  duplicateMemberQueue.value = []
+  showAddMemberModal.value = true
+  nextTick(() => {
+    newMemberInputRef.value?.focus()
+  })
+}
+
+function closeAddMemberModal() {
+  showAddMemberModal.value = false
+  editingMemberKey.value = ''
+  editingMemberName.value = ''
+  duplicateMemberQueue.value = []
+}
+
+function selectMemberFromModal(groupKey) {
+  if (!groupKey) return
+  orderTableViewMode.value = 'by_member'
+  selectedTargetMemberKey.value = groupKey
+  duplicateMemberQueue.value = []
+  showAddMemberModal.value = false
+  if (isMobile.value) {
+    setMobileTab('entry')
+  }
+}
+
+function findExistingMemberByName(rawName) {
+  const lower = String(rawName || '').trim().toLowerCase()
+  if (!lower) return null
+  const inGroups = invoiceMemberGroups.value.find(
+    (g) => g.role !== 'admin' && String(g.name || '').trim().toLowerCase() === lower,
+  )
+  if (inGroups) return inGroups
+  const inCustom = customOrderMembers.value.find(
+    (cm) => String(cm.name || '').trim().toLowerCase() === lower,
+  )
+  if (inCustom) {
+    return {
+      groupKey: inCustom.groupKey,
+      name: inCustom.name,
+      totalQty: 0,
+      subtotal: 0,
+    }
+  }
+  return null
+}
+
+function submitAddMembers(shouldSelectAndClose = false) {
+  const rawList = String(newMemberNameInput.value || '')
+    .split(/[\n,;]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+
+  if (!rawList.length) {
+    toast('error', 'Vui lòng nhập tên người đặt!')
+    nextTick(() => newMemberInputRef.value?.focus())
+    return
+  }
+
+  let addedCount = 0
+  let lastKey = ''
+  const addedNames = []
+  const nextDuplicates = []
+
+  for (const rawName of rawList) {
+    const existing = findExistingMemberByName(rawName)
+    if (existing) {
+      nextDuplicates.push({
+        rawName,
+        existingMember: existing,
+        shouldSelectAndClose,
+      })
+      continue
+    }
+
+    const cleanKey = `name:${rawName.toLowerCase()}`
+    customOrderMembers.value.push({
+      groupKey: cleanKey,
+      name: rawName,
+      role: 'guest',
+      memberId: '',
+    })
+    lastKey = cleanKey
+    addedCount += 1
+    addedNames.push(rawName)
+  }
+
+  if (addedCount > 0) {
+    orderTableViewMode.value = 'by_member'
+    if (lastKey) {
+      selectedTargetMemberKey.value = lastKey
+    }
+    toast(
+      'success',
+      addedCount === 1
+        ? `Đã thêm người đặt "${addedNames[0]}"`
+        : `Đã thêm ${addedCount} người đặt vào đơn`,
+    )
+  }
+
+  if (nextDuplicates.length > 0) {
+    duplicateMemberQueue.value = nextDuplicates
+    newMemberNameInput.value = ''
+    return
+  }
+
+  newMemberNameInput.value = ''
+  if (shouldSelectAndClose) {
+    showAddMemberModal.value = false
+    if (isMobile.value) {
+      setMobileTab('entry')
+    }
+  } else {
+    nextTick(() => newMemberInputRef.value?.focus())
+  }
+}
+
+function resolveDuplicateMemberPrompt(choice) {
+  const current = duplicateMemberQueue.value.shift()
+  if (!current) return
+
+  if (choice === 'rename') {
+    duplicateMemberQueue.value = []
+    newMemberNameInput.value = current.rawName
+    nextTick(() => {
+      newMemberInputRef.value?.focus()
+      newMemberInputRef.value?.select()
+    })
+    return
+  }
+
+  orderTableViewMode.value = 'by_member'
+
+  if (choice === 'new') {
+    const newId = genLocalMemberId()
+    const newKey = `m:${newId}`
+    customOrderMembers.value.push({
+      groupKey: newKey,
+      name: current.rawName,
+      role: 'guest',
+      memberId: newId,
+    })
+    selectedTargetMemberKey.value = newKey
+    toast('success', `Đã thêm người mới "${current.rawName}" (tách riêng)`)
+  } else if (choice === 'existing') {
+    selectedTargetMemberKey.value = current.existingMember.groupKey
+    toast('info', `Đã chọn "${current.existingMember.name}" có sẵn trong đơn`)
+  }
+
+  if (duplicateMemberQueue.value.length === 0) {
+    if (current.shouldSelectAndClose) {
+      showAddMemberModal.value = false
+      if (isMobile.value) {
+        setMobileTab('entry')
+      }
+    } else {
+      nextTick(() => newMemberInputRef.value?.focus())
+    }
+  }
+}
+
+function removeCustomOrderMember(member) {
+  if (!member) return
+  if (member.entries && member.entries.length > 0) {
+    toast('error', 'Người này đang có món trong đơn, hãy xóa hoặc chuyển món trước.')
+    return
+  }
+  const idx = customOrderMembers.value.findIndex((cm) => {
+    if (cm.groupKey === member.groupKey) return true
+    if (!cm.memberId && !member.memberId) {
+      return String(cm.name || '').trim().toLowerCase() === String(member.name || '').trim().toLowerCase()
+    }
+    return false
+  })
+  if (idx !== -1) {
+    customOrderMembers.value.splice(idx, 1)
+  }
+  if (selectedTargetMemberKey.value === member.groupKey) {
+    selectedTargetMemberKey.value = ''
+  }
+  if (editingMemberKey.value === member.groupKey) {
+    editingMemberKey.value = ''
+    editingMemberName.value = ''
+  }
+  toast('success', `Đã xóa "${member.name}" khỏi danh sách người đặt`)
+}
+
+function startRenameOrderMember(member) {
+  if (!member || member.role === 'admin') return
+  editingMemberKey.value = member.groupKey
+  editingMemberName.value = member.name || ''
+}
+
+function cancelRenameOrderMember() {
+  editingMemberKey.value = ''
+  editingMemberName.value = ''
+}
+
+function saveRenameOrderMember(member) {
+  if (!member) return
+  const newName = String(editingMemberName.value || '').trim()
+  if (!newName) {
+    toast('error', 'Tên người đặt không được để trống!')
+    return
+  }
+  if (newName === member.name) {
+    cancelRenameOrderMember()
+    return
+  }
+  const duplicate = invoiceMemberGroups.value.find(
+    (g) =>
+      g.groupKey !== member.groupKey &&
+      String(g.name || '').trim().toLowerCase() === newName.toLowerCase(),
+  )
+  let nextMemberId = member.memberId || ''
+  if (duplicate) {
+    if (
+      !confirm(
+        `Đã có người tên "${duplicate.name}" trong đơn.\nNếu đây là người khác trùng tên, nhấn OK để vẫn đổi thành "${newName}" (vẫn tách riêng).`,
+      )
+    ) {
+      return
+    }
+    if (!nextMemberId) {
+      nextMemberId = genLocalMemberId()
+    }
+  }
+
+  const hint = getOrderPrimaryMemberHint(items.value)
+  const nextGroupKey = nextMemberId ? `m:${nextMemberId}` : `name:${newName.toLowerCase()}`
+
+  for (const it of items.value) {
+    if (resolveMemberGroupKeyForItem(it, hint) === member.groupKey) {
+      it.Nguoi_dat = newName
+      if ('nguoiDat' in it) it.nguoiDat = newName
+      if (nextMemberId && !it.Nguoi_dat_id) {
+        it.Nguoi_dat_id = nextMemberId
+      }
+    }
+  }
+
+  const customEntry = customOrderMembers.value.find(
+    (cm) => cm.groupKey === member.groupKey,
+  )
+  if (customEntry) {
+    customEntry.name = newName
+    customEntry.groupKey = nextGroupKey
+    if (nextMemberId) customEntry.memberId = nextMemberId
+  }
+
+  if (selectedTargetMemberKey.value === member.groupKey) {
+    selectedTargetMemberKey.value = nextGroupKey
+  }
+
+  cancelRenameOrderMember()
+  toast('success', `Đã đổi tên thành "${newName}"`)
 }
 
 function getTargetMemberPayload() {
@@ -3398,28 +7199,75 @@ function isSameItemOwner(item, target) {
   return resolveMemberGroupKeyForItem(item, hint) === target.groupKey
 }
 
+const hangHoaByMaMap = computed(() => {
+  const map = new Map()
+  for (const h of hangHoaList.value || []) {
+    if (h?.Ma_hang) map.set(String(h.Ma_hang), h)
+  }
+  return map
+})
+
+function getOrderItemGiaGoc(item) {
+  const rawGiaGoc = Number(item?.giaGoc ?? item?.Gia_goc ?? 0)
+  if (rawGiaGoc > 0) return rawGiaGoc
+  const rawCode = String(item?.maHang || item?.Ma_hang || '').trim()
+  const prod = rawCode ? hangHoaByMaMap.value.get(rawCode) : null
+  return Number(prod?.Gia_goc ?? 0)
+}
+
+function getOrderItemMeta(item) {
+  const rawCode = String(item?.maHang || item?.Ma_hang || '').trim()
+  const prod = rawCode ? hangHoaByMaMap.value.get(rawCode) : null
+  const qty = Number(item?.soLuong ?? item?.So_luong ?? 0)
+  const giaGoc = getOrderItemGiaGoc(item)
+  const danhMuc = String(item?.danhMuc || item?.Danh_muc || prod?.Danh_muc || '').trim()
+  const trangThai = String(prod?.Trang_thai || item?.trangThai || item?.Trang_thai || '').trim()
+  const isOut = prod ? isOutOfStock(prod) : trangThai === 'Hết hàng'
+  const isAdminRow = item?.Added_by_role === 'admin' || item?.Nguoi_dat === 'Quán thêm'
+  const fallbackPrimary = String(form.tenKhachHang || '').trim() || 'Khách lẻ'
+  const nguoiDat = isAdminRow
+    ? 'Quán thêm'
+    : String(item?.Nguoi_dat || '').trim() || fallbackPrimary
+  return {
+    maHang: rawCode || '—',
+    danhMuc: danhMuc || '—',
+    giaGoc,
+    tongVon: giaGoc * qty,
+    trangThai: trangThai || (isOut ? 'Hết hàng' : 'Còn hàng'),
+    isOut,
+    nguoiDat,
+  }
+}
+
 const groupedOrderDisplayItems = computed(() => {
   const hasMultiplePeople = detectHasMultipleOrderMembers(items.value)
   const fallbackPrimary = String(form.tenKhachHang || '').trim() || 'Khách lẻ'
   const groups = new Map()
 
   items.value.forEach((item, idx) => {
-    const codeKey = item?.maHang || item?.Ma_hang || item?.tenHang || ''
+    const rawCode = String(item?.maHang || item?.Ma_hang || '').trim()
+    const codeKey = rawCode || item?.tenHang || ''
     const sizeKey = item?.size || item?.Size || ''
     const dvtKey = item?.dvt || item?.Dvt || ''
     const currency = item?.donViTienTe || item?.Don_vi_tien_te || 'P'
     const giaBan = Number(item?.giaBan ?? item?.Gia_ban ?? 0)
     const gKey = `${codeKey}__${sizeKey}__${dvtKey}__${currency}__${giaBan}`
+    const meta = getOrderItemMeta(item)
 
     if (!groups.has(gKey)) {
       groups.set(gKey, {
         groupKey: gKey,
-        maHang: codeKey,
+        maHang: rawCode || '—',
         tenHang: item?.tenHang || item?.Ten_hang || '',
+        danhMuc: meta.danhMuc,
+        trangThai: meta.trangThai,
+        isOut: meta.isOut,
         size: sizeKey,
         dvt: dvtKey,
         donViTienTe: currency,
         giaBan,
+        giaGoc: meta.giaGoc,
+        tongVon: 0,
         totalQty: 0,
         thanhTien: 0,
         tongChietKhauTien: 0,
@@ -3427,7 +7275,10 @@ const groupedOrderDisplayItems = computed(() => {
         tongGiamTru: 0,
         netTotal: 0,
         loiNhuan: 0,
+        nccLoaiGiam: normalizeNccDiscountType(item?.Ncc_loai_giam ?? item?.nccLoaiGiam),
+        nccGiaTriGiam: normalizeNccDiscountValue(item?.Ncc_gia_tri_giam ?? item?.nccGiaTriGiam),
         notesSet: new Set(),
+        peopleSet: new Set(),
         entries: [],
       })
     }
@@ -3441,6 +7292,7 @@ const groupedOrderDisplayItems = computed(() => {
     const loiNhuan = Number(item?.loiNhuan ?? item?.Loi_nhuan ?? 0)
 
     grp.totalQty += qty
+    grp.tongVon += meta.giaGoc * qty
     grp.thanhTien += thanhTien
     grp.tongChietKhauTien += tongCK
     grp.tongGiamGiaTien += tongGiam
@@ -3457,17 +7309,73 @@ const groupedOrderDisplayItems = computed(() => {
       ? 'Quán thêm'
       : String(item?.Nguoi_dat || '').trim() || fallbackPrimary
 
+    grp.peopleSet.add(`${personName} ×${qty}`)
     grp.entries.push({ item, idx, personName, role })
   })
 
   return Array.from(groups.values()).map((grp) => ({
     ...grp,
+    giaGoc: grp.totalQty > 0 ? grp.tongVon / grp.totalQty : grp.giaGoc,
     combinedNotes: Array.from(grp.notesSet).join('; '),
+    nguoiDatSummary: Array.from(grp.peopleSet).join(', '),
     showMemberBreakdown:
       hasMultiplePeople ||
       grp.entries.some((e) => Boolean(e.item?.Nguoi_dat || e.item?.Added_by_role)),
   }))
 })
+
+function recalcOrderItemProfit(row) {
+  if (!row) return
+  const qty = Math.max(1, Number(row.soLuong ?? row.So_luong ?? 1))
+  const giaBan = Number(row.giaBan ?? row.Gia_ban ?? 0)
+  const giaGoc = Number(row.giaGoc ?? row.Gia_goc ?? getOrderItemGiaGoc(row))
+  const giamGia = Number(row.giamGia ?? row.Giam_gia ?? 0)
+  const chietKhau = Number(row.chietKhau ?? row.Chiet_khau ?? 0)
+  const d = calcDiscount(giaBan, qty, giamGia, chietKhau)
+  const nccLoaiGiam = normalizeNccDiscountType(row.Ncc_loai_giam ?? row.nccLoaiGiam)
+  const nccGiaTriGiam = normalizeNccDiscountValue(row.Ncc_gia_tri_giam ?? row.nccGiaTriGiam)
+
+  const loiNhuan = calcOrderLineProfit({
+    giaBan,
+    giaGoc,
+    soLuong: qty,
+    giamGia,
+    ck1sp: d.ck1sp,
+    nccLoaiGiam,
+    nccGiaTriGiam,
+  })
+  row.Ncc_loai_giam = nccLoaiGiam
+  row.nccLoaiGiam = nccLoaiGiam
+  row.Ncc_gia_tri_giam = nccGiaTriGiam
+  row.nccGiaTriGiam = nccGiaTriGiam
+  row.Loi_nhuan = loiNhuan
+  row.loiNhuan = loiNhuan
+}
+
+function toggleRowNccType(targetRows = []) {
+  const validRows = (targetRows || []).filter(Boolean)
+  if (!validRows.length) return
+  const curType = normalizeNccDiscountType(
+    validRows[0].Ncc_loai_giam ?? validRows[0].nccLoaiGiam,
+  )
+  const nextType = curType === 'money' ? 'percent' : 'money'
+  for (const row of validRows) {
+    row.Ncc_loai_giam = nextType
+    row.nccLoaiGiam = nextType
+    recalcOrderItemProfit(row)
+  }
+}
+
+function updateRowNccValue(targetRows = [], rawVal) {
+  const validRows = (targetRows || []).filter(Boolean)
+  if (!validRows.length) return
+  const nextVal = normalizeNccDiscountValue(rawVal)
+  for (const row of validRows) {
+    row.Ncc_gia_tri_giam = nextVal
+    row.nccGiaTriGiam = nextVal
+    recalcOrderItemProfit(row)
+  }
+}
 
 function deleteGroupedOrderItem(grp) {
   if (!grp || !Array.isArray(grp.entries) || !grp.entries.length) return
@@ -3572,12 +7480,46 @@ const customerProfit = computed(() => {
     .reduce((sum, tc) => sum + Number(tc.loi_nhuan || 0), 0)
 })
 
+const activeInvoiceMilestones = computed(() => {
+  if (isExportCostMode.value) return []
+  const lang = selectedLang.value || 'vi'
+  return khuyenMaiList.value
+    .filter(
+      (k) =>
+        k &&
+        k.Loai_km === 'MILESTONE' &&
+        k.Kich_hoat !== false &&
+        Number(k.Moc_tien) > 0,
+    )
+    .slice()
+    .sort((a, b) => Number(a.Moc_tien) - Number(b.Moc_tien))
+    .map((m) => {
+      const custom = resolveNoticeText(m, lang)
+      const label = custom || (m.Kieu_uu_dai === 'GIFT' ? 'Quà tặng' : 'Freeship')
+      return {
+        threshold: Number(m.Moc_tien),
+        label,
+      }
+    })
+})
+
 const khuyenMaiText = computed(() => {
-  const kms = khuyenMaiList.value
-    .map((km) => resolveNoticeText(km, selectedLang.value || 'vi'))
+  const orderTotal = Number(tongCong.value || 0)
+  const unlocked = activeInvoiceMilestones.value
+    .filter((m) => orderTotal >= m.threshold)
+    .map((m) => m.label)
     .filter(Boolean)
 
-  return kms.map(k => `* ${k}`).join('\n')
+  return [...new Set(unlocked)].join(' + ')
+})
+
+const nextMilestoneHintText = computed(() => {
+  const orderTotal = Number(tongCong.value || 0)
+  const next = activeInvoiceMilestones.value.find((m) => orderTotal < m.threshold)
+  if (!next) return ''
+  const remaining = Math.max(0, next.threshold - orderTotal)
+  if (remaining <= 0) return ''
+  return `Mua thêm ${formatWithCurrency(remaining, donViTienTeChung.value)} để được ${next.label}`
 })
 
 const hasActiveFilters = computed(() => {
@@ -3704,8 +7646,15 @@ const manualPreview = computed(() => {
   const d = calcDiscount(giaBan, soLuong, form.giamGia, form.chietKhau)
   const thanhTien = giaBan * soLuong
   const sauGiam = thanhTien - d.tongGiamTru
-  const loiNhuan =
-    (giaBan - d.ck1sp - giaGoc - Number(form.giamGia || 0)) * soLuong
+  const loiNhuan = calcOrderLineProfit({
+    giaBan,
+    giaGoc,
+    soLuong,
+    giamGia: Number(form.giamGia || 0),
+    ck1sp: d.ck1sp,
+    nccLoaiGiam: form.nccLoaiGiam,
+    nccGiaTriGiam: form.nccGiaTriGiam,
+  })
   return {
     thanhTien,
     chietKhauTien: d.chietKhauTien,
@@ -3802,12 +7751,30 @@ function addItem() {
 
     const d = calcDiscount(giaBan, newQty, giamGia, chietKhau)
     const Thanh_tien = giaBan * newQty
-    const Loi_nhuan = (giaBan - d.ck1sp - giaGoc - giamGia) * newQty
+    const nccLoaiGiam = normalizeNccDiscountType(
+      existingItem.Ncc_loai_giam ?? existingItem.nccLoaiGiam ?? form.nccLoaiGiam,
+    )
+    const nccGiaTriGiam = normalizeNccDiscountValue(
+      existingItem.Ncc_gia_tri_giam ?? existingItem.nccGiaTriGiam ?? form.nccGiaTriGiam,
+    )
+    const Loi_nhuan = calcOrderLineProfit({
+      giaBan,
+      giaGoc,
+      soLuong: newQty,
+      giamGia,
+      ck1sp: d.ck1sp,
+      nccLoaiGiam,
+      nccGiaTriGiam,
+    })
 
     // Update existing item fields (UI & Sheet sync)
     existingItem.So_luong = newQty
     existingItem.soLuong = newQty
     existingItem.Tien_chiet_khau = d.chietKhauTien
+    existingItem.Ncc_loai_giam = nccLoaiGiam
+    existingItem.nccLoaiGiam = nccLoaiGiam
+    existingItem.Ncc_gia_tri_giam = nccGiaTriGiam
+    existingItem.nccGiaTriGiam = nccGiaTriGiam
     existingItem.Thanh_tien = Thanh_tien
     existingItem.thanhTien = Thanh_tien
     existingItem.tongGiamGiaTien = d.giamGiaTien
@@ -3835,12 +7802,21 @@ function addItem() {
   } else {
     // Add new item (existing logic)
     const d = calcDiscount(form.giaBan, form.soLuong, form.giamGia, form.chietKhau)
-  
-    const loiNhuan =
-      (form.giaBan - d.ck1sp - form.giaGoc - form.giamGia) * form.soLuong
-  
+    const nccLoaiGiam = normalizeNccDiscountType(form.nccLoaiGiam)
+    const nccGiaTriGiam = normalizeNccDiscountValue(form.nccGiaTriGiam)
+
+    const loiNhuan = calcOrderLineProfit({
+      giaBan: form.giaBan,
+      giaGoc: form.giaGoc,
+      soLuong: form.soLuong,
+      giamGia: form.giamGia,
+      ck1sp: d.ck1sp,
+      nccLoaiGiam,
+      nccGiaTriGiam,
+    })
+
     const thanhTien = form.giaBan * form.soLuong
-  
+
     items.value.push({
       Ma_hoa_don: maHoaDon.value,
       So_hoa_don: soHoaDon.value,
@@ -3858,6 +7834,10 @@ function addItem() {
       Gia_ban: form.giaBan,
       Giam_gia: form.giamGia,
       Tien_chiet_khau: d.chietKhauTien,
+      Ncc_loai_giam: nccLoaiGiam,
+      Ncc_gia_tri_giam: nccGiaTriGiam,
+      nccLoaiGiam,
+      nccGiaTriGiam,
       Thanh_tien: thanhTien,
       Loi_nhuan: loiNhuan,
       Ghi_chu: form.ghiChuHang || '',
@@ -3897,18 +7877,169 @@ function addItem() {
 }
 
 function resetItem() {
+  showManualAddOptions.value = false
   form.maHang = ''
   form.tenHang = ''
   form.soLuong = 1
   form.giaGoc = 0
   form.chietKhau = 0
   form.giamGia = 0
+  form.nccLoaiGiam = 'percent'
+  form.nccGiaTriGiam = 0
   form.giaBan = 0
   form.ghiChuHang = ''
 }
 
+const isManualMatchedInDb = computed(() => {
+  const code = String(form.maHang || '').trim()
+  if (!code) return false
+  return hangHoaList.value.some((h) => String(h?.Ma_hang || '').trim() === code)
+})
+
+const manualLinePreview = computed(() => {
+  const price = Number(form.giaBan || 0)
+  const disc = Number(form.giamGia || 0)
+  const qty = Math.max(1, Number(form.soLuong || 1))
+  return Math.max(0, (price - disc) * qty)
+})
+
+function genManualUniqueMaHang(tenHang) {
+  const clean = String(tenHang || '').trim()
+  const ascii = clean
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+  const baseCode =
+    ascii
+      .split(/\s+/)
+      .map((w) => w.replace(/[^a-zA-Z0-9]/g, '')[0]?.toUpperCase())
+      .filter(Boolean)
+      .join('') || 'SP'
+
+  const existingSet = new Set(
+    (hangHoaList.value || []).map((h) => String(h?.Ma_hang || '').trim()).filter(Boolean),
+  )
+  if (!existingSet.has(baseCode)) return baseCode
+  let suffix = 1
+  while (existingSet.has(`${baseCode}_${suffix}`)) {
+    suffix += 1
+  }
+  return `${baseCode}_${suffix}`
+}
+
+function handleManualAddClick() {
+  if (isSavingManualToDb.value) return
+  const tenHangTrim = (form.tenHang || '').trim()
+  if (!tenHangTrim) {
+    toast('warn', '⚠️ Vui lòng nhập tên hàng')
+    return
+  }
+  if (form.maHang && isManualOutOfStock.value) {
+    toast('error', '❌ Sản phẩm này đang ở trạng thái HẾT HÀNG!')
+    return
+  }
+  showManualAddOptions.value = !showManualAddOptions.value
+}
+
+function manualAddOrderOnly() {
+  showManualAddOptions.value = false
+  addItem()
+}
+
+async function manualAddAndSaveToDb() {
+  if (isSavingManualToDb.value) return
+  const tenHangTrim = (form.tenHang || '').trim()
+  if (!tenHangTrim) {
+    toast('warn', '⚠️ Vui lòng nhập tên hàng')
+    return
+  }
+
+  const isExisting = isManualMatchedInDb.value
+  const targetMaHang = isExisting
+    ? String(form.maHang).trim()
+    : genManualUniqueMaHang(tenHangTrim)
+  const langKey = form.lang === 'tl' ? 'fil' : form.lang || 'vi'
+  const danhMucTrim = (form.danhMuc || '').trim()
+  const sizeTrim = (form.size || '').trim()
+  const dvtTrim = (form.dvt || '').trim()
+  const currencyTrim = (form.donViTienTe || 'P').trim() || 'P'
+  const existingRow = isExisting
+    ? hangHoaList.value.find((h) => String(h?.Ma_hang || '').trim() === targetMaHang)
+    : null
+
+  const i18nSeed = existingRow?.i18n ? JSON.parse(JSON.stringify(existingRow.i18n)) : {}
+  i18nSeed[langKey] = {
+    ...(i18nSeed[langKey] || {}),
+    Ten_hang: tenHangTrim,
+    Danh_muc: danhMucTrim,
+    Dvt: dvtTrim,
+  }
+
+  const productPayload = syncProductWithI18n({
+    ...(existingRow || {}),
+    Ma_hang: targetMaHang,
+    Ten_hang: langKey === 'vi' ? tenHangTrim : existingRow?.Ten_hang || tenHangTrim,
+    Danh_muc: langKey === 'vi' ? danhMucTrim : existingRow?.Danh_muc || danhMucTrim,
+    Size: sizeTrim,
+    Dvt: langKey === 'vi' ? dvtTrim : existingRow?.Dvt || dvtTrim,
+    Gia_goc: Number(form.giaGoc || 0),
+    Gia_ban: Number(form.giaBan || 0),
+    Ncc_loai_giam: normalizeNccDiscountType(form.nccLoaiGiam),
+    Ncc_gia_tri_giam: normalizeNccDiscountValue(form.nccGiaTriGiam),
+    Don_vi_tien_te: currencyTrim,
+    Trang_thai: form.trangThai || existingRow?.Trang_thai || 'Còn hàng',
+    i18n: i18nSeed,
+  })
+  if (!isExisting) {
+    productPayload.Gia_Giam = ''
+  }
+
+  isSavingManualToDb.value = true
+  try {
+    const res = await dispatchAction({
+      action: 'nhapHangHoa',
+      data: [productPayload],
+    })
+    if (!res?.success) {
+      toast('error', '❌ ' + (res?.message || 'Không thể lưu sản phẩm vào DB'))
+      return
+    }
+
+    const idx = hangHoaList.value.findIndex(
+      (h) => String(h?.Ma_hang || '').trim() === targetMaHang,
+    )
+    if (idx > -1) {
+      hangHoaList.value[idx] = { ...hangHoaList.value[idx], ...productPayload }
+    } else {
+      hangHoaList.value.unshift(productPayload)
+      productQty[targetMaHang] = 1
+      productNotes[targetMaHang] = ''
+      notePopoverOpen[targetMaHang] = false
+      cardHighlight[targetMaHang] = false
+    }
+
+    form.maHang = targetMaHang
+    form.trangThai = productPayload.Trang_thai
+    showManualAddOptions.value = false
+    addItem()
+    toast(
+      'success',
+      isExisting
+        ? `✅ Đã cập nhật DB (#${targetMaHang}) & thêm vào đơn!`
+        : `✅ Đã lưu vào DB (#${targetMaHang}) & thêm vào đơn!`,
+    )
+  } catch (e) {
+    console.error('Lỗi lưu sản phẩm thủ công vào DB:', e)
+    toast('error', '❌ Lỗi kết nối Firebase khi lưu sản phẩm vào DB')
+  } finally {
+    isSavingManualToDb.value = false
+  }
+}
+
 /* ================= THANH TOÁN ================= */
 const hinhThucThanhToan = ref('TIEN_MAT')
+const ckBaoGomShip = ref(false)
 const tiGiaRef = ref(null)
 
 function handlePaymentMethodChange(method) {
@@ -3925,11 +8056,309 @@ const tenHinhThucThanhToan = computed(() => {
   return 'Tiền mặt'
 })
 
+/* ================= XUẤT MÃ QR CHUYỂN KHOẢN TỰ ĐIỀN (VIETQR) ================= */
+const showQrExportModal = ref(false)
+const selectedQrBankIndex = ref(0)
+const qrExportMemo = ref('')
+const qrModalWrapRef = ref(null)
+const qrModalCardRef = ref(null)
+const isQrImageCopied = ref(false)
+const isExportingQrPng = ref(false)
+
+const parsedCkAccounts = computed(() =>
+  (thongTinChuyenKhoanList.value || []).map((info) => parseBankAccountInfo(info)).filter(Boolean),
+)
+
+const qrExportAccounts = computed(() =>
+  parsedCkAccounts.value.filter((acc) => acc.hasAnyQr),
+)
+
+const activeQrBankAccount = computed(
+  () =>
+    qrExportAccounts.value[selectedQrBankIndex.value] ||
+    qrExportAccounts.value[0] ||
+    null,
+)
+
+const qrExportShipIncluded = computed(
+  () => normalizedPhiShip.value > 0 && ckBaoGomShip.value,
+)
+
+const qrExportCurrency = computed(() => {
+  const acc = activeQrBankAccount.value
+  if (!acc) return donViTienTeCK.value || 'VND'
+  if (acc.currency === 'P' || acc.currency === 'PHP') {
+    return donViTienTeChung.value || 'P'
+  }
+  return acc.currency || donViTienTeCK.value || 'VND'
+})
+
+const qrExportDisplayAmount = computed(() => {
+  const acc = activeQrBankAccount.value
+  const baseAmt = Number(tongCong.value || 0) + (qrExportShipIncluded.value ? normalizedPhiShip.value : 0)
+  if (!acc) return Math.max(0, Math.round(baseAmt * Number(tiGia.value || 1)))
+
+  const accCur = acc.currency === 'P' ? 'PHP' : acc.currency
+  const orderCurRaw = String(donViTienTeChung.value || 'P').trim().toUpperCase()
+  const orderCur = orderCurRaw === 'P' ? 'PHP' : orderCurRaw
+
+  if (accCur === orderCur) {
+    return Math.max(0, Math.round(baseAmt))
+  }
+  const rate =
+    accCur === 'VND'
+      ? Number(tiGia.value || acc.tiGia || 1)
+      : Number(acc.tiGia || tiGia.value || 1)
+  return Math.max(0, Math.round(baseAmt * rate))
+})
+
+const qrExportShipStatusText = computed(() =>
+  qrExportShipIncluded.value ? 'Đã tính ship' : 'Chưa tính ship',
+)
+
+const qrModalPayload = computed(() => {
+  const acc = activeQrBankAccount.value
+  if (!acc?.isValidVietQr) return ''
+  return buildVietQrPayload({
+    bin: acc.bin,
+    accountNo: acc.stk,
+    amount: qrExportDisplayAmount.value,
+    addInfo: qrExportMemo.value,
+  })
+})
+
+function getBankDynamicQrPayload(info) {
+  const parsed = parseBankAccountInfo(info)
+  if (!parsed?.isValidVietQr) return ''
+  return buildVietQrPayload({
+    bin: parsed.bin,
+    accountNo: parsed.stk,
+    amount: Math.max(0, Math.round(Number(exportTongChuyenKhoan.value || 0))),
+    addInfo: maHoaDon.value || '',
+  })
+}
+
+function openQrExportModal() {
+  if (!items.value.length) {
+    toast('warn', 'Chưa có hàng trong đơn')
+    return
+  }
+  if (!qrExportAccounts.value.length) {
+    toast(
+      'warn',
+      'Chưa có tài khoản chuyển khoản hoặc ảnh QR trong mục Ngân hàng & Tỉ giá',
+    )
+    return
+  }
+  selectedQrBankIndex.value = 0
+  qrExportMemo.value = toAsciiClean(maHoaDon.value || '').slice(0, 50)
+  isQrImageCopied.value = false
+  showQrExportModal.value = true
+}
+
+function loadImageAsync(src, useCors = false) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    if (useCors && !String(src || '').startsWith('data:')) {
+      img.crossOrigin = 'anonymous'
+    }
+    img.onload = () => resolve(img)
+    img.onerror = reject
+    img.src = src
+  })
+}
+
+async function renderQrExportPngBlob() {
+  const acc = activeQrBankAccount.value
+  if (!acc) throw new Error('Không tìm thấy tài khoản QR để xuất')
+
+  let qrImg = null
+  if (acc.isValidVietQr) {
+    const svgEl = qrModalWrapRef.value?.querySelector('svg')
+    if (!svgEl) throw new Error('Không tìm thấy mã QR để xuất')
+    const svgClone = svgEl.cloneNode(true)
+    svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+    svgClone.setAttribute('width', '420')
+    svgClone.setAttribute('height', '420')
+    const svgMarkup = new XMLSerializer().serializeToString(svgClone)
+    const svgDataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`
+    qrImg = await loadImageAsync(svgDataUrl)
+  } else {
+    if (!acc.qrImgSrc) throw new Error('Tài khoản này chưa có ảnh QR tĩnh')
+    qrImg = await loadImageAsync(acc.qrImgSrc, true)
+  }
+
+  const W = 680
+  const H = 880
+  const canvas = document.createElement('canvas')
+  canvas.width = W
+  canvas.height = H
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Không khởi tạo được canvas')
+
+  // Outer light card background
+  ctx.fillStyle = '#f8fafc'
+  ctx.fillRect(0, 0, W, H)
+
+  // Main white rounded card
+  ctx.fillStyle = '#ffffff'
+  ctx.strokeStyle = '#e2e8f0'
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  ctx.roundRect(28, 28, W - 56, H - 56, 28)
+  ctx.fill()
+  ctx.stroke()
+
+  // Header gradient pill
+  ctx.fillStyle = '#0f172a'
+  ctx.beginPath()
+  ctx.roundRect(68, 56, W - 136, 56, 14)
+  ctx.fill()
+
+  ctx.fillStyle = acc.isValidVietQr ? '#38bdf8' : '#fbbf24'
+  ctx.font = '800 18px system-ui, -apple-system, Segoe UI, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText(
+    acc.isValidVietQr ? 'VIETQR · CHUYỂN KHOẢN TỰ ĐIỀN' : 'QR CHUYỂN KHOẢN',
+    W / 2,
+    91,
+  )
+
+  // Bank name
+  ctx.fillStyle = '#1e293b'
+  ctx.font = '800 22px system-ui, -apple-system, Segoe UI, sans-serif'
+  ctx.fillText(String(acc.bankName || acc.title || '').toUpperCase(), W / 2, 148)
+
+  // QR Frame (fit keeping aspect ratio for static QR images)
+  const qrSize = 360
+  const qrX = (W - qrSize) / 2
+  const qrY = 172
+  ctx.fillStyle = '#ffffff'
+  ctx.strokeStyle = '#cbd5e1'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.roundRect(qrX - 18, qrY - 18, qrSize + 36, qrSize + 36, 20)
+  ctx.fill()
+  ctx.stroke()
+
+  const iw = qrImg.naturalWidth || qrSize
+  const ih = qrImg.naturalHeight || qrSize
+  const scale = Math.min(qrSize / iw, qrSize / ih)
+  const dw = iw * scale
+  const dh = ih * scale
+  ctx.drawImage(qrImg, qrX + (qrSize - dw) / 2, qrY + (qrSize - dh) / 2, dw, dh)
+
+  // Amount label + value
+  ctx.fillStyle = '#64748b'
+  ctx.font = '700 16px system-ui, -apple-system, Segoe UI, sans-serif'
+  ctx.fillText('SỐ TIỀN CHUYỂN KHOẢN', W / 2, 588)
+
+  ctx.fillStyle = '#059669'
+  ctx.font = '900 38px system-ui, -apple-system, Segoe UI, sans-serif'
+  ctx.fillText(formatWithCurrency(qrExportDisplayAmount.value, qrExportCurrency.value), W / 2, 634)
+
+  ctx.fillStyle = qrExportShipIncluded.value ? '#0284c7' : '#64748b'
+  ctx.font = '700 17px system-ui, -apple-system, Segoe UI, sans-serif'
+  ctx.fillText(`(${qrExportShipStatusText.value})`, W / 2, 666)
+
+  // Divider
+  ctx.strokeStyle = '#e2e8f0'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(68, 692)
+  ctx.lineTo(W - 68, 692)
+  ctx.stroke()
+
+  // Account details
+  ctx.textAlign = 'left'
+  const detailLines = [
+    acc.ownerName ? ['Chủ TK:', acc.ownerName] : null,
+    acc.stk ? ['Số TK:', acc.stk] : null,
+    acc.isValidVietQr && qrExportMemo.value ? ['Nội dung:', qrExportMemo.value] : null,
+  ].filter(Boolean)
+
+  let curY = 732
+  for (const [label, val] of detailLines) {
+    ctx.fillStyle = '#64748b'
+    ctx.font = '600 18px system-ui, -apple-system, Segoe UI, sans-serif'
+    ctx.fillText(label, 76, curY)
+
+    ctx.fillStyle = '#0f172a'
+    ctx.font = '800 19px system-ui, -apple-system, Segoe UI, sans-serif'
+    ctx.textAlign = 'right'
+    ctx.fillText(String(val), W - 76, curY)
+    ctx.textAlign = 'left'
+    curY += 36
+  }
+
+  return await new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob)
+      else reject(new Error('Không xuất được file PNG'))
+    }, 'image/png')
+  })
+}
+
+async function downloadQrExportPng() {
+  if (isExportingQrPng.value) return
+  isExportingQrPng.value = true
+  try {
+    const blob = await renderQrExportPngBlob()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `vietqr-${maHoaDon.value || 'chuyen-khoan'}.png`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    toast('success', 'Đã tải ảnh mã QR chuyển khoản!')
+  } catch (err) {
+    console.error('Lỗi tải ảnh QR:', err)
+    toast('error', 'Không thể tạo ảnh mã QR')
+  } finally {
+    isExportingQrPng.value = false
+  }
+}
+
+async function copyQrExportPng() {
+  if (isExportingQrPng.value) return
+  isExportingQrPng.value = true
+  try {
+    const blob = await renderQrExportPngBlob()
+    if (
+      typeof navigator !== 'undefined' &&
+      navigator.clipboard &&
+      typeof window !== 'undefined' &&
+      typeof window.ClipboardItem === 'function'
+    ) {
+      await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })])
+      isQrImageCopied.value = true
+      toast('success', 'Đã copy ảnh mã QR vào clipboard!')
+      setTimeout(() => {
+        isQrImageCopied.value = false
+      }, 2200)
+    } else {
+      await downloadQrExportPng()
+    }
+  } catch (err) {
+    console.warn('Copy QR image fallback to download:', err)
+    toast('warn', 'Trình duyệt không hỗ trợ copy ảnh trực tiếp, đang tải về...')
+    isExportingQrPng.value = false
+    await downloadQrExportPng()
+    return
+  } finally {
+    isExportingQrPng.value = false
+  }
+}
+
 /* ================= GLOBAL DISCOUNT INTERFACE ================= */
 const showDiscountModal = ref(false)
 const activeDiscountType = ref('money') // 'money' | 'percent'
 const globalGiamGia = ref(0)
 const globalChietKhauPercent = ref(0)
+const phiShip = ref(0)
+const normalizedPhiShip = computed(() => Math.max(0, Number(phiShip.value || 0)))
 const tempGlobalGiamGia = ref(0)
 const tempGlobalChietKhauPercent = ref(0)
 
@@ -3941,9 +8370,14 @@ watch(
     gioNhanHang,
     phutNhanHang,
     hinhThucThanhToan,
+    ckBaoGomShip,
+    exportPriceMode,
     orderTableViewMode,
+    syncedOrderDigest,
+    customOrderMembers,
     globalGiamGia,
     globalChietKhauPercent,
+    phiShip,
     items,
     () => form.maKhachHang,
     () => form.tenKhachHang,
@@ -4066,7 +8500,7 @@ function buildInvoicePayload(targetStatus = '') {
     hoa_don: {
       Ma_hoa_don: maHoaDon.value,
       So_hoa_don: soHoaDon.value,
-      Ngay_tao_duong_lich: formatDateTimeVN(),
+      Ngay_tao_duong_lich: orderCreatedAt.value || formatDateTimeVN(),
       Thoi_gian_nhan_hang: formatDateTimeVN(new Date(thoiGianNhanHang.value)),
       Ma_khach_hang: form.maKhachHang,
       Ten_khach_hang: form.tenKhachHang,
@@ -4080,11 +8514,30 @@ function buildInvoicePayload(targetStatus = '') {
       Dia_chi: form.diaChi,
       So_dien_thoai: String(form.soDienThoai),
       Ghi_chu_don_hang: form.ghiChuDonHang,
+      Don_vi_tien_te: donViTienTeChung.value,
       Ti_gia: tiGia.value,
       Don_vi_tien_te_ck: donViTienTeCK.value,
+      Phi_ship: normalizedPhiShip.value,
       ...(targetStatus ? { Trang_thai: targetStatus } : {}),
     },
-    items: items.value,
+    items: (items.value || []).map((it) => ({
+      ...it,
+      lineId: it.lineId || '',
+      Ma_hang: it.Ma_hang || it.maHang || '',
+      Ten_hang: it.Ten_hang || it.tenHang || '',
+      Size: it.Size || it.size || '',
+      Dvt: it.Dvt || it.dvt || '',
+      Don_vi_tien_te: it.Don_vi_tien_te || it.donViTienTe || donViTienTeChung.value,
+      So_luong: Number(it.soLuong ?? it.So_luong ?? 1),
+      Gia_goc: Number(it.giaGoc ?? it.Gia_goc ?? 0),
+      Gia_ban: Number(it.giaBan ?? it.Gia_ban ?? 0),
+      Giam_gia: Number(it.giamGia ?? it.Giam_gia ?? 0),
+      Chiet_khau: Number(it.chietKhau ?? it.Chiet_khau ?? 0),
+      Tien_chiet_khau: Number(it.tongChietKhauTien ?? it.Tien_chiet_khau ?? 0),
+      Thanh_tien: Number(it.thanhTien ?? it.Thanh_tien ?? 0),
+      Loi_nhuan: Number(it.loiNhuan ?? it.Loi_nhuan ?? 0),
+      Ghi_chu: it.ghiChuHang ?? it.Ghi_chu ?? '',
+    })),
     khach_hang: {
       Ma_khach_hang: form.maKhachHang,
       Ten_khach_hang: form.tenKhachHang,
@@ -4100,23 +8553,57 @@ function updateActiveTabSourceStatus(nextStatus) {
   const tab = activeTabObj.value
   if (!tab) return
   tab.sourceOrderStatus = nextStatus
+  if (nextStatus && nextStatus !== 'Chờ duyệt') {
+    tab.pendingWebUpdate = null
+    tab.updateBaselineItems = null
+    tab.updateBaselineMeta = null
+  }
   saveTabsToStorage()
 }
 
-async function hoanThanhDon() {
+function updateActiveTabAdminStatus(nextStatus, seenInDonHang = null) {
+  const tab = activeTabObj.value
+  if (!tab) return
+  tab.adminOrderStatus = nextStatus
+  if (seenInDonHang !== null) {
+    tab.adminSeenInDonHang = Boolean(seenInDonHang)
+  }
+  saveTabsToStorage()
+}
+
+async function hoanThanhDon(targetStatus = 'Đang xử lý', openModalOnDone = false) {
   if (!items.value.length) {
     toast('warn', 'Chưa có hàng trong đơn')
     return
   }
 
-  if (isSubmitting.value) return
+  if (isSubmitting.value || isOrderActionLoading.value) return
+  const nextStatus = typeof targetStatus === 'string' && targetStatus.trim() ? targetStatus.trim() : 'Đang xử lý'
+  if (!orderCreatedAt.value) {
+    orderCreatedAt.value = formatDateTimeVN()
+  }
   isSubmitting.value = true
 
   try {
-    const json = await dispatchAction(buildInvoicePayload())
+    const json = await dispatchAction(buildInvoicePayload(nextStatus))
 
     if (json.success) {
-      openSuccessModal('✅ Hoàn thành đơn thành công')
+      const dh = donHangList.value.find(
+        (d) => String(d?.Ma_hoa_don || '').trim() === String(maHoaDon.value).trim(),
+      )
+      if (dh) dh.Trang_thai = nextStatus
+      updateActiveTabAdminStatus(nextStatus, Boolean(dh))
+      markOrderSyncedWithWeb()
+
+      if (openModalOnDone || nextStatus === 'Hoàn thành') {
+        openSuccessModal('✅ Hoàn thành đơn hàng thành công!')
+      } else {
+        const msg =
+          nextStatus === 'Đang ship'
+            ? '🛵 Đã chốt đơn — trạng thái: Đang ship!'
+            : '✅ Đã chốt đơn — trạng thái: Đang xử lý!'
+        toast('success', msg)
+      }
     } else {
       toast('error', '❌ Lỗi: ' + (json.message || 'Không thể lưu đơn hàng'))
     }
@@ -4126,6 +8613,189 @@ async function hoanThanhDon() {
   } finally {
     isSubmitting.value = false
   }
+}
+
+const ORDER_STATUS_STEPS = [
+  { value: 'Chờ duyệt', label: 'Chờ duyệt' },
+  { value: 'Đang xử lý', label: 'Xử lý' },
+  { value: 'Đang ship', label: 'Đang ship' },
+  { value: 'Hoàn thành', label: 'Hoàn thành' },
+]
+
+const ADMIN_ORDER_STATUS_STEPS = [
+  { value: 'Đang xử lý', label: 'Xử lý' },
+  { value: 'Đang ship', label: 'Đang ship' },
+  { value: 'Hoàn thành', label: 'Hoàn thành' },
+]
+
+const activeProgressSteps = computed(() =>
+  isLinkedOnlineOrder.value ? ORDER_STATUS_STEPS : ADMIN_ORDER_STATUS_STEPS,
+)
+
+const currentOrderSyncFingerprint = computed(() => computeOrderSyncFingerprint())
+
+const isOrderSyncedWithWeb = computed(() => {
+  if (!isLinkedOnlineOrder.value && !isSubmittedAdminOrder.value) return false
+  if (!syncedOrderDigest.value) return false
+  return currentOrderSyncFingerprint.value === syncedOrderDigest.value
+})
+
+const activeOrderStepIndex = computed(() => {
+  const st = activeOrderStatus.value
+  const steps = activeProgressSteps.value
+  const idx = steps.findIndex((s) => s.value === st)
+  if (idx !== -1) return idx
+  return isLinkedOnlineOrder.value ? 0 : -1
+})
+
+const orderProgressPercent = computed(() => {
+  const maxStep = activeProgressSteps.value.length - 1
+  if (maxStep <= 0 || activeOrderStepIndex.value <= 0) return 0
+  return Math.round((activeOrderStepIndex.value / maxStep) * 100)
+})
+
+function getOrderProgressStepClass(stepIdx) {
+  const currentIdx = activeOrderStepIndex.value
+  if (currentIdx === -1) return 'is-upcoming'
+  const isCompletedAll = activeOrderStatus.value === 'Hoàn thành'
+  if (isCompletedAll || stepIdx < currentIdx) return 'is-done'
+  if (stepIdx === currentIdx) return 'is-current'
+  return 'is-upcoming'
+}
+
+function markOrderSyncedWithWeb() {
+  const digest = currentOrderSyncFingerprint.value
+  syncedOrderDigest.value = digest
+  const tab = activeTabObj.value
+  if (tab) {
+    tab.syncedDigest = digest
+    saveTabsToStorage()
+  }
+}
+
+function syncOrderToWebFromInvoice() {
+  if (!isLinkedOnlineOrder.value) return
+  if (activeOrderStatus.value === 'Chờ duyệt') {
+    return saveOrderDraftFromInvoice()
+  }
+  return saveApprovedOrderEdits()
+}
+
+function handleOrderProgressStepClick(targetStatus) {
+  if (!targetStatus || isOrderActionLoading.value || isSubmitting.value) return
+  if (!isLinkedOnlineOrder.value) {
+    return handleAdminProgressStepClick(targetStatus)
+  }
+  if (activeOrderStatus.value === targetStatus) {
+    if (!isOrderSyncedWithWeb.value) {
+      toast('info', 'Đơn có thay đổi chưa đồng bộ — bấm "ĐỒNG BỘ WEB" để cập nhật lên web')
+    }
+    return
+  }
+  if (targetStatus === 'Chờ duyệt') {
+    return runOnlineOrderTransition(
+      'Chờ duyệt',
+      `Chuyển đơn #${maHoaDon.value} về trạng thái Chờ duyệt?`,
+      '✅ Đã chuyển đơn về Chờ duyệt!',
+    )
+  }
+  if (targetStatus === 'Đang xử lý') return approveOrderFromInvoice()
+  if (targetStatus === 'Đang ship') return shipOrderFromInvoice()
+  if (targetStatus === 'Hoàn thành') return completeOrderFromInvoice()
+}
+
+function handleAdminProgressStepClick(targetStatus) {
+  if (!isSubmittedAdminOrder.value) {
+    if (!items.value.length) {
+      toast('warn', 'Chưa có hàng trong đơn')
+      return
+    }
+    if (targetStatus === 'Đang xử lý') {
+      return hoanThanhDon('Đang xử lý', false)
+    }
+    if (targetStatus === 'Đang ship') {
+      if (!confirm(`Xác nhận chốt đơn #${maHoaDon.value} và chuyển ngay sang Đang ship?`)) return
+      return hoanThanhDon('Đang ship', false)
+    }
+    if (targetStatus === 'Hoàn thành') {
+      if (!confirm(`Xác nhận chốt và Hoàn thành đơn #${maHoaDon.value} ngay?`)) return
+      return hoanThanhDon('Hoàn thành', true)
+    }
+    return
+  }
+
+  if (activeOrderStatus.value === targetStatus) {
+    if (!isOrderSyncedWithWeb.value) {
+      toast('info', 'Đơn có thay đổi chưa lưu — bấm "LƯU CẬP NHẬT" để cập nhật đơn hàng')
+    }
+    return
+  }
+
+  if (targetStatus === 'Đang xử lý') {
+    return runAdminOrderTransition(
+      'Đang xử lý',
+      `Chuyển đơn #${maHoaDon.value} về trạng thái Đang xử lý?`,
+      '✅ Đã chuyển đơn sang Đang xử lý!',
+    )
+  }
+  if (targetStatus === 'Đang ship') {
+    return runAdminOrderTransition(
+      'Đang ship',
+      `Xác nhận chuyển đơn #${maHoaDon.value} sang trạng thái Đang ship?`,
+      '🛵 Đơn hàng đã chuyển sang Đang ship!',
+    )
+  }
+  if (targetStatus === 'Hoàn thành') {
+    return runAdminOrderTransition(
+      'Hoàn thành',
+      `Xác nhận hoàn thành đơn #${maHoaDon.value}?`,
+      '✅ Hoàn thành đơn hàng thành công!',
+      true,
+    )
+  }
+}
+
+async function runAdminOrderTransition(targetStatus, confirmText, successText, openModalOnDone = false) {
+  if (!items.value.length) {
+    toast('warn', 'Chưa có hàng trong đơn')
+    return
+  }
+  if (isOrderActionLoading.value || isSubmitting.value) return
+  if (confirmText && !confirm(confirmText)) return
+
+  isOrderActionLoading.value = true
+  try {
+    const res = await dispatchAction(buildInvoicePayload(targetStatus))
+    if (res?.success) {
+      const dh = donHangList.value.find(
+        (d) => String(d?.Ma_hoa_don || '').trim() === String(maHoaDon.value).trim(),
+      )
+      if (dh) dh.Trang_thai = targetStatus
+      updateActiveTabAdminStatus(targetStatus, dh ? true : null)
+      markOrderSyncedWithWeb()
+
+      if (openModalOnDone) {
+        openSuccessModal(successText)
+      } else {
+        toast('success', successText)
+      }
+    } else {
+      toast('error', '❌ Lỗi: ' + (res?.message || 'Không thể cập nhật đơn hàng'))
+    }
+  } catch (e) {
+    console.error(e)
+    toast('error', '❌ Lỗi kết nối Firebase')
+  } finally {
+    isOrderActionLoading.value = false
+  }
+}
+
+function saveAdminOrderEdits() {
+  return runAdminOrderTransition(
+    activeOrderStatus.value || 'Đang xử lý',
+    '',
+    '✅ Đã lưu cập nhật đơn hàng!',
+  )
 }
 
 async function saveOrderDraftFromInvoice() {
@@ -4157,17 +8827,19 @@ async function saveOrderDraftFromInvoice() {
         Thoi_gian_nhan_hang: formatDateTimeVN(new Date(thoiGianNhanHang.value)),
         Hinh_thuc_thanh_toan: hinhThucThanhToan.value,
         Ghi_chu: form.ghiChuDonHang || '',
+        Phi_ship: normalizedPhiShip.value,
       },
     })
     if (res?.success) {
       updateActiveTabSourceStatus('Chờ duyệt')
-      toast('success', '✅ Đã lưu nháp đơn (vẫn đang chờ duyệt / xác nhận)')
+      markOrderSyncedWithWeb()
+      toast('success', '✅ Đã đồng bộ đơn hàng lên web!')
     } else {
-      toast('error', '❌ ' + (res?.message || 'Không lưu được nháp đơn'))
+      toast('error', '❌ ' + (res?.message || 'Không đồng bộ được đơn lên web'))
     }
   } catch (e) {
     console.error(e)
-    toast('error', '❌ Lỗi kết nối Firebase khi lưu nháp')
+    toast('error', '❌ Lỗi kết nối Firebase khi đồng bộ web')
   } finally {
     isOrderActionLoading.value = false
   }
@@ -4186,6 +8858,7 @@ async function runOnlineOrderTransition(targetStatus, confirmText, successText, 
     const res = await dispatchAction(buildInvoicePayload(targetStatus))
     if (res?.success) {
       updateActiveTabSourceStatus(targetStatus)
+      markOrderSyncedWithWeb()
       const dh = donHangList.value.find(
         (d) => String(d?.Ma_hoa_don || '').trim() === String(maHoaDon.value).trim(),
       )
@@ -4219,7 +8892,7 @@ function saveApprovedOrderEdits() {
   return runOnlineOrderTransition(
     activeOrderStatus.value || 'Đang xử lý',
     '',
-    '✅ Đã lưu cập nhật đơn hàng!',
+    '✅ Đã đồng bộ đơn hàng lên web!',
   )
 }
 
@@ -4242,11 +8915,10 @@ function completeOrderFromInvoice() {
 
 async function cancelOrderFromInvoice() {
   if (isOrderActionLoading.value || isSubmitting.value) return
-  if (
-    !confirm(
-      `Xác nhận HỦY đơn #${maHoaDon.value}? Đơn sẽ bị hủy đồng bộ cả ở trang Đơn hàng và phía khách!`,
-    )
-  ) {
+  const confirmMsg = isLinkedOnlineOrder.value
+    ? `Xác nhận HỦY đơn #${maHoaDon.value}? Đơn sẽ bị hủy đồng bộ cả ở trang Đơn hàng và phía khách!`
+    : `Xác nhận HỦY đơn #${maHoaDon.value}? Đơn sẽ bị hủy khỏi danh sách Đơn hàng!`
+  if (!confirm(confirmMsg)) {
     return
   }
 
@@ -4257,7 +8929,11 @@ async function cancelOrderFromInvoice() {
       Ma_hoa_don: maHoaDon.value,
     })
     if (res?.success) {
-      updateActiveTabSourceStatus('Đã hủy')
+      if (isLinkedOnlineOrder.value) {
+        updateActiveTabSourceStatus('Đã hủy')
+      } else {
+        updateActiveTabAdminStatus('Đã hủy')
+      }
       toast('success', `Đã hủy đơn #${maHoaDon.value}`)
       if (activeInvoiceTabId.value) {
         closeInvoiceTab(activeInvoiceTabId.value)
@@ -4358,6 +9034,12 @@ function buildIsolatedInvoiceStyles() {
     .hd-table tbody tr:nth-child(even) { background: #f9fafb; }
     .hd-table td { padding: 10px; font-size: 12px; color: #374151; border-right: 1px solid #e5e7eb; }
     .hd-table td:last-child { border-right: none; }
+    .hd-table tbody tr.hd-member-group-row { background: #f1f5f9 !important; border-top: 2px solid #cbd5e1; border-bottom: 1px solid #cbd5e1; }
+    .hd-table tbody tr.hd-member-group-row td { padding: 8px 10px; color: #0f172a; font-weight: 700; }
+    .hd-mg-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .hd-mg-name { font-size: 13px; font-weight: 800; color: #0f172a; }
+    .hd-mg-badge { font-size: 11px; font-weight: 700; color: #475569; margin-left: 4px; }
+    .hd-mg-meta { font-size: 12px; font-weight: 800; color: #0f172a; white-space: nowrap; }
     .text-center { text-align: center; }
     .text-left { text-align: left; }
     .text-right { text-align: right; }
@@ -4373,6 +9055,12 @@ function buildIsolatedInvoiceStyles() {
     .col-total { width: 110px; }
     .hd-summary-row {
       display: grid; grid-template-columns: 1fr 420px; gap: 20px; align-items: stretch; margin-bottom: 16px;
+    }
+    .hd-summary-row.is-no-bank {
+      display: flex; justify-content: flex-end;
+    }
+    .hd-summary-row.is-no-bank .hd-summary {
+      width: 420px; max-width: 100%;
     }
     .hd-bank-box {
       background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 10px; padding: 16px;
@@ -4408,7 +9096,9 @@ function buildIsolatedInvoiceStyles() {
     }
     .ba-label { font-size: 12px; font-weight: 800; color: #475569; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; }
     .ba-value { font-size: 22px; font-weight: 900; color: #000000; letter-spacing: -0.5px; }
-    .ba-sub { font-size: 12px; color: #64748b; font-weight: 600; margin-top: 4px; }
+    .ba-sub { font-size: 12px; color: #64748b; font-weight: 700; margin-top: 4px; }
+    .ba-sub.is-ship-included { color: #0284c7; }
+    .ba-sub.is-ship-excluded { color: #64748b; }
     .hd-summary {
       display: flex; flex-direction: column; gap: 8px; margin-left: 0; max-width: 400px;
       padding: 16px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 20px;
@@ -4421,14 +9111,19 @@ function buildIsolatedInvoiceStyles() {
     .summary-label { font-size: 13px; color: #6b7280; font-weight: 600; }
     .summary-value { font-size: 14px; color: #1f2937; font-weight: 700; }
     .summary-row.discount .summary-label, .summary-row.discount .summary-value { color: #dc2626; }
+    .summary-row.goods-total .summary-label, .summary-row.goods-total .summary-value { color: #111827; font-weight: 700; border-top: 1px dashed #d1d5db; padding-top: 8px; }
+    .summary-row.shipping .summary-label, .summary-row.shipping .summary-value { color: #0284c7; font-weight: 700; }
     .summary-row.total { border-top: 2px solid #1a1a1a; padding-top: 12px; margin-top: 8px; }
     .summary-row.total .summary-label { font-size: 15px; color: #1a1a1a; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
     .summary-row.total .summary-value { font-size: 18px; color: #1a1a1a; font-weight: 900; }
     .summary-row.subtotal .summary-label, .summary-row.subtotal .summary-value,
     .summary-row.payment .summary-label, .summary-row.payment .summary-value { font-weight: 800; color: #111827; }
     .summary-row.payment { border-top: 1px solid #d1d5db; padding-top: 8px; margin-top: 4px; }
-    .hd-promo { margin-top: 5px; padding: 4px 0; text-align: right; }
-    .hd-promo-text { font-size: 13px; color: #dc2626; font-weight: 700; white-space: pre-line; }
+    .summary-row.promo { margin-top: 4px; padding-top: 6px; border-top: 1px dashed #cbd5e1; gap: 10px; align-items: flex-start; }
+    .summary-row.promo .summary-label { color: #047857; font-weight: 800; flex-shrink: 0; }
+    .summary-row.promo .summary-value { color: #059669; font-weight: 700; text-align: right; }
+    .hd-promo-next { margin-top: 6px; padding: 6px 10px; border-radius: 6px; background: #fffbeb; border: 1px solid #fde68a; text-align: center; }
+    .hd-promo-next-text { font-size: 12px; font-weight: 700; color: #b45309; line-height: 1.35; }
     .hd-footer-note { text-align: center; padding-top: 20px; border-top: 2px solid #e5e7eb; }
     .footer-line { font-size: 12px; color: #6b7280; font-weight: 500; margin: 4px 0; font-style: italic; }
   `
@@ -4684,6 +9379,19 @@ async function renderInvoiceCanvasIsolated() {
     )
     idoc.close()
 
+    // Convert dynamic SVG QR codes inside isolated invoice to data:image/svg+xml imgs for crisp html2canvas capture
+    for (const svgEl of Array.from(idoc.querySelectorAll('svg.bank-qr-svg'))) {
+      svgEl.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+      const svgMarkup = new XMLSerializer().serializeToString(svgEl)
+      const imgReplacement = idoc.createElement('img')
+      imgReplacement.setAttribute(
+        'src',
+        `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`,
+      )
+      imgReplacement.setAttribute('alt', 'QR')
+      svgEl.replaceWith(imgReplacement)
+    }
+
     const imgs = Array.from(idoc.querySelectorAll('img'))
     await Promise.race([
       Promise.all(
@@ -4747,7 +9455,165 @@ async function renderInvoiceCanvasIsolated() {
 
 const hoaDonRef = ref(null)
 
-async function previewHoaDon() {
+const isExportCostMode = computed(() => exportPriceMode.value === 'giaGoc')
+const isExportByMember = computed(() => exportGroupMode.value === 'by_member')
+
+const exportTableColSpan = computed(
+  () => 5 + (hasAnySize.value ? 1 : 0) + (hasAnyDvt.value ? 1 : 0),
+)
+
+const totalCostAmount = computed(() =>
+  items.value.reduce((s, i) => s + getOrderItemGiaGoc(i) * Number(i?.soLuong ?? i?.So_luong ?? 0), 0),
+)
+
+function getExportItemUnitPrice(item) {
+  return isExportCostMode.value
+    ? getOrderItemGiaGoc(item)
+    : Number(item?.giaBan ?? item?.Gia_ban ?? 0)
+}
+
+function getExportItemLineTotal(item) {
+  if (isExportCostMode.value) {
+    const qty = Number(item?.soLuong ?? item?.So_luong ?? 0)
+    return getOrderItemGiaGoc(item) * qty
+  }
+  return Number(item?.thanhTien ?? item?.Thanh_tien ?? 0) - Number(item?.tongGiamTru || 0)
+}
+
+const exportGroupedRows = computed(() => {
+  const groups = new Map()
+  for (const item of items.value) {
+    const rawCode = String(item?.maHang || item?.Ma_hang || '').trim()
+    const codeKey = rawCode || item?.tenHang || ''
+    const sizeKey = item?.size || item?.Size || ''
+    const dvtKey = item?.dvt || item?.Dvt || ''
+    const currency = item?.donViTienTe || item?.Don_vi_tien_te || 'P'
+    const unitPrice = getExportItemUnitPrice(item)
+    const gKey = `${codeKey}__${sizeKey}__${dvtKey}__${currency}__${unitPrice}`
+
+    if (!groups.has(gKey)) {
+      groups.set(gKey, {
+        groupKey: gKey,
+        tenHang: item?.tenHang || item?.Ten_hang || '',
+        size: sizeKey,
+        dvt: dvtKey,
+        donViTienTe: currency,
+        soLuong: 0,
+        unitPrice,
+        lineTotal: 0,
+        notesSet: new Set(),
+      })
+    }
+
+    const grp = groups.get(gKey)
+    grp.soLuong += Number(item?.soLuong ?? item?.So_luong ?? 0)
+    grp.lineTotal += getExportItemLineTotal(item)
+    const noteStr = String(item?.ghiChuHang || item?.Ghi_chu || '').trim()
+    if (noteStr) grp.notesSet.add(noteStr)
+  }
+
+  return Array.from(groups.values()).map((grp) => ({
+    ...grp,
+    ghiChuHang: Array.from(grp.notesSet).join('; '),
+  }))
+})
+
+const exportMemberSections = computed(() => {
+  const nonEmpty = invoiceMemberGroups.value.filter(
+    (grp) => grp.entries && grp.entries.length > 0,
+  )
+  const nameTotals = new Map()
+  for (const grp of nonEmpty) {
+    if (grp.role === 'admin') continue
+    const lower = String(grp.name || '').trim().toLowerCase()
+    if (lower) nameTotals.set(lower, (nameTotals.get(lower) || 0) + 1)
+  }
+  const nameSeen = new Map()
+
+  return nonEmpty.map((grp) => {
+    const lower = String(grp.name || '').trim().toLowerCase()
+    let displayName = grp.name
+    if (grp.role !== 'admin' && lower && (nameTotals.get(lower) || 0) > 1) {
+      const seq = (nameSeen.get(lower) || 0) + 1
+      nameSeen.set(lower, seq)
+      displayName = `${grp.name} (#${seq})`
+    }
+
+    const rows = grp.entries.map(({ item }) => ({
+      tenHang: item?.tenHang || item?.Ten_hang || '',
+      ghiChuHang: String(item?.ghiChuHang || item?.Ghi_chu || '').trim(),
+      size: item?.size || item?.Size || '',
+      dvt: item?.dvt || item?.Dvt || '',
+      soLuong: Number(item?.soLuong ?? item?.So_luong ?? 0),
+      donViTienTe: item?.donViTienTe || item?.Don_vi_tien_te || 'P',
+      unitPrice: getExportItemUnitPrice(item),
+      lineTotal: getExportItemLineTotal(item),
+    }))
+    const sectionTotal = rows.reduce((s, r) => s + r.lineTotal, 0)
+    return {
+      groupKey: grp.groupKey,
+      name: displayName,
+      badge: grp.badge,
+      totalQty: grp.totalQty,
+      sectionTotal,
+      rows,
+    }
+  })
+})
+
+const exportTamTinh = computed(() => (isExportCostMode.value ? totalCostAmount.value : tamTinh.value))
+
+const exportShippingFee = computed(() => (!isExportCostMode.value ? normalizedPhiShip.value : 0))
+
+const exportTongCong = computed(() =>
+  isExportCostMode.value ? totalCostAmount.value : tongCong.value + exportShippingFee.value,
+)
+
+const exportTongChuyenKhoan = computed(() => {
+  const rate = Number(tiGia.value || 1)
+  return exportTongCong.value * rate
+})
+
+function selectExportPriceMode(mode) {
+  exportPriceMode.value = mode
+  isTextCopied.value = false
+}
+
+function selectExportGroupMode(mode) {
+  exportGroupMode.value = mode
+  isTextCopied.value = false
+}
+
+function closeExportPriceChoiceModal() {
+  showExportPriceChoiceModal.value = false
+  pendingExportAction.value = ''
+}
+
+function confirmExportOptions(groupMode, priceMode) {
+  exportGroupMode.value = groupMode
+  exportPriceMode.value = priceMode
+  isTextCopied.value = false
+  const action = pendingExportAction.value
+  pendingExportAction.value = ''
+  showExportPriceChoiceModal.value = false
+  if (action === 'image') {
+    executePreviewHoaDon()
+  } else if (action === 'text') {
+    showTextInvoice.value = true
+  }
+}
+
+function previewHoaDon() {
+  if (!items.value.length) {
+    toast('warn', 'Chưa có hàng trong đơn')
+    return
+  }
+  if (isPreviewing.value) return
+  pendingExportAction.value = 'image'
+  showExportPriceChoiceModal.value = true
+}
+
+async function executePreviewHoaDon() {
   if (!items.value.length) {
     toast('warn', 'Chưa có hàng trong đơn')
     return
@@ -4756,12 +9622,18 @@ async function previewHoaDon() {
   if (isPreviewing.value) return
   isPreviewing.value = true
 
-  const fileName = `hoa-don-${maHoaDon.value || 'export'}.png`
+  const groupSuffix = isExportByMember.value ? '-tung-nguoi' : '-gop'
+  const modeSuffix = isExportCostMode.value ? '-gia-goc' : ''
+  const fileName = `hoa-don-${maHoaDon.value || 'export'}${groupSuffix}${modeSuffix}.png`
+  const titleParts = []
+  if (isExportByMember.value) titleParts.push('Từng người')
+  if (isExportCostMode.value) titleParts.push('Giá gốc')
+  const titleSuffix = titleParts.length ? ` (${titleParts.join(' · ')})` : ''
   // Mở tab mới ngay khi bấm để 0ms trễ và không bị trình duyệt chặn popup
   const win = window.open('', '_blank')
   if (win && !win.closed) {
     win.document.open()
-    win.document.write(buildInvoiceViewerShellHtml(`Hóa đơn ${maHoaDon.value || ''}`, fileName))
+    win.document.write(buildInvoiceViewerShellHtml(`Hóa đơn ${maHoaDon.value || ''}${titleSuffix}`, fileName))
     win.document.close()
   }
 
@@ -4800,23 +9672,50 @@ const textInvoiceRef = ref(null)
 const isTextCopied = ref(false)
 
 const textInvoice = computed(() => {
-  const lines = []
+  let bodyText = ''
 
-  items.value.forEach((i) => {
-    const ghiChu = i.ghiChuHang ? ` (${i.ghiChuHang})` : ''
-    lines.push(
-      `${i.soLuong} ${i.tenHang} : ${formatWithCurrency(i.giaBan, i.donViTienTe)}${ghiChu}`
-    )
-  })
+  if (isExportByMember.value) {
+    bodyText = exportMemberSections.value
+      .map((sec) => {
+        const roleLabel = sec.badge ? ` (${sec.badge})` : ''
+        const header = `【${sec.name}${roleLabel} — ${formatWithCurrency(sec.sectionTotal, donViTienTeChung.value)}】`
+        const itemLines = sec.rows.map((i) => {
+          const ghiChu = i.ghiChuHang ? ` (${i.ghiChuHang})` : ''
+          return `- ${i.soLuong} ${i.tenHang} : ${formatWithCurrency(i.unitPrice, i.donViTienTe)}${ghiChu}`
+        })
+        return [header, ...itemLines].join('\n')
+      })
+      .join('\n\n')
+  } else {
+    bodyText = exportGroupedRows.value
+      .map((i) => {
+        const ghiChu = i.ghiChuHang ? ` (${i.ghiChuHang})` : ''
+        return `${i.soLuong} ${i.tenHang} : ${formatWithCurrency(i.unitPrice, i.donViTienTe)}${ghiChu}`
+      })
+      .join('\n')
+  }
+
+  const isCostTextMode = isExportCostMode.value
+  const isTransferPay = hinhThucThanhToan.value === 'CHUYEN_KHOAN'
+  const summaryLine = isCostTextMode
+    ? (isTransferPay
+        ? (ckBaoGomShip.value ? 'Khách CK tiền hàng + ship' : 'Khách CK tiền hàng')
+        : `Thu cod: ${formatWithCurrency(tongCong.value, donViTienTeChung.value)}`)
+    : exportShippingFee.value > 0
+      ? `Tổng cộng : ${formatWithCurrency(tongCong.value, donViTienTeChung.value)} + ${formatWithCurrency(exportShippingFee.value, donViTienTeChung.value)} ship`
+      : `Tổng cộng : ${formatWithCurrency(exportTongCong.value, donViTienTeChung.value)}`
+  const promoLine = khuyenMaiText.value ? `\nƯu đãi : ${khuyenMaiText.value}` : ''
+  const nextPromoLine = nextMilestoneHintText.value ? `\n${nextMilestoneHintText.value}` : ''
+  const trimmedOrderNote = String(form.ghiChuDonHang || '').trim()
+  const orderNoteLine = trimmedOrderNote ? `\nGhi chú đơn hàng : ${trimmedOrderNote}` : ''
 
   return `
-${lines.join('\n')}
+${bodyText}
 
 Địa chỉ: ${form.diaChi}
 SĐT: ${form.soDienThoai}
 Thời gian nhận: ${formatDateTimeVN(new Date(thoiGianNhanHang.value))}
-Tổng cộng: ${formatWithCurrency(tongCong.value, donViTienTeChung.value)}
-Ghi chú đơn hàng : ${form.ghiChuDonHang || ''}
+${summaryLine}${promoLine}${nextPromoLine}${orderNoteLine}
 `.trim()
 })
 
@@ -4825,7 +9724,8 @@ function openTextInvoice() {
     toast('warn', 'Chưa có hàng trong đơn')
     return
   }
-  showTextInvoice.value = true
+  pendingExportAction.value = 'text'
+  showExportPriceChoiceModal.value = true
 }
 
 function copyTextInvoice() {
@@ -4840,7 +9740,11 @@ function copyTextInvoice() {
 
 function openEditItem(item, idx, siblingEntries = []) {
   editIndex.value = idx
-  Object.assign(editItem, JSON.parse(JSON.stringify(item)))
+  const cloned = JSON.parse(JSON.stringify(item))
+  cloned.giaGoc = getOrderItemGiaGoc(cloned)
+  cloned.nccLoaiGiam = normalizeNccDiscountType(cloned.Ncc_loai_giam ?? cloned.nccLoaiGiam)
+  cloned.nccGiaTriGiam = normalizeNccDiscountValue(cloned.Ncc_gia_tri_giam ?? cloned.nccGiaTriGiam)
+  Object.assign(editItem, cloned)
   const hint = getOrderPrimaryMemberHint(items.value)
   editItemMemberKey.value = resolveMemberGroupKeyForItem(item, hint)
   editModalSiblings.value = Array.isArray(siblingEntries) && siblingEntries.length > 1 ? siblingEntries : []
@@ -4852,7 +9756,11 @@ function switchEditModalSibling(sib) {
   const liveItem = items.value[sib.idx] || sib.item
   if (!liveItem) return
   editIndex.value = sib.idx
-  Object.assign(editItem, JSON.parse(JSON.stringify(liveItem)))
+  const cloned = JSON.parse(JSON.stringify(liveItem))
+  cloned.giaGoc = getOrderItemGiaGoc(cloned)
+  cloned.nccLoaiGiam = normalizeNccDiscountType(cloned.Ncc_loai_giam ?? cloned.nccLoaiGiam)
+  cloned.nccGiaTriGiam = normalizeNccDiscountValue(cloned.Ncc_gia_tri_giam ?? cloned.nccGiaTriGiam)
+  Object.assign(editItem, cloned)
   const hint = getOrderPrimaryMemberHint(items.value)
   editItemMemberKey.value = resolveMemberGroupKeyForItem(liveItem, hint)
 }
@@ -4873,6 +9781,10 @@ function saveEditItem() {
   }
 
   const d = calcDiscount(i.giaBan, i.soLuong, i.giamGia, i.chietKhau)
+  const nccLoaiGiam = normalizeNccDiscountType(i.nccLoaiGiam ?? i.Ncc_loai_giam)
+  const nccGiaTriGiam = normalizeNccDiscountValue(i.nccGiaTriGiam ?? i.Ncc_gia_tri_giam)
+  i.giaGoc = Math.max(0, Number(i.giaGoc || 0))
+  i.giaBan = Math.max(0, Number(i.giaBan || 0))
 
   i.thanhTien = i.giaBan * i.soLuong
   i.tongGiamGiaTien = d.giamGiaTien
@@ -4880,9 +9792,20 @@ function saveEditItem() {
   i.tongGiamTru = d.tongGiamTru
   i.tongGiamGiaDong = d.tongGiamTru
 
-  i.loiNhuan =
-    (i.giaBan - d.ck1sp - i.giaGoc - i.giamGia) * i.soLuong
+  i.loiNhuan = calcOrderLineProfit({
+    giaBan: i.giaBan,
+    giaGoc: i.giaGoc,
+    soLuong: i.soLuong,
+    giamGia: i.giamGia,
+    ck1sp: d.ck1sp,
+    nccLoaiGiam,
+    nccGiaTriGiam,
+  })
 
+  i.Ncc_loai_giam = nccLoaiGiam
+  i.Ncc_gia_tri_giam = nccGiaTriGiam
+  i.nccLoaiGiam = nccLoaiGiam
+  i.nccGiaTriGiam = nccGiaTriGiam
   i.Tien_chiet_khau = d.chietKhauTien
   i.Thanh_tien = i.thanhTien
   i.Loi_nhuan = i.loiNhuan
@@ -4963,6 +9886,222 @@ function getStockClass(productOrStatus) {
 
 const addedSuccess = reactive({})
 
+function findProductOrderIndex(product, targetMember = getTargetMemberPayload()) {
+  if (!product) return -1
+  const maHangKey = product.Ma_hang
+  const sizeKey = product.Size || ''
+  const dvtKey = product.Dvt || ''
+
+  return items.value.findIndex(
+    (i) =>
+      (i.Ma_hang || i.maHang) === maHangKey &&
+      (i.Size ?? i.size ?? '') === sizeKey &&
+      (i.Dvt ?? i.dvt ?? '') === dvtKey &&
+      isSameItemOwner(i, targetMember),
+  )
+}
+
+function getProductEffectivePrices(product) {
+  const giaGoc = Number(product?.Gia_goc) || 0
+  const giaBan =
+    product?.Gia_Giam && Number(product.Gia_Giam) > 0
+      ? Number(product.Gia_Giam)
+      : Number(product?.Gia_ban) || 0
+  return { giaGoc, giaBan }
+}
+
+function applyExistingOrderItemQty(existingItem, product, newQty, targetMember, ghiChuMoi = '') {
+  const { giaGoc, giaBan } = getProductEffectivePrices(product)
+  const chietKhau = Number(existingItem.chietKhau ?? existingItem.Chiet_khau ?? 0)
+  const giamGia = Number(existingItem.giamGia ?? existingItem.Giam_gia ?? 0)
+
+  const d = calcDiscount(giaBan, newQty, giamGia, chietKhau)
+  const Thanh_tien = giaBan * newQty
+  const nccLoaiGiam = normalizeNccDiscountType(
+    existingItem.Ncc_loai_giam ?? existingItem.nccLoaiGiam ?? product?.Ncc_loai_giam,
+  )
+  const nccGiaTriGiam = normalizeNccDiscountValue(
+    existingItem.Ncc_gia_tri_giam ?? existingItem.nccGiaTriGiam ?? product?.Ncc_gia_tri_giam,
+  )
+  const Loi_nhuan = calcOrderLineProfit({
+    giaBan,
+    giaGoc,
+    soLuong: newQty,
+    giamGia,
+    ck1sp: d.ck1sp,
+    nccLoaiGiam,
+    nccGiaTriGiam,
+  })
+
+  existingItem.So_luong = newQty
+  existingItem.soLuong = newQty
+  existingItem.Tien_chiet_khau = d.chietKhauTien
+  existingItem.Ncc_loai_giam = nccLoaiGiam
+  existingItem.Ncc_gia_tri_giam = nccGiaTriGiam
+  existingItem.nccLoaiGiam = nccLoaiGiam
+  existingItem.nccGiaTriGiam = nccGiaTriGiam
+  existingItem.Thanh_tien = Thanh_tien
+  existingItem.thanhTien = Thanh_tien
+  existingItem.tongGiamGiaTien = d.giamGiaTien
+  existingItem.tongChietKhauTien = d.chietKhauTien
+  existingItem.tongGiamTru = d.tongGiamTru
+  existingItem.tongGiamGiaDong = d.tongGiamTru
+  existingItem.Loi_nhuan = Loi_nhuan
+  existingItem.loiNhuan = Loi_nhuan
+  if (!existingItem.Nguoi_dat && targetMember.Nguoi_dat) existingItem.Nguoi_dat = targetMember.Nguoi_dat
+  if (!existingItem.Nguoi_dat_id && targetMember.Nguoi_dat_id) existingItem.Nguoi_dat_id = targetMember.Nguoi_dat_id
+  if (!existingItem.Added_by_role && targetMember.Added_by_role) existingItem.Added_by_role = targetMember.Added_by_role
+
+  if (ghiChuMoi && ghiChuMoi !== existingItem.Ghi_chu) {
+    existingItem.Ghi_chu = existingItem.Ghi_chu
+      ? `${existingItem.Ghi_chu}, ${ghiChuMoi}`
+      : ghiChuMoi
+    existingItem.ghiChuHang = existingItem.Ghi_chu
+  }
+}
+
+function buildNewOrderItem(product, qtyToAdd, ghiChuMoi, targetMember) {
+  const { giaGoc, giaBan } = getProductEffectivePrices(product)
+  const chietKhau = 0
+  const giamGia = 0
+  const d = calcDiscount(giaBan, qtyToAdd, giamGia, chietKhau)
+  const nccLoaiGiam = normalizeNccDiscountType(product?.Ncc_loai_giam)
+  const nccGiaTriGiam = normalizeNccDiscountValue(product?.Ncc_gia_tri_giam)
+  const loiNhuan = calcOrderLineProfit({
+    giaBan,
+    giaGoc,
+    soLuong: qtyToAdd,
+    giamGia,
+    ck1sp: d.ck1sp,
+    nccLoaiGiam,
+    nccGiaTriGiam,
+  })
+  const thanhTien = giaBan * qtyToAdd
+
+  return {
+    Ma_hoa_don: maHoaDon.value,
+    So_hoa_don: soHoaDon.value,
+    Ngay_tao_duong_lich: formatDateTimeVN(),
+    Ma_hang: product.Ma_hang,
+    Ten_hang: product.Ten_hang,
+    Trang_thai: product.Trang_thai,
+    Danh_muc: product.Danh_muc,
+    Size: product.Size,
+    Dvt: product.Dvt,
+    Don_vi_tien_te: product.Don_vi_tien_te || 'P',
+    donViTienTe: product.Don_vi_tien_te || 'P',
+    So_luong: qtyToAdd,
+    Gia_goc: giaGoc,
+    Gia_ban: giaBan,
+    Giam_gia: giamGia,
+    Tien_chiet_khau: d.chietKhauTien,
+    Ncc_loai_giam: nccLoaiGiam,
+    Ncc_gia_tri_giam: nccGiaTriGiam,
+    nccLoaiGiam,
+    nccGiaTriGiam,
+    Thanh_tien: thanhTien,
+    Loi_nhuan: loiNhuan,
+    Ghi_chu: ghiChuMoi,
+    ghiChuHang: ghiChuMoi,
+    Nguoi_dat: targetMember.Nguoi_dat,
+    Nguoi_dat_id: targetMember.Nguoi_dat_id,
+    Added_by_role: targetMember.Added_by_role,
+    soLuong: qtyToAdd,
+    giaGoc: giaGoc,
+    giaBan: giaBan,
+    chietKhau: chietKhau,
+    giamGia: giamGia,
+    thanhTien,
+    loiNhuan,
+    tongGiamGiaTien: d.giamGiaTien,
+    tongChietKhauTien: d.chietKhauTien,
+    tongGiamTru: d.tongGiamTru,
+    tongGiamGiaDong: d.tongGiamTru,
+    maHang: product.Ma_hang,
+    tenHang: product.Ten_hang,
+    size: product.Size,
+    dvt: product.Dvt,
+    danhMuc: product.Danh_muc,
+    trangThai: product.Trang_thai,
+  }
+}
+
+function getMobileCartQty(product) {
+  if (!product) return 0
+  const idx = findProductOrderIndex(product)
+  if (idx === -1) return 0
+  return Number(items.value[idx]?.So_luong || items.value[idx]?.soLuong || 0)
+}
+
+function setMobileCartQty(product, rawQty) {
+  if (!product) return
+  const parsed = Number(rawQty)
+  const targetQty = Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0
+  const targetMember = getTargetMemberPayload()
+  const existingIdx = findProductOrderIndex(product, targetMember)
+  const currentQty = existingIdx > -1 ? Number(items.value[existingIdx]?.So_luong || 0) : 0
+
+  if (targetQty > currentQty && isOutOfStock(product)) {
+    toast('error', 'Sản phẩm đang ở trạng thái HẾT HÀNG!')
+    return
+  }
+
+  if (targetQty === 0) {
+    if (existingIdx > -1) {
+      items.value.splice(existingIdx, 1)
+    }
+    return
+  }
+
+  const ghiChuMoi = (productNotes[product.Ma_hang] || '').trim()
+  if (existingIdx > -1) {
+    applyExistingOrderItemQty(items.value[existingIdx], product, targetQty, targetMember, ghiChuMoi)
+    highlightRow(existingIdx)
+  } else {
+    items.value.push(buildNewOrderItem(product, targetQty, ghiChuMoi, targetMember))
+    highlightRow(items.value.length - 1)
+  }
+
+  if (ghiChuMoi) {
+    productNotes[product.Ma_hang] = ''
+  }
+  notePopoverOpen[product.Ma_hang] = false
+  highlightCard(product.Ma_hang)
+}
+
+function adjustMobileCartQty(product, delta) {
+  const currentQty = getMobileCartQty(product)
+  setMobileCartQty(product, currentQty + delta)
+}
+
+function onProductCardClick(product) {
+  if (isMobile.value) {
+    adjustMobileCartQty(product, 1)
+    return
+  }
+  openProductDetail(product)
+}
+
+function saveMobileProductNote(product) {
+  if (!product) return
+  notePopoverOpen[product.Ma_hang] = false
+  const noteVal = (productNotes[product.Ma_hang] || '').trim()
+  if (!noteVal) return
+
+  const existingIdx = findProductOrderIndex(product)
+  if (existingIdx > -1) {
+    const existingItem = items.value[existingIdx]
+    if (noteVal !== existingItem.Ghi_chu) {
+      existingItem.Ghi_chu = existingItem.Ghi_chu
+        ? `${existingItem.Ghi_chu}, ${noteVal}`
+        : noteVal
+      existingItem.ghiChuHang = existingItem.Ghi_chu
+    }
+    productNotes[product.Ma_hang] = ''
+    highlightRow(existingIdx)
+  }
+}
+
 function addProductToCart(product) {
   const qtyToAdd = productQty[product.Ma_hang] || 1
   const ghiChuMoi = productNotes[product.Ma_hang] || ''
@@ -4973,130 +10112,19 @@ function addProductToCart(product) {
   }
 
   const targetMember = getTargetMemberPayload()
-
-  /* ===== CHECK EXISTS & AGGREGATE ===== */
-  const maHangKey = product.Ma_hang
-  const sizeKey = product.Size || ''
-  const dvtKey = product.Dvt || ''
-
-  const existingItemIndex = items.value.findIndex(i => 
-    (i.Ma_hang || i.maHang) === maHangKey && 
-    (i.Size ?? i.size ?? '') === sizeKey && 
-    (i.Dvt ?? i.dvt ?? '') === dvtKey &&
-    isSameItemOwner(i, targetMember)
-  )
+  const existingItemIndex = findProductOrderIndex(product, targetMember)
 
   if (existingItemIndex > -1) {
-    // Aggregation Logic
     const existingItem = items.value[existingItemIndex]
     const newQty = existingItem.So_luong + qtyToAdd
-
-    // Calculations
-    const giaGoc = Number(product.Gia_goc) || 0
-    const giaBan = (product.Gia_Giam && Number(product.Gia_Giam) > 0) 
-      ? Number(product.Gia_Giam) 
-      : Number(product.Gia_ban) || 0
-    
-    const chietKhau = Number(existingItem.chietKhau ?? existingItem.Chiet_khau ?? 0)
-    const giamGia = Number(existingItem.giamGia ?? existingItem.Giam_gia ?? 0)
-    
-    const d = calcDiscount(giaBan, newQty, giamGia, chietKhau)
-    const Thanh_tien = giaBan * newQty
-    const Loi_nhuan = (giaBan - d.ck1sp - giaGoc - giamGia) * newQty
-
-    // Update existing item fields
-    existingItem.So_luong = newQty
-    existingItem.soLuong = newQty
-    existingItem.Tien_chiet_khau = d.chietKhauTien
-    existingItem.Thanh_tien = Thanh_tien
-    existingItem.thanhTien = Thanh_tien
-    existingItem.tongGiamGiaTien = d.giamGiaTien
-    existingItem.tongChietKhauTien = d.chietKhauTien
-    existingItem.tongGiamTru = d.tongGiamTru
-    existingItem.tongGiamGiaDong = d.tongGiamTru
-    existingItem.Loi_nhuan = Loi_nhuan
-    existingItem.loiNhuan = Loi_nhuan
-    if (!existingItem.Nguoi_dat && targetMember.Nguoi_dat) existingItem.Nguoi_dat = targetMember.Nguoi_dat
-    if (!existingItem.Nguoi_dat_id && targetMember.Nguoi_dat_id) existingItem.Nguoi_dat_id = targetMember.Nguoi_dat_id
-    if (!existingItem.Added_by_role && targetMember.Added_by_role) existingItem.Added_by_role = targetMember.Added_by_role
-    
-    // Merge Notes
-    if (ghiChuMoi && ghiChuMoi !== existingItem.Ghi_chu) {
-      existingItem.Ghi_chu = existingItem.Ghi_chu 
-        ? `${existingItem.Ghi_chu}, ${ghiChuMoi}`
-        : ghiChuMoi
-      existingItem.ghiChuHang = existingItem.Ghi_chu
-    }
+    applyExistingOrderItemQty(existingItem, product, newQty, targetMember, ghiChuMoi)
 
     const ownerSuffix = showMemberTargetBar.value && targetMember.Nguoi_dat ? ` (${targetMember.Nguoi_dat})` : ''
     toast('success', `✅ Đã cộng dồn +${qtyToAdd} vào ${product.Ten_hang}${ownerSuffix}`)
     highlightRow(existingItemIndex)
-
-    // Trigger Success State
-    addedSuccess[product.Ma_hang] = true
-    setTimeout(() => {
-      addedSuccess[product.Ma_hang] = false
-    }, 1500)
-
   } else {
-    // Add new item (existing logic)
-    const giaGoc = Number(product.Gia_goc) || 0
-    const giaBan = (product.Gia_Giam && Number(product.Gia_Giam) > 0) 
-      ? Number(product.Gia_Giam) 
-      : Number(product.Gia_ban) || 0
-    
-    const chietKhau = 0 
-    const giamGia = 0 
-    
-    const d = calcDiscount(giaBan, qtyToAdd, giamGia, chietKhau)
-  
-    const loiNhuan = (giaBan - d.ck1sp - giaGoc - giamGia) * qtyToAdd
-    const thanhTien = giaBan * qtyToAdd
-  
-    items.value.push({
-      Ma_hoa_don: maHoaDon.value,
-      So_hoa_don: soHoaDon.value,
-      Ngay_tao_duong_lich: formatDateTimeVN(),
-      Ma_hang: product.Ma_hang,
-      Ten_hang: product.Ten_hang,
-      Trang_thai: product.Trang_thai,
-      Danh_muc: product.Danh_muc,
-      Size: product.Size,
-      Dvt: product.Dvt,
-      Don_vi_tien_te: product.Don_vi_tien_te || 'P',
-      donViTienTe: product.Don_vi_tien_te || 'P',
-      So_luong: qtyToAdd,
-      Gia_goc: giaGoc,
-      Gia_ban: giaBan,
-      Giam_gia: giamGia,
-      Tien_chiet_khau: d.chietKhauTien,
-      Thanh_tien: thanhTien,
-      Loi_nhuan: loiNhuan,
-      Ghi_chu: ghiChuMoi,
-      ghiChuHang: ghiChuMoi,
-      Nguoi_dat: targetMember.Nguoi_dat,
-      Nguoi_dat_id: targetMember.Nguoi_dat_id,
-      Added_by_role: targetMember.Added_by_role,
-      soLuong: qtyToAdd,
-      giaGoc: giaGoc,
-      giaBan: giaBan,
-      chietKhau: chietKhau,
-      giamGia: giamGia,
-      thanhTien,
-      loiNhuan,
-      tongGiamGiaTien: d.giamGiaTien,
-      tongChietKhauTien: d.chietKhauTien,
-      tongGiamTru: d.tongGiamTru,
-      tongGiamGiaDong: d.tongGiamTru,
-      maHang: product.Ma_hang,
-      tenHang: product.Ten_hang,
-      size: product.Size,
-      dvt: product.Dvt,
-      danhMuc: product.Danh_muc,
-      trangThai: product.Trang_thai,
-    })
-    const newIndex = items.value.length - 1
-    highlightRow(newIndex)
+    items.value.push(buildNewOrderItem(product, qtyToAdd, ghiChuMoi, targetMember))
+    highlightRow(items.value.length - 1)
   }
 
   // Trigger Success State
@@ -5268,8 +10296,8 @@ h3.card-title i {
 
 .layout-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px; /* Reduced gap */
+  grid-template-columns: minmax(285px, 1fr) minmax(365px, 1.28fr) minmax(275px, 0.88fr);
+  gap: 10px;
   align-items: stretch;
   flex: 1;
   min-height: 0;
@@ -5277,12 +10305,14 @@ h3.card-title i {
 }
 
 .left-stack,
+.center-stack,
 .right-stack {
   display: flex;
   flex-direction: column;
-  gap: 12px; /* Reduced gap */
+  gap: 10px;
   height: 100%;
   min-height: 0;
+  min-width: 0;
 }
 
 .entry-box {
@@ -7161,28 +12191,30 @@ textarea:focus {
   background: transparent;
 }
 
-/* Align specific columns to center as requested */
-.order-box th:nth-child(1), .order-box td:nth-child(1), /* STT */
-.order-box th:nth-child(3), .order-box td:nth-child(3), /* SO LUONG */
-.order-box th:nth-child(4), .order-box td:nth-child(4), /* GIA BAN */
-.order-box th:nth-child(5), .order-box td:nth-child(5), /* GIAM & CK% */
-.order-box th:nth-child(6), .order-box td:nth-child(6), /* THANH TIEN */
-.order-box th:nth-child(7), .order-box td:nth-child(7)  /* XOA */ {
+/* Align specific columns reliably regardless of visible column toggles */
+.order-box th.col-center,
+.order-box td.col-center {
   text-align: center;
 }
 
-/* Bold Specific Columns (STT, Qty, Price, Disc, Total) */
-.order-box td:nth-child(1),
-.order-box td:nth-child(3),
-.order-box td:nth-child(4),
-.order-box td:nth-child(5) .disc-cell, 
-.order-box td:nth-child(6) .total-amount {
-  font-weight: 700;
-  color: #f8fafc; /* Brighter white for bold text */
+.order-box th.col-left,
+.order-box td.col-left {
+  text-align: left;
 }
 
-/* Ensure Discount/Total sub-text remains normal if needed */
-.order-box td:nth-child(5) .disc-cell span {
+.order-box table thead th {
+  white-space: nowrap;
+}
+
+/* Bold Specific Columns */
+.order-box td.col-bold,
+.order-box .disc-cell,
+.order-box .total-amount {
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.order-box .disc-cell span {
   font-weight: 700;
 }
 .prod-cell {
@@ -7233,21 +12265,6 @@ textarea:focus {
 .total-amount {
   display: block;
   line-height: 1.2;
-}
-.profit-inline {
-  margin-top: 4px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #22c55e;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  opacity: 0.9;
-  line-height: 1.2;
-}
-.profit-arrow {
-  font-size: 11px;
-  line-height: 1;
 }
 .profit-value {
   font-size: 11px;
@@ -8069,6 +13086,125 @@ textarea:focus {
 .summary-row.discount .summary-label,
 .summary-row.discount .summary-value {
   color: #dc2626;
+}
+
+.summary-row.shipping .summary-label,
+.summary-row.shipping .summary-value {
+  color: #0284c7;
+  font-weight: 700;
+}
+
+.summary-row.goods-total .summary-label,
+.summary-row.goods-total .summary-value {
+  color: #111827;
+  font-weight: 700;
+  border-top: 1px dashed #d1d5db;
+  padding-top: 8px;
+}
+
+.pc-ft-breakdown-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.pc-ft-sub-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+  color: #cbd5e1;
+}
+
+.pc-ft-sub-label {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.pc-ft-sub-val {
+  color: #f8fafc;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.pc-ft-sub-row.is-ship .pc-ft-sub-label,
+.pc-ft-sub-row.is-ship .pc-ft-sub-val {
+  color: #38bdf8;
+}
+
+.ship-fee-hint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  color: #7dd3fc;
+  padding: 2px 4px 0;
+  line-height: 1.3;
+}
+
+.shipping-fee-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+}
+
+.shipping-fee-controls .er-input-wrapper {
+  flex: 1;
+  min-width: 0;
+}
+
+.ck-ship-inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 7px;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  background: rgba(15, 23, 42, 0.6);
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease;
+}
+
+.ck-ship-inline-check.active {
+  border-color: rgba(56, 189, 248, 0.72);
+  background: rgba(14, 165, 233, 0.2);
+  color: #e0f2fe;
+}
+
+.ck-ship-inline-check input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  accent-color: #38bdf8;
+  cursor: pointer;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.pc-ft-ship-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.16);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #7dd3fc;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .summary-row.total {
@@ -11974,16 +17110,36 @@ textarea:focus {
 }
 
 /* ===== INVOICE PRINT PROMO ===== */
-.hd-promo { 
-  margin-top: 5px; 
-  padding: 4px 0; 
-  text-align: right; /* Align right as requested */
+.summary-row.promo {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px dashed #cbd5e1;
+  gap: 10px;
+  align-items: flex-start;
 }
-.hd-promo-text { 
-  font-size: 13px; 
-  color: #dc2626; /* Red color */
-  font-weight: 700; /* Slightly bolder */
-  white-space: pre-line; 
+.summary-row.promo .summary-label {
+  color: #047857;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.summary-row.promo .summary-value {
+  color: #059669;
+  font-weight: 700;
+  text-align: right;
+}
+.hd-promo-next {
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  text-align: center;
+}
+.hd-promo-next-text {
+  font-size: 12px;
+  font-weight: 700;
+  color: #b45309;
+  line-height: 1.35;
 }
 
 
@@ -12233,6 +17389,16 @@ textarea:focus {
   margin-bottom: 16px;
 }
 
+.hd-summary-row.is-no-bank {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.hd-summary-row.is-no-bank .hd-summary {
+  width: 420px;
+  max-width: 100%;
+}
+
 .hd-bank-box {
   background: #f8fafc;
   border: 1px solid #cbd5e1;
@@ -12337,8 +17503,16 @@ textarea:focus {
 .ba-sub {
   font-size: 12px;
   color: #64748b;
-  font-weight: 600;
+  font-weight: 700;
   margin-top: 4px;
+}
+
+.ba-sub.is-ship-included {
+  color: #0284c7;
+}
+
+.ba-sub.is-ship-excluded {
+  color: #64748b;
 }
 
 
@@ -12433,9 +17607,47 @@ textarea:focus {
   letter-spacing: 0.5px;
 }
 
+.payment-toggle-section .pay-toggle-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+}
+
 .payment-toggle-section .pay-toggle {
   display: flex;
+  flex: 1;
+  min-width: 0;
   gap: 6px;
+}
+
+.pay-qr-export-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 0 11px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.28);
+  transition: transform 0.14s ease, filter 0.16s ease, box-shadow 0.16s ease;
+}
+
+.pay-qr-export-btn:hover {
+  filter: brightness(1.07);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.42);
+}
+
+.pay-qr-export-btn:active {
+  transform: scale(0.97);
 }
 
 .payment-toggle-section .pill-btn {
@@ -14065,61 +19277,94 @@ textarea:focus {
 /* Card Container - Clean Glass */
 .mv4-card {
   position: relative;
-  background: rgba(15, 23, 42, 0.6); /* Subtle dark background */
-  border-radius: 16px;
-  padding: 16px 20px;
+  background: rgba(15, 23, 42, 0.68);
+  border-radius: 14px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 10px;
   flex: 1;
   overflow: visible;
   backdrop-filter: blur(20px);
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5); /* Deep shadow only */
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.14);
 }
 
-/* Header - Clean */
 .mv4-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-bottom: 12px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 8px;
+  padding-bottom: 10px;
+  margin-bottom: 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
   position: relative;
-  min-height: 32px;
+  min-height: 30px;
 }
 
 .mv4-header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 9px;
+  min-width: 0;
 }
 
-.mv4-header-left i {
-  width: 32px;
-  height: 32px;
+.mv4-header-left > i {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.25);
   border-radius: 8px;
   color: #10b981;
-  font-size: 16px;
+  font-size: 15px;
 }
 
-.mv4-header-left span {
-  font-size: 14px;
-  font-weight: 700;
+.mv4-header-titles {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mv4-header-titles > span:first-child {
+  font-size: 12.5px;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.6px;
   color: #e2e8f0;
+}
+
+.mv4-db-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.mv4-db-badge.is-existing {
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.mv4-db-badge.is-new {
+  background: rgba(56, 189, 248, 0.16);
+  color: #7dd3fc;
+  border: 1px solid rgba(56, 189, 248, 0.35);
 }
 
 .mv4-btn-clear {
   width: 28px;
   height: 28px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -14128,6 +19373,7 @@ textarea:focus {
   color: #f87171;
   transition: 0.2s;
   border: 1px solid transparent;
+  cursor: pointer;
 }
 
 .mv4-btn-clear:hover {
@@ -14135,61 +19381,139 @@ textarea:focus {
   border-color: rgba(239, 68, 68, 0.3);
 }
 
-/* Layouts */
-.mv4-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 8px 0; }
-.mv4-row-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 8px 0; }
-.mv4-row-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 8px 0; }
-.mv4-row-full { display: flex; width: 100%; padding: 8px 0; }
-.mv4-row-qty { display: flex; justify-content: center; align-items: center; gap: 20px; padding-top: 12px; margin-bottom: auto; }
+/* Reorganized Sections & Responsive Grids */
+.entry-body.entry-body-manual {
+  container-type: inline-size;
+  container-name: manual-panel;
+}
 
-/* Fields - Clean Input */
+.mv4-section {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 10px;
+  border-radius: 11px;
+  background: rgba(2, 6, 23, 0.42);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.mv4-section.is-pricing {
+  background: rgba(15, 23, 42, 0.65);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.mv4-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mv4-section-head > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #93c5fd;
+}
+
+.mv4-preview-chip {
+  font-size: 11px;
+  font-weight: 800;
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.mv4-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mv4-pair-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mv4-price-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mv4-row-qty-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+/* Fields - Vertical Labels for clean compact fit */
 .mv4-field {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
 }
 
 .mv4-field label {
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 10.5px;
+  font-weight: 700;
   text-transform: uppercase;
-  color: #ffffff; /* Use white color as requested */
-  letter-spacing: 0.5px;
-  width: 70px;
-  flex-shrink: 0;
-  text-align: right;
+  color: #94a3b8;
+  letter-spacing: 0.4px;
+  width: auto;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mv4-field.highlight label {
+  color: #6ee7b7;
 }
 
 .mv4-field label .req { color: #f43f5e; margin-left: 2px; }
 
 .mv4-field input,
 .mv4-field select {
-  flex: 1;
   width: 100%;
-  height: 38px;
-  padding: 0 12px;
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(148, 163, 184, 0.15);
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 8px;
   color: #e2e8f0;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
   transition: all 0.2s ease;
 }
 
 .mv4-field input:hover,
 .mv4-field select:hover {
-  border-color: rgba(148, 163, 184, 0.3);
-  background: rgba(15, 23, 42, 0.8);
+  border-color: rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.9);
 }
 
 .mv4-field input:focus,
 .mv4-field select:focus {
   outline: none;
-  background: rgba(15, 23, 42, 0.9);
+  background: rgba(15, 23, 42, 0.95);
   border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); /* Subtle focus ring */
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
 /* Hero Input - Clean */
@@ -14197,41 +19521,44 @@ textarea:focus {
   position: relative;
   display: flex;
   align-items: center;
-}
-
-.mv4-input-hero i {
-  position: absolute;
-  left: 12px;
-  color: #10b981;
-  font-size: 18px;
-  z-index: 1;
+  width: 100%;
 }
 
 .mv4-input-hero input {
-  height: 48px;
-  padding: 0 16px 0 40px;
-  font-size: 15px;
+  height: 42px;
+  padding: 0 60px 0 12px;
+  font-size: 14px;
   font-weight: 600;
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(16, 185, 129, 0.28);
 }
 
 .mv4-input-hero input:focus {
   border-color: #10b981;
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
-  background: rgba(15, 23, 42, 0.8);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.18);
+  background: rgba(15, 23, 42, 0.95);
 }
 
 /* Price Input - Clean */
 .mv4-input-price {
   display: flex;
   align-items: center;
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 8px;
-  height: 38px;
+  height: 36px;
   overflow: hidden;
   transition: 0.2s;
+  min-width: 0;
+}
+
+.mv4-field.highlight .mv4-input-price {
+  border-color: rgba(16, 185, 129, 0.42);
+}
+
+.mv4-input-price.danger:focus-within {
+  border-color: #f87171;
+  box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.18);
 }
 
 .mv4-input-price:focus-within {
@@ -14241,26 +19568,183 @@ textarea:focus {
 
 .mv4-input-price input {
   flex: 1;
+  min-width: 0;
   background: transparent;
   border: none;
-  padding: 0 12px;
+  padding: 0 8px;
   color: #e2e8f0;
   font-family: 'JetBrains Mono', monospace;
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 12.5px;
   height: 100%;
 }
-.mv4-input-price input:focus { outline: none; }
+.mv4-input-price input:focus { outline: none; box-shadow: none; }
 
 .mv4-input-price .currency {
-  padding: 0 12px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #64748b;
-  background: rgba(0, 0, 0, 0.1);
+  padding: 0 7px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  background: rgba(0, 0, 0, 0.18);
   height: 100%;
   display: flex;
   align-items: center;
-  border-left: 1px solid rgba(148, 163, 184, 0.1);
+  border-left: 1px solid rgba(148, 163, 184, 0.14);
+  flex-shrink: 0;
+}
+
+@container manual-panel (max-width: 350px) {
+  .mv4-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .mv4-price-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .mv4-price-grid .mv4-field.highlight {
+    grid-column: 1 / -1;
+  }
+}
+
+@container manual-panel (max-width: 245px) {
+  .mv4-meta-grid,
+  .mv4-pair-grid,
+  .mv4-price-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Action Wrap & Add Options Popover */
+.mv4-action-wrap {
+  position: relative;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.mv4-add-options-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px;
+  border-radius: 12px;
+  background: #0f172a;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.68);
+}
+
+.mv4-opt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #94a3b8;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.mv4-opt-head > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mv4-opt-close {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.mv4-opt-close:hover {
+  color: #ffffff;
+  background: rgba(239, 68, 68, 0.25);
+}
+
+.mv4-opt-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 11px;
+  border-radius: 9px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(30, 41, 59, 0.85);
+  color: #f8fafc;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mv4-opt-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.mv4-opt-btn > i {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.mv4-opt-btn.is-order-only > i {
+  color: #34d399;
+}
+
+.mv4-opt-btn.is-order-only:hover:not(:disabled) {
+  border-color: rgba(16, 185, 129, 0.6);
+  background: rgba(16, 185, 129, 0.16);
+}
+
+.mv4-opt-btn.is-save-db {
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(14, 165, 233, 0.14);
+}
+
+.mv4-opt-btn.is-save-db > i {
+  color: #38bdf8;
+}
+
+.mv4-opt-btn.is-save-db:hover:not(:disabled) {
+  border-color: rgba(56, 189, 248, 0.7);
+  background: rgba(14, 165, 233, 0.24);
+}
+
+.mv4-opt-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mv4-opt-text strong {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.mv4-opt-text span {
+  font-size: 10.5px;
+  color: #94a3b8;
+  line-height: 1.3;
+}
+
+.mv4-btn-caret {
+  font-size: 17px;
+  margin-left: auto;
+  opacity: 0.85;
 }
 
 /* Quantity Section Styles */
@@ -14751,6 +20235,7 @@ textarea:focus {
   }
 
   .left-stack,
+  .center-stack,
   .right-stack {
     width: 100% !important;
     display: block;
@@ -14758,6 +20243,20 @@ textarea:focus {
     padding: 0 !important;
     height: auto !important;
     min-height: 0;
+  }
+
+  .pc-right-scroll {
+    display: contents;
+  }
+
+  .pc-checkout-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0 12px 12px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
   }
 
   .page {
@@ -14916,6 +20415,23 @@ textarea:focus {
     padding-bottom: 0 !important;
   }
 
+  .footer-export-actions.is-mobile-export {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .footer-export-actions.is-mobile-export .btn-preview,
+  .footer-export-actions.is-mobile-export .btn-text {
+    min-height: 48px !important;
+    padding: 10px 8px !important;
+    font-size: 12px !important;
+    flex-direction: row !important;
+    gap: 6px !important;
+  }
+
   .submit-stack.mobile-scroll-submit {
     position: static !important;
     display: grid !important;
@@ -14924,16 +20440,7 @@ textarea:focus {
     width: 100% !important;
     min-width: 0 !important;
     height: auto !important;
-    padding: 4px 0 8px !important;
-  }
-
-  .submit-stack.mobile-scroll-submit .btn-preview,
-  .submit-stack.mobile-scroll-submit .btn-text {
-    min-height: 48px !important;
-    padding: 10px 8px !important;
-    font-size: 12px !important;
-    flex-direction: row !important;
-    gap: 6px !important;
+    padding: 2px 0 4px !important;
   }
 
   .submit-stack.mobile-scroll-submit .btn-complete {
@@ -14951,6 +20458,125 @@ textarea:focus {
     max-height: none !important;
     overflow: visible !important;
     padding-bottom: 8px !important;
+  }
+
+  .catalog-grid-section .product-card-horizontal.is-mobile-in-cart {
+    border-color: rgba(16, 185, 129, 0.72) !important;
+    background: linear-gradient(145deg, rgba(16, 185, 129, 0.14), rgba(15, 23, 42, 0.96)) !important;
+    box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.28), 0 6px 16px rgba(2, 6, 23, 0.35) !important;
+  }
+
+  .mobile-detail-info-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(15, 23, 42, 0.78);
+    color: #e2e8f0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    z-index: 3;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .mobile-cart-qty-badge {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    min-width: 24px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.45);
+    z-index: 3;
+  }
+
+  .mobile-quick-add-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .mobile-tap-add-btn {
+    flex: 1;
+    height: 30px;
+    padding: 0 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(16, 185, 129, 0.45);
+    background: rgba(16, 185, 129, 0.14);
+    color: #34d399;
+    font-size: 12px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+  }
+
+  .mobile-tap-add-btn:disabled {
+    background: rgba(51, 65, 85, 0.5);
+    border-color: rgba(148, 163, 184, 0.2);
+    color: #94a3b8;
+    cursor: not-allowed;
+  }
+
+  .mobile-live-stepper {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .mobile-live-stepper .qty-btn-circle {
+    width: 28px;
+    height: 28px;
+    font-size: 15px;
+  }
+
+  .mobile-live-stepper .mobile-qty-minus {
+    background: rgba(239, 68, 68, 0.18);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    box-shadow: none;
+  }
+
+  .mobile-live-qty-input {
+    width: 44px !important;
+    height: 28px !important;
+    font-size: 13px !important;
+    color: #ecfdf5 !important;
+    background: rgba(16, 185, 129, 0.2) !important;
+    border-color: rgba(52, 211, 153, 0.55) !important;
+  }
+
+  .mobile-added-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(16, 185, 129, 0.18);
+    border: 1px solid rgba(52, 211, 153, 0.4);
+    color: #6ee7b7;
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+    margin-right: auto;
   }
 
   .order-box {
@@ -15376,24 +21002,25 @@ textarea:focus {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 6px 11px;
-  border-radius: 9px;
-  border: 1px dashed rgba(52, 211, 153, 0.55);
-  background: rgba(16, 185, 129, 0.12);
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px dashed rgba(52, 211, 153, 0.65);
+  background: rgba(16, 185, 129, 0.14);
   color: #6ee7b7;
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 800;
-  white-space: nowrap;
   cursor: pointer;
   flex-shrink: 0;
   transition: all 0.16s ease;
 }
 
 .invoice-tab-add-btn:hover {
-  background: rgba(16, 185, 129, 0.24);
+  background: rgba(16, 185, 129, 0.28);
   border-style: solid;
   color: #ecfdf5;
+  transform: scale(1.05);
 }
 
 /* ================= ORDER VIEW MODE (THEO TỪNG NGƯỜI / DẠNG GỘP) ================= */
@@ -15846,5 +21473,3956 @@ textarea:focus {
   background: rgba(14, 165, 233, 0.22);
   border-color: rgba(56, 189, 248, 0.8);
   color: #e0f2fe;
+}
+
+/* ================= SEARCH RESULT HIGHLIGHT ================= */
+.search-box-unified.has-query .search-input-unified {
+  border-color: rgba(250, 204, 21, 0.85);
+  box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.22);
+}
+
+.search-box-unified.has-query .search-icon {
+  color: #eab308;
+}
+
+.search-result-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  background: rgba(250, 204, 21, 0.1);
+  border: 1px solid rgba(250, 204, 21, 0.3);
+  color: #fef08a;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.search-result-banner .srb-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-result-banner .srb-text strong {
+  color: #fde047;
+  font-weight: 900;
+}
+
+.search-result-banner .srb-text em {
+  font-style: normal;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.search-result-banner .srb-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  background: rgba(250, 204, 21, 0.14);
+  color: #fef08a;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.search-result-banner .srb-clear:hover {
+  background: rgba(250, 204, 21, 0.26);
+}
+
+.catalog-grid-section .product-card-horizontal.is-search-match {
+  border-color: rgba(250, 204, 21, 0.45);
+  box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.15), 0 6px 16px rgba(2, 6, 23, 0.35);
+}
+
+.search-hl-mark {
+  background: linear-gradient(135deg, rgba(250, 204, 21, 0.92), rgba(245, 158, 11, 0.92));
+  color: #0f172a;
+  font-weight: 900;
+  padding: 0 3px;
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(250, 204, 21, 0.35);
+}
+
+/* ================= PC 3-COLUMN LAYOUT & STACKED RIGHT PANEL ================= */
+@media (min-width: 1025px) {
+  .page {
+    padding: 10px;
+  }
+
+  .layout-grid {
+    --col-left: minmax(285px, 1fr);
+    --col-center: minmax(430px, 1.42fr);
+    --col-right: minmax(290px, 0.9fr);
+    grid-template-columns: var(--col-left) 10px var(--col-center) 10px var(--col-right);
+    gap: 0;
+  }
+
+  .layout-grid.is-resizing-cols,
+  .layout-grid.is-resizing-cols * {
+    user-select: none !important;
+    cursor: col-resize !important;
+  }
+
+  .layout-grid.is-left-collapsed {
+    --col-left: 44px !important;
+  }
+
+  .layout-grid.is-center-collapsed {
+    --col-center: 44px !important;
+  }
+
+  .layout-grid.is-center-collapsed:not(.is-left-collapsed) {
+    --col-left: minmax(280px, 1fr) !important;
+  }
+
+  .layout-grid.is-center-collapsed.is-left-collapsed:not(.is-right-collapsed) {
+    --col-right: minmax(280px, 1fr) !important;
+  }
+
+  .layout-grid.is-right-collapsed {
+    --col-right: 44px !important;
+  }
+
+  /* --- DRAG RESIZER HANDLES --- */
+  .pc-col-resizer {
+    position: relative;
+    width: 10px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: col-resize;
+    z-index: 15;
+    touch-action: none;
+  }
+
+  .pc-resizer-grip {
+    width: 3px;
+    height: 44px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.25);
+    transition: all 0.16s ease;
+  }
+
+  .pc-col-resizer:hover .pc-resizer-grip,
+  .pc-col-resizer.active .pc-resizer-grip {
+    width: 4px;
+    height: 76px;
+    background: #22c55e;
+    box-shadow: 0 0 12px rgba(34, 197, 94, 0.6);
+  }
+
+  .pc-col-resizer.disabled {
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .pc-col-resizer.disabled .pc-resizer-grip {
+    opacity: 0.18;
+    height: 24px;
+  }
+
+  .prpb-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .pc-col-reset-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 28px;
+    padding: 0 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    background: rgba(14, 165, 233, 0.14);
+    color: #7dd3fc;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+  }
+
+  .pc-col-reset-btn:hover {
+    border-color: rgba(56, 189, 248, 0.65);
+    background: rgba(14, 165, 233, 0.24);
+    color: #e0f2fe;
+  }
+
+  /* --- COLUMN TOGGLE BUTTONS & COLLAPSED RAILS --- */
+  .pc-col-toggle-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    background: rgba(30, 41, 59, 0.85);
+    color: #cbd5e1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.16s ease;
+  }
+
+  .pc-col-toggle-btn:hover {
+    border-color: rgba(34, 197, 94, 0.6);
+    background: rgba(16, 185, 129, 0.18);
+    color: #ffffff;
+  }
+
+  .pc-col-rail {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    padding: 14px 4px;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 0.98));
+    color: #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 14px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    box-shadow: 0 10px 26px rgba(2, 6, 23, 0.45);
+  }
+
+  .pc-col-rail:hover {
+    border-color: rgba(34, 197, 94, 0.55);
+    background: linear-gradient(180deg, rgba(16, 185, 129, 0.16), rgba(15, 23, 42, 0.96));
+  }
+
+  .pc-rail-ico {
+    font-size: 18px;
+    color: #4ade80;
+    flex-shrink: 0;
+  }
+
+  .pc-rail-label {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-size: 11.5px;
+    font-weight: 900;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: #cbd5e1;
+    white-space: nowrap;
+  }
+
+  .pc-rail-badge {
+    min-width: 24px;
+    height: 24px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: rgba(34, 197, 94, 0.22);
+    border: 1px solid rgba(34, 197, 94, 0.5);
+    color: #4ade80;
+    font-size: 11px;
+    font-weight: 900;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pc-rail-total {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    margin-top: auto;
+    font-size: 11.5px;
+    font-weight: 900;
+    color: #4ade80;
+    white-space: nowrap;
+  }
+
+  .pc-right-panel-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 9px 12px;
+    border-radius: 0;
+    background: rgba(2, 6, 23, 0.62);
+    border: none;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+    flex-shrink: 0;
+  }
+
+  .prpb-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 900;
+    letter-spacing: 0.7px;
+    color: #e2e8f0;
+    text-transform: uppercase;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .prpb-title i {
+    color: #4ade80;
+    font-size: 15px;
+  }
+
+  .pc-collapsible-header {
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .pc-card-title-left {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .pc-card-header-right {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .pc-card-mini-val {
+    max-width: 105px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: 0;
+    color: #6ee7b7;
+    background: rgba(16, 185, 129, 0.14);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    padding: 1px 6px;
+    border-radius: 999px;
+  }
+
+  .pc-card-chevron {
+    font-size: 16px !important;
+    color: #94a3b8 !important;
+    filter: none !important;
+    transition: transform 0.18s ease;
+  }
+
+  .right-stack .box.is-pc-collapsed > h3,
+  .right-stack .box.is-pc-collapsed > h3.card-title {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+    border-bottom: none !important;
+  }
+
+  /* --- LEFT COLUMN: KHO HÀNG --- */
+  .left-stack .entry-box {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .left-stack .entry-box .catalog-toolbar-unified {
+    padding: 10px 12px;
+    gap: 8px;
+    row-gap: 8px;
+  }
+
+  .left-stack .toolbar-section-title {
+    gap: 8px;
+    padding-bottom: 8px;
+    margin-bottom: 0;
+  }
+
+  .left-stack .entry-mode-toggle {
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .left-stack .mode-btn {
+    padding: 7px 10px;
+    font-size: 12px;
+    gap: 5px;
+  }
+
+  .left-stack .mode-btn i {
+    font-size: 14px;
+  }
+
+  .left-stack .pc-toolbar-row-2 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .left-stack .pc-search-full {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .left-stack .pc-search-full .search-input-unified {
+    height: 34px;
+    font-size: 12.5px;
+  }
+
+  .left-stack .pc-toolbar-row-2 .filter-item {
+    flex: 1 1 0;
+    min-width: 78px;
+  }
+
+  .left-stack .pc-toolbar-row-2 .custom-select-wrapper,
+  .left-stack .pc-toolbar-row-2 .custom-select {
+    width: 100%;
+    min-width: 0;
+    height: 32px;
+    font-size: 11.5px;
+  }
+
+  .left-stack .pc-toolbar-row-2 .filter-checkbox-btn {
+    height: 32px;
+    padding: 0 8px;
+    font-size: 11.5px;
+  }
+
+  .left-stack .pc-toolbar-row-2 .btn-reset-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .left-stack .entry-body {
+    padding: 10px 12px;
+    gap: 10px;
+    border-radius: 0 0 14px 14px;
+  }
+
+  .left-stack .catalog-grid-section {
+    container-type: inline-size;
+    container-name: catalog-grid;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .left-stack .catalog-grid-section .product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(235px, 100%), 1fr));
+    gap: 8px;
+    padding: 2px 0 8px;
+  }
+
+  .left-stack .catalog-grid-section .product-card-horizontal {
+    min-height: 114px;
+  }
+
+  .left-stack .catalog-grid-section .pc-media-horizontal {
+    width: 86px;
+    min-width: 86px;
+  }
+
+  .left-stack .catalog-grid-section .pc-content-horizontal {
+    padding: 7px 9px;
+  }
+
+  .left-stack .catalog-grid-section .pc-name-horizontal {
+    font-size: 12.5px;
+    min-height: 32px;
+    margin-bottom: 3px;
+  }
+
+  .left-stack .catalog-grid-section .price-sale,
+  .left-stack .catalog-grid-section .price-normal {
+    font-size: 13px;
+  }
+
+  @container catalog-grid (max-width: 479px) {
+    .left-stack .catalog-grid-section .product-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @container catalog-grid (max-width: 336px) {
+    .left-stack .catalog-grid-section .product-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .left-stack .catalog-grid-section .product-card-horizontal {
+      flex-direction: column !important;
+      height: auto !important;
+      min-height: 0;
+    }
+
+    .left-stack .catalog-grid-section .pc-media-horizontal {
+      width: 100% !important;
+      min-width: 0 !important;
+      height: 110px !important;
+      min-height: 110px !important;
+    }
+
+    .left-stack .catalog-grid-section .pc-content-horizontal {
+      width: 100%;
+      padding: 8px 10px 10px;
+      gap: 6px;
+    }
+
+    .left-stack .catalog-grid-section .pc-name-horizontal {
+      min-height: auto;
+      margin-bottom: 2px;
+    }
+
+    .left-stack .catalog-grid-section .pc-info-group {
+      gap: 6px;
+    }
+
+    .left-stack .catalog-grid-section .pc-price-stock-row {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+
+    .left-stack .catalog-grid-section .qty-note-row {
+      width: 100%;
+      margin-top: 4px;
+      gap: 6px;
+    }
+
+    .left-stack .catalog-grid-section .qty-input-box {
+      width: 44px;
+    }
+
+    .left-stack .catalog-grid-section .note-popover-horizontal {
+      width: min(200px, calc(100% - 8px));
+      left: 4px;
+      right: 4px;
+    }
+  }
+
+  .left-stack .manual-entry-header {
+    padding: 10px 12px;
+    margin-bottom: 0;
+    border-bottom: 1px dashed rgba(148, 163, 184, 0.15);
+  }
+
+  .left-stack .manual-entry-header .entry-mode-toggle {
+    width: 100%;
+  }
+
+  /* --- CENTER COLUMN: BẢNG ĐƠN HÀNG + CỘT TAB DỌC --- */
+  .center-stack {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .center-stack .order-box {
+    padding: 12px;
+    min-width: 0;
+  }
+
+  .center-stack .order-box table thead th {
+    font-size: 10.5px;
+    padding: 10px 6px;
+    letter-spacing: 0.05em;
+  }
+
+  .center-stack .order-box table th,
+  .center-stack .order-box table td {
+    padding: 10px 6px;
+    font-size: 12.5px;
+  }
+
+  .center-stack .prod-name {
+    font-size: 13px;
+  }
+
+  .center-stack .prod-sub,
+  .center-stack .disc-cell {
+    font-size: 11px;
+  }
+
+  /* --- RIGHT COLUMN: UNIFIED POS INSPECTOR PANEL + STICKY FOOTER --- */
+  .right-stack {
+    overflow: hidden;
+    min-width: 0;
+    gap: 0;
+  }
+
+  .right-stack:not(.is-pc-collapsed) {
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.97), rgba(2, 6, 23, 0.99));
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    box-shadow: 0 12px 32px rgba(2, 6, 23, 0.46);
+  }
+
+  .pc-right-tabs {
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    padding: 8px 10px;
+    background: rgba(2, 6, 23, 0.42);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  }
+
+  .pc-right-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 0;
+    height: 33px;
+    padding: 0 10px;
+    border-radius: 9px;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    background: rgba(30, 41, 59, 0.45);
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: all 0.16s ease;
+  }
+
+  .pc-right-tab-btn:hover {
+    color: #e2e8f0;
+    background: rgba(30, 41, 59, 0.78);
+  }
+
+  .pc-right-tab-btn.active {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.24), rgba(5, 150, 105, 0.18));
+    border-color: rgba(34, 197, 94, 0.55);
+    color: #ecfdf5;
+    box-shadow: 0 2px 10px rgba(16, 185, 129, 0.16);
+  }
+
+  .pc-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 900;
+    flex-shrink: 0;
+  }
+
+  .pc-tab-badge.is-ok {
+    background: rgba(34, 197, 94, 0.22);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.45);
+  }
+
+  .pc-tab-badge.is-disc {
+    background: rgba(239, 68, 68, 0.24);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.45);
+  }
+
+  .pc-right-scroll {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.28) transparent;
+  }
+
+  .pc-right-scroll::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .pc-right-scroll::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.28);
+    border-radius: 99px;
+  }
+
+  .right-stack .info-row-2col {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .right-stack .customer-scroll-container,
+  .right-stack .summary-stack {
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    box-sizing: border-box !important;
+  }
+
+  .right-stack .bottom-row {
+    display: block;
+    min-width: 0 !important;
+    width: 100% !important;
+    padding-top: 0 !important;
+    border-top: none !important;
+  }
+
+  .right-stack .payment-scroll {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .right-stack .customer-box,
+  .right-stack .delivery-box,
+  .right-stack .summary-card {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+  }
+
+  .right-stack .delivery-box,
+  .right-stack .summary-card--payment {
+    padding-top: 12px !important;
+    border-top: 1px solid rgba(148, 163, 184, 0.14) !important;
+  }
+
+  .right-stack .customer-box:hover,
+  .right-stack .delivery-box:hover,
+  .right-stack .summary-card:hover {
+    transform: none;
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .right-stack .delivery-box:hover,
+  .right-stack .summary-card--payment:hover {
+    border-top-color: rgba(148, 163, 184, 0.14) !important;
+  }
+
+  .right-stack .customer-box > h3,
+  .right-stack .delivery-box > h3,
+  .right-stack .summary-card .card-title {
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.75px !important;
+    text-transform: uppercase !important;
+    color: #cbd5e1 !important;
+    padding-bottom: 0 !important;
+    margin-bottom: 8px !important;
+    border-bottom: none !important;
+  }
+
+  .right-stack .customer-box > h3 i,
+  .right-stack .delivery-box > h3 i,
+  .right-stack .summary-card .card-title i {
+    font-size: 14px !important;
+    color: #4ade80 !important;
+    filter: none !important;
+  }
+
+  .right-stack .pc-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .right-stack .field-row {
+    display: grid;
+    grid-template-columns: 94px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 0 !important;
+    min-width: 0;
+  }
+
+  .right-stack .field-row label {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: #94a3b8 !important;
+    line-height: 1.25;
+    white-space: nowrap;
+  }
+
+  .right-stack .field-control {
+    min-width: 0;
+  }
+
+  .right-stack .customer-box input,
+  .right-stack .customer-box select,
+  .right-stack .delivery-box input,
+  .right-stack .delivery-box select {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    height: 34px;
+    padding: 0 10px !important;
+    font-size: 12.5px !important;
+    border-radius: 8px !important;
+    border: 1px solid rgba(148, 163, 184, 0.2) !important;
+    background: rgba(30, 41, 59, 0.65) !important;
+    color: #f8fafc !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+  }
+
+  .right-stack .customer-box input:focus,
+  .right-stack .customer-box select:focus,
+  .right-stack .delivery-box input:focus,
+  .right-stack .delivery-box select:focus,
+  .right-stack .delivery-box textarea:focus,
+  .right-stack .exchange-rate-section .er-input:focus {
+    outline: none !important;
+    border-color: rgba(34, 197, 94, 0.65) !important;
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.14) !important;
+  }
+
+  .right-stack .delivery-time-row {
+    flex-wrap: nowrap;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  .right-stack .delivery-time-row .time-select {
+    width: auto !important;
+    min-width: 48px;
+    flex: 1 1 0;
+    padding: 0 4px !important;
+    text-align: center;
+  }
+
+  .right-stack .delivery-time-row .btn-now {
+    height: 34px;
+    padding: 0 10px;
+    font-size: 11.5px;
+    font-weight: 700;
+    border-radius: 8px;
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+
+  .right-stack .delivery-box textarea {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    min-height: 50px;
+    padding: 7px 10px !important;
+    font-size: 12.5px !important;
+    border-radius: 8px !important;
+    border: 1px solid rgba(148, 163, 184, 0.2) !important;
+    background: rgba(30, 41, 59, 0.65) !important;
+    color: #f8fafc !important;
+  }
+
+  .right-stack .cust-summary-box {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    margin: 2px 0 !important;
+    padding: 7px 8px !important;
+    gap: 6px !important;
+    border-radius: 9px !important;
+    background: rgba(30, 41, 59, 0.45) !important;
+    border: 1px solid rgba(148, 163, 184, 0.14) !important;
+    min-width: 0;
+  }
+
+  .right-stack .cust-stat {
+    min-width: 0;
+  }
+
+  .right-stack .cust-stat-label {
+    font-size: 10px !important;
+  }
+
+  .right-stack .cust-stat-value {
+    font-size: 11.5px !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .right-stack .summary-card .sum-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .right-stack .summary-card .sum-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 3px 0 !important;
+    min-width: 0;
+  }
+
+  .right-stack .summary-card .sum-label {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: #94a3b8 !important;
+    white-space: nowrap;
+  }
+
+  .right-stack .summary-card .sum-right-group {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    min-width: 0;
+    flex-shrink: 1;
+  }
+
+  .right-stack .summary-card .btn-limit-red {
+    padding: 2px 7px;
+    font-size: 10.5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .right-stack .summary-card .sum-value {
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .right-stack .summary-card .sum-val-base {
+    color: #f8fafc !important;
+  }
+
+  .right-stack .summary-card .sum-val-disc {
+    color: #f87171 !important;
+  }
+
+  .right-stack .summary-card .sum-val-profit {
+    color: #4ade80 !important;
+  }
+
+  .right-stack .payment-toggle-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+
+  .right-stack .pm-label {
+    font-size: 11.5px !important;
+    font-weight: 600 !important;
+    color: #94a3b8 !important;
+  }
+
+  .right-stack .summary-card .pay-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .right-stack .summary-card .pay-toggle {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    padding: 3px;
+    border-radius: 10px;
+    background: rgba(2, 6, 23, 0.68);
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    min-width: 0;
+  }
+
+  .right-stack .pay-qr-export-btn {
+    height: 38px !important;
+    padding: 0 9px !important;
+    border-radius: 9px !important;
+    font-size: 11.5px !important;
+  }
+
+  .right-stack .summary-card .pill-btn {
+    height: 32px !important;
+    padding: 0 8px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    border-radius: 7px !important;
+    border: 1px solid transparent !important;
+    background: transparent !important;
+    color: #94a3b8 !important;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .right-stack .summary-card .pill-btn.active {
+    background: rgba(16, 185, 129, 0.2) !important;
+    border-color: rgba(34, 197, 94, 0.5) !important;
+    color: #ecfdf5 !important;
+  }
+
+  .right-stack .summary-card .pill-btn--transfer.active {
+    background: rgba(59, 130, 246, 0.22) !important;
+    border-color: rgba(96, 165, 250, 0.5) !important;
+    color: #eff6ff !important;
+  }
+
+  .right-stack .exchange-rate-section {
+    display: grid;
+    grid-template-columns: 94px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    margin: 2px 0 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    min-width: 0;
+  }
+
+  .right-stack .exchange-rate-section .er-label {
+    margin: 0 !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: #94a3b8 !important;
+    white-space: nowrap;
+  }
+
+  .right-stack .exchange-rate-section .er-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .right-stack .exchange-rate-section .er-input {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    max-width: none;
+    height: 34px !important;
+    padding: 0 10px !important;
+    text-align: right;
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    border: 1px solid rgba(148, 163, 184, 0.2) !important;
+    background: rgba(30, 41, 59, 0.65) !important;
+    color: #f8fafc !important;
+  }
+
+  .right-stack .exchange-rate-section .er-badge {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 7px;
+  }
+
+  .right-stack .ship-fee-hint {
+    margin-left: 102px;
+    margin-top: 2px;
+    font-size: 10.5px;
+    color: #7dd3fc;
+  }
+
+  /* --- STICKY CHECKOUT FOOTER --- */
+  .pc-checkout-footer {
+    flex-shrink: 0;
+    min-width: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px 12px;
+    border-radius: 0;
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(2, 6, 23, 0.98));
+    border: none;
+    border-top: 1px solid rgba(34, 197, 94, 0.28);
+    box-shadow: 0 -8px 20px rgba(2, 6, 23, 0.35);
+  }
+
+  .pc-footer-total-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .pc-ft-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .pc-ft-left {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .pc-ft-label {
+    font-size: 10.5px;
+    font-weight: 900;
+    letter-spacing: 0.7px;
+    color: #cbd5e1;
+    white-space: nowrap;
+  }
+
+  .pc-ft-pay-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    background: rgba(34, 197, 94, 0.14);
+    color: #86efac;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .pc-ft-pay-chip.is-transfer {
+    border-color: rgba(59, 130, 246, 0.45);
+    background: rgba(59, 130, 246, 0.18);
+    color: #93c5fd;
+  }
+
+  .pc-ft-value {
+    font-size: clamp(16px, 1.35vw, 19px);
+    font-weight: 950;
+    color: #4ade80;
+    text-shadow: 0 0 16px rgba(34, 197, 94, 0.45);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .pc-ft-transfer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(59, 130, 246, 0.16);
+    border: 1px solid rgba(59, 130, 246, 0.32);
+    font-size: 10.5px;
+    color: #e2e8f0;
+    min-width: 0;
+  }
+
+  .pc-ft-transfer strong {
+    color: #93c5fd;
+    font-size: 12px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .footer-export-actions .btn,
+  .pc-submit-stack .btn {
+    min-width: 0;
+    min-height: 36px;
+    padding: 7px 8px;
+    font-size: 11.5px;
+    flex-direction: row;
+    gap: 5px;
+    border-radius: 10px;
+    -webkit-text-stroke: 0;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .submit-stack.pc-submit-stack {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+    min-width: 0;
+    height: auto;
+    width: 100%;
+  }
+
+  .pc-submit-stack .btn-complete {
+    grid-column: 1 / -1;
+    min-height: 44px;
+    font-size: 14px;
+    letter-spacing: 0.9px;
+    border-radius: 12px;
+  }
+
+  .pc-submit-stack .btn-order-cancel {
+    grid-column: 1 / -1;
+    min-height: 36px;
+  }
+
+  .pc-submit-stack .btn-order-draft:has(+ .btn-complete),
+  .pc-submit-stack .btn-order-draft:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 1400px) {
+  .layout-grid {
+    --col-left: minmax(335px, 1.02fr);
+    --col-center: minmax(520px, 1.48fr);
+    --col-right: minmax(310px, 0.84fr);
+    gap: 12px;
+  }
+}
+
+@media (min-width: 1700px) {
+  .layout-grid {
+    --col-left: minmax(405px, 1.04fr);
+    --col-center: minmax(620px, 1.52fr);
+    --col-right: minmax(335px, 0.82fr);
+  }
+}
+
+/* ================= ORDER TABLE COLUMN VISIBILITY SETTINGS ================= */
+.order-col-settings-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ov-col-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 9px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.78);
+  color: #cbd5e1;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.16s ease;
+}
+
+.ov-col-btn:hover,
+.ov-col-btn.active {
+  border-color: rgba(34, 197, 94, 0.6);
+  background: rgba(16, 185, 129, 0.18);
+  color: #ecfdf5;
+}
+
+.ov-col-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.22);
+  color: #6ee7b7;
+  font-size: 10px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.order-col-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.98);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.75);
+  backdrop-filter: blur(14px);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ocp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed rgba(148, 163, 184, 0.22);
+}
+
+.ocp-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #f8fafc;
+}
+
+.ocp-title i {
+  color: #4ade80;
+  font-size: 15px;
+}
+
+.ocp-close {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(30, 41, 59, 0.7);
+  color: #cbd5e1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.ocp-close:hover {
+  color: #ffffff;
+  border-color: rgba(239, 68, 68, 0.5);
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.ocp-presets {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.ocp-preset-btn {
+  padding: 6px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(30, 41, 59, 0.75);
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ocp-preset-btn:hover {
+  border-color: rgba(34, 197, 94, 0.55);
+  background: rgba(16, 185, 129, 0.2);
+  color: #ecfdf5;
+}
+
+.ocp-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ocp-group-title {
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  margin-bottom: 6px;
+}
+
+.ocp-check-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.ocp-check-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(30, 41, 59, 0.45);
+  color: #cbd5e1;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.ocp-check-item input[type='checkbox'] {
+  accent-color: #22c55e;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ocp-check-item.checked {
+  border-color: rgba(34, 197, 94, 0.42);
+  background: rgba(16, 185, 129, 0.12);
+  color: #f8fafc;
+}
+
+.ocp-footer-switch {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(148, 163, 184, 0.22);
+}
+
+.ocp-check-full {
+  width: 100%;
+}
+
+.ocp-locked-hint {
+  font-size: 10.5px;
+  color: #64748b;
+  text-align: center;
+}
+
+/* Extra column cell styles */
+.col-code-pill {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(148, 163, 184, 0.14);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  color: #cbd5e1;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.col-muted-text {
+  color: #94a3b8;
+  font-size: 11.5px;
+}
+
+.col-sizedvt-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11.5px;
+  color: #cbd5e1;
+  white-space: nowrap;
+}
+
+.col-stock-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.col-stock-badge.is-ok {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+.col-stock-badge.is-out {
+  background: rgba(239, 68, 68, 0.16);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.col-person-pill {
+  display: inline-block;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #bae6fd;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.col-cost-val {
+  color: #fbbf24;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.col-profit-val {
+  color: #4ade80;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.col-profit-val.is-neg {
+  color: #f87171;
+}
+
+.col-note-text {
+  display: inline-block;
+  max-width: 170px;
+  font-size: 11.5px;
+  color: #fda4af;
+  font-weight: 600;
+  white-space: normal;
+  line-height: 1.3;
+}
+
+/* ===== FOOTER ACTION BLOCKS & EXPORT PRICE MODE ===== */
+.footer-action-block {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 8px 9px;
+  border-radius: 10px;
+  min-width: 0;
+}
+
+.footer-export-block {
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.footer-order-block {
+  background: rgba(15, 23, 42, 0.86);
+  border: 1px solid rgba(34, 197, 94, 0.26);
+}
+
+.fab-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fab-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.fab-title i {
+  font-size: 12.5px;
+  color: #cbd5e1;
+}
+
+.footer-order-block .fab-title i {
+  color: #4ade80;
+}
+
+.fab-status-pill {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  background: rgba(59, 130, 246, 0.16);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #93c5fd;
+  white-space: nowrap;
+}
+
+.footer-export-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  min-width: 0;
+  width: 100%;
+}
+
+.text-invoice-mode-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.text-invoice-mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.epm-label {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #cbd5e1;
+  white-space: nowrap;
+}
+
+.epm-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  flex: 1;
+}
+
+.epm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(30, 41, 59, 0.72);
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.epm-btn:hover {
+  border-color: rgba(148, 163, 184, 0.55);
+  color: #ffffff;
+}
+
+.epm-btn.active {
+  border-color: rgba(34, 197, 94, 0.85);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.28), rgba(5, 150, 105, 0.24));
+  color: #86efac;
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.28);
+}
+
+.epm-btn.is-cost.active {
+  border-color: rgba(245, 158, 11, 0.9);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.28), rgba(217, 119, 6, 0.24));
+  color: #fde68a;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.3);
+}
+
+.export-choice-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.export-choice-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.ecs-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.ecs-title i {
+  color: #38bdf8;
+  font-size: 15px;
+}
+
+.ecs-sub {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.ecs-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.export-choice-card {
+  width: 100%;
+  text-align: left;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.92);
+  color: #f8fafc;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: all 0.18s ease;
+}
+
+.export-choice-card.is-sell:hover {
+  border-color: rgba(34, 197, 94, 0.8);
+  background: rgba(16, 185, 129, 0.14);
+}
+
+.export-choice-card.is-cost:hover {
+  border-color: rgba(245, 158, 11, 0.85);
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.ecc-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.export-choice-card.is-sell .ecc-head {
+  color: #4ade80;
+}
+
+.export-choice-card.is-cost .ecc-head {
+  color: #fbbf24;
+}
+
+.ecc-sub {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.ecc-total {
+  margin-top: 2px;
+  font-size: 15px;
+  font-weight: 900;
+  color: #ffffff;
+}
+
+/* ================= ADD / MANAGE ORDER MEMBERS ================= */
+.ov-add-member-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 9px;
+  border: 1px dashed rgba(56, 189, 248, 0.55);
+  background: rgba(14, 165, 233, 0.14);
+  color: #7dd3fc;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.16s ease;
+}
+
+.ov-add-member-btn:hover {
+  background: rgba(14, 165, 233, 0.26);
+  border-style: solid;
+  border-color: rgba(56, 189, 248, 0.85);
+  color: #f0f9ff;
+}
+
+.ov-member-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.25);
+  color: #e0f2fe;
+  font-size: 10.5px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.emtb-add-pill {
+  border-style: dashed !important;
+  border-color: rgba(56, 189, 248, 0.5) !important;
+  color: #7dd3fc !important;
+  background: rgba(14, 165, 233, 0.1) !important;
+}
+
+.emtb-add-pill:hover {
+  border-style: solid !important;
+  background: rgba(14, 165, 233, 0.22) !important;
+  color: #f0f9ff !important;
+}
+
+.ogr-remove-member-btn,
+.omg-remove-member-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.12);
+  color: #fca5a5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.ogr-remove-member-btn:hover,
+.omg-remove-member-btn:hover {
+  background: rgba(239, 68, 68, 0.28);
+  border-color: rgba(248, 113, 113, 0.7);
+  color: #ffffff;
+}
+
+.order-member-empty-row td {
+  padding: 10px 14px !important;
+  text-align: center;
+  font-size: 12px;
+  color: #94a3b8;
+  font-style: italic;
+  background: rgba(15, 23, 42, 0.32) !important;
+}
+
+.order-member-empty-card {
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px dashed rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.45);
+  color: #94a3b8;
+  font-size: 12px;
+  text-align: center;
+}
+
+.order-member-empty-card strong {
+  color: #7dd3fc;
+}
+
+.add-member-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.amf-input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(15, 23, 42, 0.85);
+  color: #f8fafc;
+  font-size: 13.5px;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.amf-input:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.22);
+}
+
+.amf-add-btn {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  background: linear-gradient(135deg, #0284c7, #0ea5e9);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.16s ease;
+}
+
+.amf-add-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.amf-members-section {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.amf-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #e2e8f0;
+}
+
+.amf-section-title small {
+  font-size: 11px;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.amf-member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.amf-member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.72);
+  transition: border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.amf-member-row.active {
+  border-color: rgba(52, 211, 153, 0.65);
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.amf-member-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+}
+
+.amf-member-info > i {
+  font-size: 16px;
+  color: #38bdf8;
+  flex-shrink: 0;
+}
+
+.amf-member-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.amf-member-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.amf-member-name > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.amf-member-meta {
+  font-size: 11.5px;
+  color: #94a3b8;
+  margin-top: 1px;
+}
+
+.amf-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.amf-select-btn {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(30, 41, 59, 0.85);
+  color: #cbd5e1;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.amf-select-btn.active {
+  border-color: rgba(52, 211, 153, 0.75);
+  background: rgba(16, 185, 129, 0.25);
+  color: #6ee7b7;
+}
+
+.amf-icon-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(30, 41, 59, 0.8);
+  color: #cbd5e1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.amf-icon-btn:hover {
+  border-color: rgba(56, 189, 248, 0.6);
+  color: #ffffff;
+}
+
+.amf-icon-btn.is-save {
+  border-color: rgba(34, 197, 94, 0.6);
+  background: rgba(16, 185, 129, 0.22);
+  color: #4ade80;
+}
+
+.amf-icon-btn.is-del:hover {
+  border-color: rgba(248, 113, 113, 0.7);
+  background: rgba(239, 68, 68, 0.22);
+  color: #fca5a5;
+}
+
+.amf-rename-input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid #38bdf8;
+  background: rgba(15, 23, 42, 0.95);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  outline: none;
+}
+
+/* ================= ORDER STATUS PROGRESS & WEB SYNC BUTTON ================= */
+.fab-sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.fab-sync-pill.is-synced {
+  background: rgba(30, 41, 59, 0.75);
+  border: 1px solid rgba(100, 116, 139, 0.35);
+  color: #94a3b8;
+}
+
+.fab-sync-pill.is-unsynced {
+  background: rgba(14, 165, 233, 0.18);
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  color: #38bdf8;
+}
+
+.order-progress-row {
+  width: 100%;
+  min-width: 0;
+}
+
+.order-progress-cancelled {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.order-status-progress {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 2px;
+  padding: 6px 4px 4px;
+  border-radius: 9px;
+  background: rgba(2, 6, 23, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.order-status-progress.is-3-steps {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.osp-track {
+  position: absolute;
+  top: 16px;
+  left: 12.5%;
+  right: 12.5%;
+  height: 2px;
+  background: rgba(148, 163, 184, 0.24);
+  border-radius: 999px;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.order-status-progress.is-3-steps .osp-track {
+  left: 16.67%;
+  right: 16.67%;
+}
+
+.osp-track-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #38bdf8);
+  border-radius: 999px;
+  transition: width 0.24s ease;
+}
+
+.osp-step {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 1px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  min-width: 0;
+  transition: transform 0.14s ease, opacity 0.14s ease;
+}
+
+.osp-step:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.osp-step:not(:disabled):hover .osp-dot {
+  transform: scale(1.1);
+  border-color: #7dd3fc;
+}
+
+.osp-step:not(:disabled):hover .osp-label {
+  color: #f8fafc;
+}
+
+.osp-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  background: #0f172a;
+  border: 2px solid rgba(148, 163, 184, 0.4);
+  color: #94a3b8;
+  transition: all 0.18s ease;
+}
+
+.osp-label {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: #94a3b8;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.osp-step.is-done .osp-dot {
+  background: #059669;
+  border-color: #34d399;
+  color: #ffffff;
+}
+
+.osp-step.is-done .osp-label {
+  color: #6ee7b7;
+}
+
+.osp-step.is-current .osp-dot {
+  background: #0ea5e9;
+  border-color: #7dd3fc;
+  color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+}
+
+.osp-step.is-current .osp-label {
+  color: #e0f2fe;
+  font-weight: 800;
+}
+
+.submit-stack.pc-submit-stack.is-online-actions {
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+}
+
+.submit-stack.pc-submit-stack.is-online-actions .btn-order-cancel,
+.submit-stack.pc-submit-stack.is-online-actions .btn-close-order-tab {
+  grid-column: auto;
+}
+
+.submit-stack.pc-submit-stack.is-online-actions .btn-close-order-tab:only-child {
+  grid-column: 1 / -1;
+}
+
+.submit-stack .btn-sync-web.is-synced {
+  background: linear-gradient(135deg, #1e293b, #0f172a) !important;
+  color: #64748b !important;
+  border: 1px solid rgba(100, 116, 139, 0.35) !important;
+  box-shadow: none !important;
+}
+
+.submit-stack .btn-sync-web.is-synced:hover:not(:disabled) {
+  background: linear-gradient(135deg, #273449, #162033) !important;
+  color: #94a3b8 !important;
+}
+
+.submit-stack .btn-sync-web.is-unsynced {
+  background: linear-gradient(135deg, #0284c7, #06b6d4) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(56, 189, 248, 0.8) !important;
+  box-shadow: 0 4px 14px rgba(14, 165, 233, 0.36) !important;
+}
+
+.submit-stack .btn-sync-web.is-unsynced:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0369a1, #0891b2) !important;
+  box-shadow: 0 6px 18px rgba(14, 165, 233, 0.48) !important;
+}
+
+.omg-dup-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  color: #fde68a;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.25;
+  flex-shrink: 0;
+}
+
+.amf-dup-alert {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(245, 158, 11, 0.55);
+  background: rgba(245, 158, 11, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.amf-dup-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.amf-dup-head > i {
+  font-size: 18px;
+  color: #fbbf24;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.amf-dup-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.amf-dup-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fef3c7;
+  line-height: 1.35;
+}
+
+.amf-dup-meta {
+  color: #fde68a;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.amf-dup-sub {
+  margin-top: 3px;
+  font-size: 12px;
+  color: #e2e8f0;
+  line-height: 1.35;
+}
+
+.amf-dup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.amf-dup-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 31px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.amf-dup-btn.is-confirm {
+  background: linear-gradient(135deg, #059669, #10b981);
+  border-color: rgba(52, 211, 153, 0.7);
+  color: #ffffff;
+}
+
+.amf-dup-btn.is-confirm:hover {
+  filter: brightness(1.08);
+}
+
+.amf-dup-btn.is-existing {
+  background: rgba(14, 165, 233, 0.18);
+  border-color: rgba(56, 189, 248, 0.55);
+  color: #7dd3fc;
+}
+
+.amf-dup-btn.is-existing:hover {
+  background: rgba(14, 165, 233, 0.3);
+  color: #f0f9ff;
+}
+
+.amf-dup-btn.is-rename {
+  background: rgba(30, 41, 59, 0.85);
+  border-color: rgba(148, 163, 184, 0.35);
+  color: #cbd5e1;
+}
+
+.amf-dup-btn.is-rename:hover {
+  border-color: rgba(148, 163, 184, 0.7);
+  color: #ffffff;
+}
+
+/* ================= BELL PENDING ORDERS BUTTON & MODAL ================= */
+.invoice-tab-bell-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(30, 41, 59, 0.78);
+  color: #94a3b8;
+  font-size: 15px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.16s ease;
+}
+
+.invoice-tab-bell-btn:hover {
+  border-color: rgba(248, 113, 113, 0.65);
+  color: #f8fafc;
+}
+
+.invoice-tab-bell-btn.has-pending {
+  border-color: rgba(239, 68, 68, 0.65);
+  background: rgba(220, 38, 38, 0.2);
+  color: #fca5a5;
+  box-shadow: 0 2px 10px rgba(239, 68, 68, 0.25);
+}
+
+.invoice-tab-bell-btn.has-pending:hover {
+  background: rgba(220, 38, 38, 0.34);
+  color: #ffffff;
+}
+
+.invoice-tab-bell-btn.is-ringing i {
+  animation: pendingBellRing 0.75s ease-in-out infinite;
+}
+
+@keyframes pendingBellRing {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(16deg); }
+  40% { transform: rotate(-14deg); }
+  60% { transform: rotate(10deg); }
+  80% { transform: rotate(-8deg); }
+}
+
+.itb-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ef4444;
+  border: 1.5px solid #0f172a;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.invoice-tab-pill.status-waiting {
+  border-color: rgba(239, 68, 68, 0.55);
+  background: rgba(185, 28, 28, 0.22);
+  color: #fecaca;
+}
+
+.invoice-tab-pill.status-waiting.active {
+  border-color: rgba(248, 113, 113, 0.9);
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.36), rgba(153, 27, 27, 0.42));
+  color: #ffffff;
+  box-shadow: 0 2px 10px rgba(239, 68, 68, 0.28);
+}
+
+.pmv4-icon-box.is-alert-red {
+  background: rgba(239, 68, 68, 0.18) !important;
+  border-color: rgba(239, 68, 68, 0.45) !important;
+  color: #f87171 !important;
+}
+
+.po-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 28px 14px;
+  border-radius: 12px;
+  border: 1px dashed rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.55);
+  color: #94a3b8;
+  font-size: 13px;
+  text-align: center;
+}
+
+.po-empty i {
+  font-size: 28px;
+  color: #34d399;
+}
+
+.po-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 62vh;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.po-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(239, 68, 68, 0.38);
+  background: rgba(15, 23, 42, 0.82);
+  transition: border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.po-card:hover {
+  border-color: rgba(248, 113, 113, 0.72);
+  background: rgba(30, 41, 59, 0.88);
+}
+
+.po-card.is-opened {
+  border-color: rgba(56, 189, 248, 0.38);
+}
+
+.po-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.po-code-group {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.po-code {
+  font-size: 13px;
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.po-badge-waiting {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  color: #fca5a5;
+}
+
+.po-badge-opened {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  background: rgba(14, 165, 233, 0.18);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  color: #7dd3fc;
+}
+
+.po-total {
+  font-size: 14px;
+  font-weight: 900;
+  color: #4ade80;
+  white-space: nowrap;
+}
+
+.po-customer-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 13px;
+  color: #e2e8f0;
+}
+
+.po-customer-row i {
+  color: #38bdf8;
+}
+
+.po-phone {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.po-sub-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  color: #94a3b8;
+  line-height: 1.35;
+}
+
+.po-sub-row i {
+  color: #64748b;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.po-items-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.55);
+  font-size: 11.5px;
+  color: #cbd5e1;
+  line-height: 1.35;
+}
+
+.po-items-preview i {
+  color: #fbbf24;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.po-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
+.po-import-btn {
+  height: 33px;
+  padding: 0 13px;
+  border-radius: 9px;
+  border: 1px solid rgba(52, 211, 153, 0.65);
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.po-import-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.po-import-btn.is-open-tab {
+  border-color: rgba(56, 189, 248, 0.65);
+  background: linear-gradient(135deg, #0284c7, #0ea5e9);
+}
+
+.po-import-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.order-created-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(30, 41, 59, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.order-created-pill i {
+  color: #38bdf8;
+}
+
+/* ================= VERTICAL TABS RAIL (PC) & MOBILE COMPAT ================= */
+.itb-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.itp-top-line,
+.itp-sub-line {
+  display: contents;
+}
+
+.itb-collapse-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(30, 41, 59, 0.78);
+  color: #cbd5e1;
+  font-size: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.16s ease;
+}
+
+.itb-collapse-btn:hover {
+  border-color: rgba(56, 189, 248, 0.55);
+  color: #f8fafc;
+}
+
+@media (min-width: 1025px) {
+  .invoice-tabs-bar.is-pc-vertical {
+    width: 152px;
+    flex-shrink: 0;
+    height: 100%;
+    min-height: 0;
+    margin-bottom: 0;
+    padding: 8px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(2, 6, 23, 0.95));
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    box-shadow: 0 8px 22px rgba(2, 6, 23, 0.4);
+  }
+
+  .invoice-tabs-bar.is-pc-vertical .itb-actions {
+    order: -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  }
+
+  .invoice-tabs-bar.is-pc-vertical .invoice-tab-add-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 999px;
+    font-size: 16px;
+    flex: none;
+  }
+
+  .invoice-tabs-bar.is-pc-vertical .invoice-tabs-scroll {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: 0;
+    padding-right: 2px;
+    gap: 6px;
+  }
+
+  .invoice-tabs-bar.is-pc-vertical .invoice-tab-pill {
+    width: 100%;
+    max-width: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+    padding: 7px 8px;
+    border-radius: 10px;
+    white-space: normal;
+  }
+
+  .invoice-tabs-bar.is-pc-vertical .itp-dot {
+    display: none;
+  }
+
+  .invoice-tabs-bar.is-pc-vertical .itp-top-line {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .invoice-tabs-bar.is-pc-vertical .itp-top-line::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: #64748b;
+    flex-shrink: 0;
+  }
+
+  .invoice-tabs-bar.is-pc-vertical .invoice-tab-pill.active .itp-top-line::before {
+    background: #34d399;
+  }
+
+  .invoice-tabs-bar.is-pc-vertical .invoice-tab-pill.is-approved .itp-top-line::before {
+    background: #38bdf8;
+  }
+
+  .invoice-tabs-bar.is-pc-vertical .invoice-tab-pill.status-waiting .itp-top-line::before {
+    background: #f87171;
+  }
+
+  .invoice-tabs-bar.is-pc-vertical .itp-title {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    font-size: 11.5px;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .invoice-tabs-bar.is-pc-vertical .itp-sub-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    width: 100%;
+    padding-left: 12px;
+  }
+
+  .invoice-tabs-bar.is-pc-vertical .itp-status-tag {
+    font-size: 9.5px;
+    padding: 1px 6px;
+  }
+
+  /* Collapsed compact vertical rail */
+  .invoice-tabs-bar.is-pc-vertical.is-rail-collapsed {
+    width: 52px;
+    padding: 8px 5px;
+  }
+
+  .invoice-tabs-bar.is-pc-vertical.is-rail-collapsed .itb-actions {
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .invoice-tabs-bar.is-pc-vertical.is-rail-collapsed .itb-collapse-btn,
+  .invoice-tabs-bar.is-pc-vertical.is-rail-collapsed .invoice-tab-add-btn,
+  .invoice-tabs-bar.is-pc-vertical.is-rail-collapsed .invoice-tab-bell-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    flex: none;
+  }
+
+  .invoice-tabs-bar.is-pc-vertical.is-rail-collapsed .invoice-tab-add-btn {
+    border-radius: 999px;
+  }
+
+  .invoice-tabs-bar.is-pc-vertical.is-rail-collapsed .invoice-tab-pill {
+    position: relative;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 4px;
+    gap: 3px;
+  }
+
+  .invoice-tabs-bar.is-pc-vertical.is-rail-collapsed .itp-dot {
+    display: inline-block;
+  }
+
+  .invoice-tabs-bar.is-pc-vertical.is-rail-collapsed .itp-compact-idx {
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  .invoice-tabs-bar.is-pc-vertical.is-rail-collapsed .itp-sub-line {
+    justify-content: center;
+    padding-left: 0;
+  }
+}
+
+/* ================= ORDER TABLE COLUMN RESIZE HANDLES ================= */
+.order-box table.is-fixed-cols {
+  table-layout: fixed;
+  width: max-content;
+  min-width: 100%;
+}
+
+.order-box table.is-fixed-cols th,
+.order-box table.is-fixed-cols td {
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.order-box table.is-resizing-table-cols,
+.order-box table.is-resizing-table-cols * {
+  user-select: none !important;
+  cursor: col-resize !important;
+}
+
+.order-box table thead th {
+  position: sticky;
+  top: 0;
+}
+
+.th-label-text {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.th-col-resizer {
+  position: absolute;
+  top: 4px;
+  right: 0;
+  bottom: 4px;
+  width: 7px;
+  cursor: col-resize;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+.th-col-resizer::after {
+  content: '';
+  width: 2px;
+  height: 56%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.24);
+  transition: background-color 0.14s ease, width 0.14s ease, height 0.14s ease;
+}
+
+.order-box table thead th:hover .th-col-resizer::after,
+.order-box table thead th.is-col-resizing .th-col-resizer::after {
+  width: 3px;
+  height: 76%;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.ocp-reset-widths-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  background: rgba(14, 165, 233, 0.14);
+  color: #7dd3fc;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ocp-reset-widths-btn:hover {
+  border-color: rgba(56, 189, 248, 0.75);
+  background: rgba(14, 165, 233, 0.25);
+  color: #e0f2fe;
+}
+
+/* ================= TAB SOURCE FILTER (TẤT CẢ / ĐƠN WEB / ĐƠN ADMIN) ================= */
+.itb-source-filter {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+  padding: 2px;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  flex-shrink: 0;
+}
+
+.itb-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 4px 3px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-width: 0;
+}
+
+.itb-filter-btn > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.itb-filter-btn:hover {
+  color: #e2e8f0;
+  background: rgba(30, 41, 59, 0.65);
+}
+
+.itb-filter-btn.active {
+  background: rgba(16, 185, 129, 0.22);
+  color: #6ee7b7;
+  box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.45);
+}
+
+.itb-filter-btn.is-web.active {
+  background: rgba(14, 165, 233, 0.22);
+  color: #7dd3fc;
+  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.48);
+}
+
+.itb-filter-btn.is-admin.active {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fcd34d;
+  box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.45);
+}
+
+.itb-fcount {
+  font-size: 9.5px;
+  font-weight: 800;
+  opacity: 0.82;
+}
+
+.itb-filter-empty {
+  padding: 12px 8px;
+  font-size: 11px;
+  color: #64748b;
+  font-style: italic;
+  text-align: center;
+}
+
+@media (min-width: 1025px) {
+  .invoice-tabs-bar.is-pc-vertical .itb-source-filter {
+    order: -1;
+  }
+  .invoice-tabs-bar.is-pc-vertical .itb-search-wrap {
+    order: -1;
+  }
+}
+
+@media (max-width: 1024px) {
+  .invoice-tabs-bar {
+    flex-wrap: wrap;
+  }
+  .itb-source-filter {
+    order: 3;
+    width: 100%;
+  }
+  .itb-search-wrap {
+    order: 4;
+    width: 100%;
+  }
+}
+
+.itb-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 8px;
+  gap: 5px;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  flex-shrink: 0;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.itb-search-wrap:focus-within {
+  border-color: rgba(56, 189, 248, 0.65);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.14);
+}
+
+.itb-search-icon {
+  font-size: 13px;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.itb-search-input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #f1f5f9;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.itb-search-input::placeholder {
+  color: #64748b;
+}
+
+.itb-search-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(148, 163, 184, 0.22);
+  color: #cbd5e1;
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.itb-search-clear:hover {
+  background: rgba(239, 68, 68, 0.28);
+  color: #fecaca;
+}
+
+.invoice-tab-pill.is-search-match {
+  border-color: rgba(250, 204, 21, 0.55) !important;
+  box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.22);
+}
+
+.itp-search-match-sub {
+  margin-top: 2px;
+  padding-left: 14px;
+  font-size: 10.5px;
+  color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  width: 100%;
+}
+
+.pmv4-icon-box.is-ctc-warn {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+}
+
+.ctc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ctc-status-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.ctc-meta-label {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.ctc-source-chip {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.ctc-source-chip.is-web {
+  background: rgba(56, 189, 248, 0.16);
+  color: #7dd3fc;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+
+.ctc-source-chip.is-admin {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fcd34d;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+}
+
+.ctc-desc {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #cbd5e1;
+}
+
+.ctc-unsynced-warn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.38);
+  color: #fde68a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ctc-footer {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ctc-btn-keep,
+.ctc-btn-cancel-order {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ctc-btn-keep {
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.42);
+  color: #7dd3fc;
+}
+
+.ctc-btn-keep:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.24);
+  color: #e0f2fe;
+}
+
+.ctc-btn-cancel-order {
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+}
+
+.ctc-btn-cancel-order:hover:not(:disabled) {
+  background: #dc2626;
+  border-color: #ef4444;
+  color: #ffffff;
+}
+
+.ctc-btn-keep:disabled,
+.ctc-btn-cancel-order:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ================= CK NCC (IN ORDER TABLE, MANUAL ENTRY & EDIT MODAL) ================= */
+.table-ncc-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.table-ncc-mode-btn {
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+.table-ncc-mode-btn.is-money {
+  border-color: rgba(56, 189, 248, 0.5);
+  background: rgba(14, 165, 233, 0.18);
+  color: #7dd3fc;
+}
+
+.table-ncc-input {
+  width: 54px;
+  min-width: 40px;
+  height: 26px;
+  padding: 0 5px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(15, 23, 42, 0.8);
+  color: #f8fafc;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.table-ncc-input:focus {
+  outline: none;
+  border-color: #22c55e;
+}
+
+.ncc-inline-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ncc-type-toggle {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.ncc-type-btn {
+  padding: 6px 10px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ncc-type-btn.active {
+  background: rgba(16, 185, 129, 0.24);
+  color: #6ee7b7;
+}
+
+.ncc-inline-input {
+  flex: 1;
+  min-width: 80px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.85);
+  color: #f8fafc;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.item-card-ncc-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(16, 185, 129, 0.18);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+/* ================= CUSTOMER ORDER UPDATE HIGHLIGHTS & ACTION BOX ================= */
+.itp-update-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  background: rgba(245, 158, 11, 0.24);
+  color: #fde68a;
+  border: 1px solid rgba(251, 191, 36, 0.65);
+  margin-left: 4px;
+}
+
+.row-web-updated td {
+  background: rgba(245, 158, 11, 0.14) !important;
+  border-top: 1px solid rgba(251, 191, 36, 0.45) !important;
+  border-bottom: 1px solid rgba(251, 191, 36, 0.45) !important;
+}
+
+.row-web-updated td:first-child {
+  box-shadow: inset 4px 0 0 #f59e0b;
+}
+
+.card-web-updated {
+  background: rgba(245, 158, 11, 0.14) !important;
+  border: 1.5px solid rgba(251, 191, 36, 0.72) !important;
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.18), inset 4px 0 0 #f59e0b !important;
+}
+
+.web-update-pill {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  vertical-align: middle;
+}
+
+.web-update-pill.is-added {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+}
+
+.web-update-pill.is-qty_up {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.35);
+}
+
+.web-update-pill.is-note {
+  background: rgba(56, 189, 248, 0.24);
+  color: #7dd3fc;
+  border: 1px solid rgba(56, 189, 248, 0.55);
+}
+
+.web-update-action-box {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(120, 53, 15, 0.26);
+  border: 1px solid rgba(251, 191, 36, 0.58);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wuab-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #fde68a;
+}
+
+.wuab-head i {
+  font-size: 15px;
+  color: #fbbf24;
+}
+
+.wuab-btns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.btn-wuab-confirm,
+.btn-wuab-detail {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.16s ease;
+}
+
+.btn-wuab-confirm {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border: 1px solid rgba(52, 211, 153, 0.7);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.28);
+}
+
+.btn-wuab-confirm:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+}
+
+.btn-wuab-detail {
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  color: #fde68a;
+}
+
+.btn-wuab-detail:hover {
+  background: rgba(245, 158, 11, 0.22);
+  color: #ffffff;
+}
+
+/* Bell Modal update section + Update Detail Modal */
+.po-update-section {
+  margin-bottom: 14px;
+}
+
+.po-section-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 8px;
+}
+
+.po-section-label.is-update {
+  color: #fbbf24;
+}
+
+.po-card.is-update-card {
+  border-color: rgba(251, 191, 36, 0.55);
+  background: rgba(120, 53, 15, 0.18);
+}
+
+.po-badge-updated {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(245, 158, 11, 0.24);
+  color: #fde68a;
+  border: 1px solid rgba(251, 191, 36, 0.55);
+}
+
+.po-update-preview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.55);
+  font-size: 12.5px;
+}
+
+.po-update-preview-item.is-added {
+  color: #6ee7b7;
+  font-weight: 700;
+}
+
+.po-update-preview-item.is-qty_up {
+  color: #fde68a;
+  font-weight: 700;
+}
+
+.po-update-preview-item.is-removed,
+.po-update-preview-item.is-qty_down {
+  color: #fca5a5;
+}
+
+.po-update-preview-item.is-note,
+.po-update-preview-item.is-meta {
+  color: #93c5fd;
+}
+
+.po-update-more {
+  color: #94a3b8;
+  font-size: 11.5px;
+}
+
+.po-import-btn.is-jump-update {
+  background: linear-gradient(135deg, #d97706, #f59e0b);
+  border-color: rgba(251, 191, 36, 0.75);
+  color: #ffffff;
+}
+
+.pmv4-icon-box.is-alert-amber {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.5);
+}
+
+.wud-change-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wud-change-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.wud-change-card.is-added {
+  border-color: rgba(16, 185, 129, 0.45);
+  background: rgba(6, 78, 59, 0.22);
+}
+
+.wud-change-card.is-qty_up {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(120, 53, 15, 0.2);
+}
+
+.wud-change-card.is-removed,
+.wud-change-card.is-qty_down {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(127, 29, 29, 0.2);
+}
+
+.wud-type-badge {
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.wud-type-badge.is-added {
+  background: rgba(16, 185, 129, 0.22);
+  color: #6ee7b7;
+}
+
+.wud-type-badge.is-qty_up {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fde68a;
+}
+
+.wud-type-badge.is-removed,
+.wud-type-badge.is-qty_down {
+  background: rgba(239, 68, 68, 0.22);
+  color: #fca5a5;
+}
+
+.wud-type-badge.is-note,
+.wud-type-badge.is-meta {
+  background: rgba(56, 189, 248, 0.2);
+  color: #7dd3fc;
+}
+
+.wud-change-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.wud-change-summary {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.wud-change-sub {
+  margin-top: 3px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.pmv4-btn-primary.is-confirm-update {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.bank-qr svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ================= MODAL XUẤT MÃ QR VIETQR ================= */
+.pmv4-icon-box.is-qr-amber {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.24), rgba(217, 119, 6, 0.14));
+  border-color: rgba(245, 158, 11, 0.45);
+  color: #fbbf24;
+}
+
+.qr-export-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.qr-bank-selector-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.qr-bank-selector-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.qr-bank-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.qr-bank-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.65);
+  color: #cbd5e1;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.qr-bank-chip.active {
+  border-color: #fbbf24;
+  background: rgba(245, 158, 11, 0.18);
+  color: #fde68a;
+}
+
+.qr-type-tag {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.qr-type-tag.is-dynamic {
+  background: rgba(56, 189, 248, 0.2);
+  color: #7dd3fc;
+}
+
+.qr-type-tag.is-static {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fcd34d;
+}
+
+.qr-export-card {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  color: #0f172a;
+  box-shadow: 0 10px 28px rgba(2, 6, 23, 0.22);
+}
+
+.qec-top-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  margin-bottom: 10px;
+}
+
+.qec-brand {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #38bdf8;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+}
+
+.qec-brand.is-static {
+  color: #fbbf24;
+}
+
+.qec-bank-name {
+  font-size: 14px;
+  font-weight: 900;
+  color: #1e293b;
+  text-transform: uppercase;
+}
+
+.qec-qr-frame {
+  padding: 10px;
+  border-radius: 14px;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qec-qr-svg {
+  display: block;
+}
+
+.qec-static-qr-img {
+  width: 210px;
+  height: 210px;
+  object-fit: contain;
+  display: block;
+}
+
+.qec-amount-box {
+  margin-top: 10px;
+  padding-bottom: 10px;
+  width: 100%;
+  border-bottom: 1px dashed #cbd5e1;
+}
+
+.qec-amount-lbl {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 0.6px;
+}
+
+.qec-amount-val {
+  margin-top: 2px;
+  font-size: 23px;
+  font-weight: 900;
+  color: #059669;
+  line-height: 1.15;
+}
+
+.qec-ship-status {
+  margin-top: 3px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.qec-ship-status.is-included {
+  color: #0284c7;
+}
+
+.qec-ship-status.is-excluded {
+  color: #64748b;
+}
+
+.qec-meta-list {
+  width: 100%;
+  margin-top: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.qec-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.qec-meta-row strong {
+  color: #0f172a;
+  font-weight: 800;
+  text-align: right;
+  word-break: break-word;
+}
+
+.qr-export-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.qr-ship-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  background: rgba(15, 23, 42, 0.6);
+  color: #cbd5e1;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.qr-ship-toggle.active {
+  border-color: rgba(56, 189, 248, 0.72);
+  background: rgba(14, 165, 233, 0.16);
+  color: #e0f2fe;
+}
+
+.qr-ship-toggle input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  accent-color: #38bdf8;
+  margin: 0;
+}
+
+.qr-memo-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qr-memo-field label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.qr-memo-input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.75);
+  color: #f8fafc;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.qr-export-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.qr-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 13px;
+  border-radius: 9px;
+  border: none;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  color: #ffffff;
+}
+
+.qr-action-btn.is-copy {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.qr-action-btn.is-download {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.qr-action-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 </style>

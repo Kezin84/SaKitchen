@@ -10,6 +10,11 @@ import {
   syncNoticeWithI18n,
   resolveNoticeText,
 } from '../utils/i18nData'
+import {
+  normalizeNccDiscountType,
+  normalizeNccDiscountValue,
+  calcOrderLineProfit,
+} from '../utils/nccDiscount'
 
 export const IMGBB_KEY = 'b202a4bdc79bf1dc72f6f6ded6b74501'
 
@@ -32,6 +37,7 @@ export const SHEETS = [
   'shop_contact',
   'time',
   'thong_tin_chuyen_khoan',
+  'display_config',
   'Login',
 ]
 
@@ -48,6 +54,7 @@ export const STOREFRONT_SHEETS = [
   'khuyenmai_info',
   'time',
   'thong_tin_chuyen_khoan',
+  'display_config',
 ]
 
 /* =========================================================
@@ -437,13 +444,17 @@ async function handleHoanThanhDon(payload) {
       Gia_goc: n(i.Gia_goc),
       Gia_ban: n(i.Gia_ban),
       Giam_gia: n(i.Giam_gia),
+      Chiet_khau: n(i.Chiet_khau ?? i.chietKhau),
       Tien_chiet_khau: n(i.Tien_chiet_khau),
+      Ncc_loai_giam: normalizeNccDiscountType(i.Ncc_loai_giam ?? i.nccLoaiGiam),
+      Ncc_gia_tri_giam: normalizeNccDiscountValue(i.Ncc_gia_tri_giam ?? i.nccGiaTriGiam),
       Thanh_tien: n(i.Thanh_tien),
       Loi_nhuan: n(i.Loi_nhuan),
       Ghi_chu: s(i.Ghi_chu),
       Nguoi_dat: s(i.Nguoi_dat),
       Nguoi_dat_id: s(i.Nguoi_dat_id),
       Added_by_role: s(i.Added_by_role),
+      lineId: s(i.lineId),
       Trang_thai_don: targetOrderStatus,
       Thoi_gian_nhan_hang: s(hoa_don.Thoi_gian_nhan_hang),
     })
@@ -466,6 +477,8 @@ async function handleHoanThanhDon(payload) {
           Dvt: s(i.Dvt),
           Gia_goc: n(i.Gia_goc),
           Gia_ban: n(i.Gia_ban),
+          Ncc_loai_giam: normalizeNccDiscountType(i.Ncc_loai_giam ?? i.nccLoaiGiam),
+          Ncc_gia_tri_giam: normalizeNccDiscountValue(i.Ncc_gia_tri_giam ?? i.nccGiaTriGiam),
           Trang_thai: 'Còn hàng',
           Don_vi_tien_te: s(i.Don_vi_tien_te || donViTienTe),
           Gia_Giam: '',
@@ -588,6 +601,7 @@ async function handleHoanThanhDon(payload) {
     So_dien_thoai: s(hoa_don.So_dien_thoai),
     Thoi_gian_nhan_hang: s(hoa_don.Thoi_gian_nhan_hang),
     Tong_gia_ban: n(hoa_don.Tong_cong),
+    Phi_ship: n(hoa_don.Phi_ship),
     Ghi_chu: s(hoa_don.Ghi_chu_don_hang),
     Hinh_thuc_thanh_toan: s(hoa_don.Hinh_thuc_thanh_toan),
     Trang_thai: targetOrderStatus,
@@ -596,33 +610,55 @@ async function handleHoanThanhDon(payload) {
   })
 
   // 8. Sync live_orders so online customer tracker sees updated total/items/info
-  if (liveParsed && orderKey) {
+  const isWebLinkedOrder =
+    Boolean(liveParsed) ||
+    s(existingDH?.row?.Nguon_don).trim() === 'WEB' ||
+    s(maHoaDon).startsWith('WEB')
+  if (isWebLinkedOrder && orderKey) {
     const hhMap = new Map(hangHoaEntries.map((e) => [s(e.row.Ma_hang).trim(), e.row]))
     const syncedItemsObj = {}
     let idx = 0
     for (const rawIt of items) {
       idx++
-      const lineId =
+      const baseLineId =
         s(rawIt.lineId).trim() ||
         makeLineId(
           rawIt.Ma_hang || rawIt.Ten_hang || `item_${idx}`,
           rawIt.Nguoi_dat_id || rawIt.Nguoi_dat || `pos_${idx}`,
         )
-      const resolved = resolveCanonicalViItem({ ...rawIt, lineId }, hhMap)
+      const resolved = resolveCanonicalViItem({ ...rawIt, lineId: baseLineId }, hhMap)
       if (resolved.So_luong <= 0) continue
-      const k = safeFirebaseKey(resolved.lineId)
+      let k = safeFirebaseKey(resolved.lineId)
+      if (syncedItemsObj[k]) {
+        k = safeFirebaseKey(`${k}_${idx}`)
+      }
       resolved.lineId = k
+      const itemGiamGia = n(rawIt.Giam_gia)
+      const itemChietKhau = n(rawIt.Chiet_khau ?? rawIt.chietKhau)
+      const itemTienCK = n(rawIt.Tien_chiet_khau ?? rawIt.tongChietKhauTien)
+      const grossLine = n(rawIt.Thanh_tien) || n(resolved.Gia_ban) * n(resolved.So_luong)
+      const lineDiscount = Math.max(0, itemGiamGia * n(resolved.So_luong) + itemTienCK)
+      const netLine = Math.max(0, grossLine - lineDiscount)
       syncedItemsObj[k] = sanitizeRow({
         ...resolved,
-        Giam_gia: n(rawIt.Giam_gia),
-        Tien_chiet_khau: n(rawIt.Tien_chiet_khau),
-        Thanh_tien: n(rawIt.Thanh_tien) || n(resolved.Gia_ban) * n(resolved.So_luong),
+        Giam_gia: itemGiamGia,
+        Chiet_khau: itemChietKhau,
+        Tien_chiet_khau: itemTienCK,
+        Thanh_tien: grossLine,
+        Thanh_tien_sau_giam: netLine,
       })
     }
+    const baseLiveMeta = liveParsed?.meta || {}
+    const syncedMembersObj = buildSyncedLiveMembers(
+      liveParsed?.rawMembers,
+      items,
+      s(hoa_don.Ten_khach_hang),
+      s(baseLiveMeta.Host_id),
+    )
     if (targetOrderStatus === 'Hoàn thành') {
       updates[`live_orders/${orderKey}`] = {
         meta: sanitizeRow({
-          ...liveParsed.meta,
+          ...baseLiveMeta,
           Ma_hoa_don: maHoaDon,
           So_hoa_don: resolvedSoHoaDon,
           Ma_khach_hang: maKH,
@@ -634,7 +670,13 @@ async function handleHoanThanhDon(payload) {
           Hinh_thuc_thanh_toan: s(hoa_don.Hinh_thuc_thanh_toan),
           Ghi_chu: s(hoa_don.Ghi_chu_don_hang),
           Don_vi_tien_te: s(donViTienTe),
+          Tam_tinh: n(hoa_don.Tam_tinh),
+          Tong_giam_gia: n(hoa_don.Tong_giam_gia),
+          Tong_tien_chiet_khau: n(hoa_don.Tong_tien_chiet_khau),
+          Phi_ship: n(hoa_don.Phi_ship),
           Tong_cong: 0,
+          Synced_by_admin: true,
+          Last_source: 'admin',
           Closed_at: Date.now(),
           Updated_at: Date.now(),
         }),
@@ -643,7 +685,7 @@ async function handleHoanThanhDon(payload) {
     } else {
       updates[`live_orders/${orderKey}`] = {
         meta: sanitizeRow({
-          ...liveParsed.meta,
+          ...baseLiveMeta,
           Ma_hoa_don: maHoaDon,
           So_hoa_don: resolvedSoHoaDon,
           Ma_khach_hang: maKH,
@@ -655,19 +697,25 @@ async function handleHoanThanhDon(payload) {
           Hinh_thuc_thanh_toan: s(hoa_don.Hinh_thuc_thanh_toan),
           Ghi_chu: s(hoa_don.Ghi_chu_don_hang),
           Don_vi_tien_te: s(donViTienTe),
+          Tam_tinh: n(hoa_don.Tam_tinh),
+          Tong_giam_gia: n(hoa_don.Tong_giam_gia),
+          Tong_tien_chiet_khau: n(hoa_don.Tong_tien_chiet_khau),
+          Phi_ship: n(hoa_don.Phi_ship),
           Tong_cong: n(hoa_don.Tong_cong),
+          Synced_by_admin: true,
+          Last_source: 'admin',
           Approved_at:
             targetOrderStatus !== 'Chờ duyệt'
-              ? liveParsed.meta?.Approved_at || Date.now()
-              : liveParsed.meta?.Approved_at,
+              ? baseLiveMeta?.Approved_at || Date.now()
+              : baseLiveMeta?.Approved_at,
           Shipped_at:
             targetOrderStatus === 'Đang ship'
-              ? liveParsed.meta?.Shipped_at || Date.now()
-              : liveParsed.meta?.Shipped_at,
+              ? baseLiveMeta?.Shipped_at || Date.now()
+              : baseLiveMeta?.Shipped_at,
           Updated_at: Date.now(),
         }),
         items: syncedItemsObj,
-        members: liveParsed.rawMembers || {},
+        members: syncedMembersObj,
       }
     }
   }
@@ -759,6 +807,16 @@ function resolveCanonicalViItem(item, hangHoaMap) {
 
   const soLuong = Math.max(0, n(item?.So_luong ?? item?.qty ?? item?.soLuong, 1))
   const donViTienTe = s(item?.Don_vi_tien_te || hh?.Don_vi_tien_te || 'P').trim() || 'P'
+  const hasExplicitNccType =
+    item?.Ncc_loai_giam !== undefined || item?.nccLoaiGiam !== undefined
+  const hasExplicitNccVal =
+    item?.Ncc_gia_tri_giam !== undefined || item?.nccGiaTriGiam !== undefined
+  const nccLoaiGiam = normalizeNccDiscountType(
+    hasExplicitNccType ? (item?.Ncc_loai_giam ?? item?.nccLoaiGiam) : hh?.Ncc_loai_giam,
+  )
+  const nccGiaTriGiam = normalizeNccDiscountValue(
+    hasExplicitNccVal ? (item?.Ncc_gia_tri_giam ?? item?.nccGiaTriGiam) : hh?.Ncc_gia_tri_giam,
+  )
 
   return {
     lineId: s(item?.lineId).trim() || makeLineId(maHang || tenVi, item?.Nguoi_dat_id || 'host'),
@@ -772,6 +830,8 @@ function resolveCanonicalViItem(item, hangHoaMap) {
     Gia_goc: giaGoc,
     Gia_ban: giaBan,
     Gia_ban_goc: n(item?.Gia_ban_goc || defaultSellPrice || giaBan),
+    Ncc_loai_giam: nccLoaiGiam,
+    Ncc_gia_tri_giam: nccGiaTriGiam,
     So_luong: soLuong,
     Thanh_tien: giaBan * soLuong,
     Ghi_chu: s(item?.Ghi_chu ?? item?.note),
@@ -783,6 +843,90 @@ function resolveCanonicalViItem(item, hangHoaMap) {
   }
 }
 
+function buildSyncedLiveMembers(existingRawMembers, items = [], fallbackHostName = '', hostId = '') {
+  const nextMembers = { ...(existingRawMembers && typeof existingRawMembers === 'object' ? existingRawMembers : {}) }
+  const nowTs = Date.now()
+  for (const rawIt of items || []) {
+    if (!rawIt) continue
+    if (rawIt.Added_by_role === 'admin' || rawIt.Nguoi_dat === 'Quán thêm') continue
+    const mId = s(rawIt.Nguoi_dat_id).trim()
+    const mName = s(rawIt.Nguoi_dat).trim()
+    if (!mId || !mName) continue
+
+    let existingKey = Object.keys(nextMembers).find(
+      (k) => s(nextMembers[k]?.id || k).trim() === mId,
+    )
+    if (!existingKey) {
+      existingKey = safeFirebaseKey(mId)
+    }
+    const prevRec = nextMembers[existingKey] || {}
+    const resolvedRole =
+      (hostId && mId === hostId) || rawIt.Added_by_role === 'host' || prevRec.role === 'host'
+        ? 'host'
+        : 'guest'
+    nextMembers[existingKey] = sanitizeRow({
+      ...prevRec,
+      id: mId,
+      name: mName,
+      role: resolvedRole,
+      done: resolvedRole === 'host' ? true : prevRec.done !== undefined ? Boolean(prevRec.done) : true,
+      joinedAt: n(prevRec.joinedAt, nowTs),
+      updatedAt: nowTs,
+    })
+  }
+  if (hostId && fallbackHostName) {
+    const hostKey = Object.keys(nextMembers).find(
+      (k) => s(nextMembers[k]?.id || k).trim() === hostId,
+    )
+    if (hostKey && !nextMembers[hostKey].name) {
+      nextMembers[hostKey].name = fallbackHostName
+    }
+  }
+  return nextMembers
+}
+
+function normalizeLiveItemsObject(rawItems) {
+  const itemsMap = {}
+  const itemsList = []
+  if (!rawItems || typeof rawItems !== 'object') {
+    return { itemsMap, itemsList }
+  }
+
+  for (const [k, v] of Object.entries(rawItems)) {
+    if (!v || typeof v !== 'object') continue
+    const qty = n(v.So_luong, 0)
+    if (qty <= 0) continue
+    const price = n(v.Gia_ban, 0)
+    const itemGiam = n(v.Giam_gia, 0)
+    const itemCk = n(v.Chiet_khau, 0)
+    const itemTienCk = n(v.Tien_chiet_khau, 0)
+    const grossLine = n(v.Thanh_tien, 0) || price * qty
+    const netLine =
+      v.Thanh_tien_sau_giam !== undefined
+        ? n(v.Thanh_tien_sau_giam, 0)
+        : Math.max(0, grossLine - itemGiam * qty - itemTienCk)
+    const normalized = {
+      ...v,
+      lineId: s(v.lineId || k),
+      So_luong: qty,
+      Gia_ban: price,
+      Giam_gia: itemGiam,
+      Chiet_khau: itemCk,
+      Tien_chiet_khau: itemTienCk,
+      Thanh_tien: grossLine,
+      Thanh_tien_sau_giam: netLine,
+      Ghi_chu: s(v.Ghi_chu),
+      Nguoi_dat: s(v.Nguoi_dat),
+      Nguoi_dat_id: s(v.Nguoi_dat_id),
+    }
+    itemsMap[k] = normalized
+    itemsList.push(normalized)
+  }
+
+  itemsList.sort((a, b) => n(a.Added_at, 0) - n(b.Added_at, 0))
+  return { itemsMap, itemsList }
+}
+
 export function normalizeLiveOrderSnapshot(orderId, raw) {
   const cleanId = s(orderId).trim()
   if (!raw || typeof raw !== 'object') {
@@ -790,8 +934,11 @@ export function normalizeLiveOrderSnapshot(orderId, raw) {
       exists: false,
       orderId: cleanId,
       meta: null,
+      submittedMeta: null,
       itemsMap: {},
       itemsList: [],
+      submittedItemsMap: {},
+      submittedItemsList: [],
       rawMembers: {},
       membersMap: {},
       membersList: [],
@@ -800,32 +947,20 @@ export function normalizeLiveOrderSnapshot(orderId, raw) {
   }
 
   const meta = raw.meta && typeof raw.meta === 'object' ? { ...raw.meta } : {}
-  const rawItems = raw.items && typeof raw.items === 'object' ? raw.items : {}
+  const submittedMeta =
+    raw.submitted_meta && typeof raw.submitted_meta === 'object'
+      ? { ...raw.submitted_meta }
+      : meta
   const rawMembers = raw.members && typeof raw.members === 'object' ? { ...raw.members } : {}
   const kickedMap = raw.kicked && typeof raw.kicked === 'object' ? { ...raw.kicked } : {}
-  const itemsMap = {}
-  const itemsList = []
+  const { itemsMap, itemsList } = normalizeLiveItemsObject(raw.items)
+  const hasSubmittedItems =
+    raw.submitted_items && typeof raw.submitted_items === 'object'
+  const { itemsMap: submittedItemsMap, itemsList: submittedItemsList } = hasSubmittedItems
+    ? normalizeLiveItemsObject(raw.submitted_items)
+    : { itemsMap, itemsList }
   const membersMap = {}
   const membersList = []
-
-  for (const [k, v] of Object.entries(rawItems)) {
-    if (!v || typeof v !== 'object') continue
-    const qty = n(v.So_luong, 0)
-    if (qty <= 0) continue
-    const price = n(v.Gia_ban, 0)
-    const normalized = {
-      ...v,
-      lineId: s(v.lineId || k),
-      So_luong: qty,
-      Gia_ban: price,
-      Thanh_tien: price * qty,
-      Ghi_chu: s(v.Ghi_chu),
-      Nguoi_dat: s(v.Nguoi_dat),
-      Nguoi_dat_id: s(v.Nguoi_dat_id),
-    }
-    itemsMap[k] = normalized
-    itemsList.push(normalized)
-  }
 
   for (const [mk, mv] of Object.entries(rawMembers)) {
     if (!mv || typeof mv !== 'object') continue
@@ -850,14 +985,15 @@ export function normalizeLiveOrderSnapshot(orderId, raw) {
     return a.joinedAt - b.joinedAt
   })
 
-  itemsList.sort((a, b) => n(a.Added_at, 0) - n(b.Added_at, 0))
-
   return {
     exists: true,
     orderId: cleanId,
     meta,
+    submittedMeta,
     itemsMap,
     itemsList,
+    submittedItemsMap,
+    submittedItemsList,
     rawMembers,
     membersMap,
     membersList,
@@ -909,14 +1045,6 @@ function stripAutoPromoTagText(rawNote) {
     .trim()
 }
 
-function mergeNoteWithPromoTag(rawNote, promoSummary) {
-  const cleanBase = stripAutoPromoTagText(rawNote)
-  const cleanPromo = s(promoSummary).trim()
-  if (!cleanPromo) return cleanBase
-  const tag = `[KM ĐẠT ĐƯỢC: ${cleanPromo}]`
-  return cleanBase ? `${cleanBase} ${tag}` : tag
-}
-
 function computeEarnedMilestonesViSummary(tongCong, kmEntries = []) {
   const total = n(tongCong, 0)
   if (total <= 0) return ''
@@ -942,7 +1070,7 @@ function computeEarnedMilestonesViSummary(tongCong, kmEntries = []) {
   return unlocked.join(' | ')
 }
 
-async function syncSubmittedLiveOrderToDonHang(orderKey, orderId) {
+async function syncSubmittedLiveOrderToDonHang(orderKey, orderId, options = {}) {
   const snap = await get(dbRef(db, `live_orders/${orderKey}`))
   if (!snap.exists()) return
   const parsed = normalizeLiveOrderSnapshot(orderId, snap.val())
@@ -952,10 +1080,11 @@ async function syncSubmittedLiveOrderToDonHang(orderKey, orderId) {
   const donViTienTe =
     s(parsed.itemsList[0]?.Don_vi_tien_te || meta.Don_vi_tien_te || 'P').trim() || 'P'
 
+  const nowTs = Date.now()
   const updates = {
     [`live_orders/${orderKey}/meta/Tong_cong`]: tongCong,
     [`live_orders/${orderKey}/meta/Don_vi_tien_te`]: donViTienTe,
-    [`live_orders/${orderKey}/meta/Updated_at`]: Date.now(),
+    [`live_orders/${orderKey}/meta/Updated_at`]: nowTs,
   }
 
   if (status === 'Chờ duyệt' || status === 'Đang xử lý') {
@@ -964,14 +1093,20 @@ async function syncSubmittedLiveOrderToDonHang(orderKey, orderId) {
       status === 'Chờ duyệt' ? readSheetEntries('khuyenmai_info') : Promise.resolve([]),
     ])
 
-    let syncedNote = meta.Ghi_chu !== undefined ? s(meta.Ghi_chu) : undefined
+    let syncedNote = meta.Ghi_chu !== undefined ? stripAutoPromoTagText(meta.Ghi_chu) : undefined
     let earnedPromoVi = s(meta.Khuyen_mai_dat_duoc)
 
     if (status === 'Chờ duyệt') {
       earnedPromoVi = computeEarnedMilestonesViSummary(tongCong, kmEntries)
-      syncedNote = mergeNoteWithPromoTag(meta.Ghi_chu, earnedPromoVi)
       updates[`live_orders/${orderKey}/meta/Khuyen_mai_dat_duoc`] = earnedPromoVi
-      updates[`live_orders/${orderKey}/meta/Ghi_chu`] = syncedNote
+      if (syncedNote !== undefined) {
+        updates[`live_orders/${orderKey}/meta/Ghi_chu`] = syncedNote
+      }
+      if (!options.skipSubmittedBump) {
+        updates[`live_orders/${orderKey}/meta/Submitted_at`] = nowTs
+        updates[`live_orders/${orderKey}/meta/Last_source`] = 'web'
+        updates[`live_orders/${orderKey}/meta/Synced_by_admin`] = false
+      }
     }
 
     const dhTarget = dhEntries.find((e) => s(e.row.Ma_hoa_don).trim() === s(orderId).trim())
@@ -1130,6 +1265,7 @@ export async function upsertLiveOrderMember({
   const updates = {
     [`live_orders/${orderKey}/members/${memberKey}`]: memberPayload,
     [`live_orders/${orderKey}/kicked/${memberKey}`]: null,
+    [`live_orders/${orderKey}/meta/Updated_at`]: Date.now(),
   }
   if (isHost && nextName) {
     updates[`live_orders/${orderKey}/meta/Host_name`] = nextName
@@ -1144,6 +1280,42 @@ export async function upsertLiveOrderMember({
 
   await update(dbRef(db), updates)
   return { success: true, member: memberPayload }
+}
+
+export async function markAllLiveOrderMembersDone({ orderId, requesterId = '' } = {}) {
+  const cleanOrderId = s(orderId).trim()
+  if (!cleanOrderId) return { success: false, message: 'Thiếu mã đơn' }
+  const orderKey = safeFirebaseKey(cleanOrderId)
+  const orderSnap = await get(dbRef(db, `live_orders/${orderKey}`))
+  if (!orderSnap.exists()) return { success: false, closed: true }
+
+  const parsed = normalizeLiveOrderSnapshot(cleanOrderId, orderSnap.val())
+  const status = s(parsed.meta?.Trang_thai).trim()
+  if (status === 'Hoàn thành' || status === 'Đã hủy') {
+    return { success: false, closed: true, status }
+  }
+  if (status === 'Đang xử lý' || status === 'Đang ship') {
+    return { success: false, locked: true, status }
+  }
+
+  const hostId = s(parsed.meta?.Host_id).trim()
+  if (hostId && requesterId && s(requesterId) !== hostId) {
+    return { success: false, forbidden: true }
+  }
+
+  const nowTs = Date.now()
+  const updates = {
+    [`live_orders/${orderKey}/meta/Updated_at`]: nowTs,
+  }
+  for (const [mk, mv] of Object.entries(parsed.rawMembers || {})) {
+    if (!mv || typeof mv !== 'object') continue
+    if (!mv.done) {
+      updates[`live_orders/${orderKey}/members/${mk}/done`] = true
+      updates[`live_orders/${orderKey}/members/${mk}/updatedAt`] = nowTs
+    }
+  }
+  await update(dbRef(db), updates)
+  return { success: true }
 }
 
 export async function removeLiveOrderMember({
@@ -1216,7 +1388,6 @@ export async function removeLiveOrderMember({
   }
 
   await update(dbRef(db), updates)
-  await syncSubmittedLiveOrderToDonHang(orderKey, cleanOrderId)
   return { success: true }
 }
 
@@ -1357,7 +1528,10 @@ export async function upsertLiveOrderItem({
 
   if (nextQty <= 0) {
     await remove(dbRef(db, `live_orders/${orderKey}/items/${targetLineKey}`))
-    await syncSubmittedLiveOrderToDonHang(orderKey, cleanOrderId)
+    if (role === 'admin') {
+      await remove(dbRef(db, `live_orders/${orderKey}/submitted_items/${targetLineKey}`))
+      await syncSubmittedLiveOrderToDonHang(orderKey, cleanOrderId, { skipSubmittedBump: true })
+    }
     return { success: true, removed: true, lineId: targetLineKey }
   }
 
@@ -1419,8 +1593,14 @@ export async function upsertLiveOrderItem({
     writeUpdates[`live_orders/${orderKey}/kicked/${memberKey}`] = null
   }
 
+  if (role === 'admin') {
+    writeUpdates[`live_orders/${orderKey}/submitted_items/${targetLineKey}`] = sanitizeRow(canonical)
+  }
+
   await update(dbRef(db), writeUpdates)
-  await syncSubmittedLiveOrderToDonHang(orderKey, cleanOrderId)
+  if (role === 'admin') {
+    await syncSubmittedLiveOrderToDonHang(orderKey, cleanOrderId, { skipSubmittedBump: true })
+  }
   return { success: true, lineId: targetLineKey, item: canonical }
 }
 
@@ -1447,7 +1627,10 @@ export async function removeLiveOrderItem({
   }
 
   await remove(dbRef(db, `live_orders/${orderKey}/items/${cleanLineKey}`))
-  await syncSubmittedLiveOrderToDonHang(orderKey, cleanOrderId)
+  if (role === 'admin') {
+    await remove(dbRef(db, `live_orders/${orderKey}/submitted_items/${cleanLineKey}`))
+    await syncSubmittedLiveOrderToDonHang(orderKey, cleanOrderId, { skipSubmittedBump: true })
+  }
   return { success: true }
 }
 
@@ -1492,7 +1675,35 @@ export async function updateLiveOrderMeta({
   }
 
   await update(dbRef(db), updates)
-  await syncSubmittedLiveOrderToDonHang(orderKey, cleanOrderId)
+  if (role === 'admin') {
+    await syncSubmittedLiveOrderToDonHang(orderKey, cleanOrderId, { skipSubmittedBump: true })
+  }
+  return { success: true }
+}
+
+export async function restoreSubmittedLiveOrderDraft({ orderId } = {}) {
+  const cleanOrderId = s(orderId).trim()
+  if (!cleanOrderId) return { success: false, message: 'Thiếu mã đơn' }
+  const orderKey = safeFirebaseKey(cleanOrderId)
+  const snap = await get(dbRef(db, `live_orders/${orderKey}`))
+  if (!snap.exists()) return { success: false, closed: true }
+
+  const raw = snap.val() || {}
+  const subMeta = raw.submitted_meta && typeof raw.submitted_meta === 'object' ? raw.submitted_meta : raw.meta
+  const subItems =
+    raw.submitted_items && typeof raw.submitted_items === 'object' ? raw.submitted_items : null
+  if (!subItems || !Object.keys(subItems).length) {
+    return { success: false, message: 'Không tìm thấy món đã đặt trước đó' }
+  }
+
+  const updates = {
+    [`live_orders/${orderKey}/items`]: subItems,
+    [`live_orders/${orderKey}/meta/Updated_at`]: Date.now(),
+  }
+  if (subMeta?.Submitted_sig !== undefined) {
+    updates[`live_orders/${orderKey}/meta/Submitted_sig`] = s(subMeta.Submitted_sig)
+  }
+  await update(dbRef(db), updates)
   return { success: true }
 }
 
@@ -1577,7 +1788,11 @@ export async function submitCustomerOrder(body = {}) {
   }
 
   const metaIn = body.meta || {}
-  const nowStr = existingParsed?.meta?.Ngay_tao_duong_lich || formatVNDateTime()
+  const prevStatus = s(existingParsed?.meta?.Trang_thai).trim()
+  const nowStr =
+    prevStatus && prevStatus !== 'Nháp' && existingParsed?.meta?.Ngay_tao_duong_lich
+      ? existingParsed.meta.Ngay_tao_duong_lich
+      : formatVNDateTime()
   const tongCong = resolvedList.reduce((acc, it) => acc + n(it.Gia_ban) * n(it.So_luong), 0)
   const currency =
     s(resolvedList[0]?.Don_vi_tien_te || metaIn.Don_vi_tien_te || 'P').trim() || 'P'
@@ -1596,9 +1811,15 @@ export async function submitCustomerOrder(body = {}) {
   const earnedPromoVi =
     computeEarnedMilestonesViSummary(tongCong, kmEntries) ||
     s(metaIn.Khuyen_mai_dat_duoc).trim()
-  const rawGhiChu = s(metaIn.Ghi_chu ?? existingParsed?.meta?.Ghi_chu).trim()
-  const ghiChu = mergeNoteWithPromoTag(rawGhiChu, earnedPromoVi)
+  const ghiChu = stripAutoPromoTagText(metaIn.Ghi_chu ?? existingParsed?.meta?.Ghi_chu)
   const maKH = genAutoMaKhachHang(tenKhach, sdt, diaChi)
+
+  const dhTarget = dhEntries.find((e) => s(e.row.Ma_hoa_don).trim() === cleanOrderId)
+  const dhKey = dhTarget ? dhTarget.key : createRowKey()
+  const existingOrderStatus = s(existingParsed?.meta?.Trang_thai).trim()
+  const isNewOrderNotification =
+    !dhTarget && (!existingOrderStatus || existingOrderStatus === 'Nháp')
+  const webUpdateTs = isNewOrderNotification ? 0 : Date.now()
 
   const nextMeta = sanitizeRow({
     Ma_hoa_don: cleanOrderId,
@@ -1615,16 +1836,18 @@ export async function submitCustomerOrder(body = {}) {
     Khuyen_mai_dat_duoc: earnedPromoVi,
     Submitted_sig: s(metaIn.Submitted_sig ?? existingParsed?.meta?.Submitted_sig),
     Don_vi_tien_te: currency,
+    Phi_ship: n(existingParsed?.meta?.Phi_ship),
     Tong_cong: tongCong,
     Host_id: s(body.hostId || existingParsed?.meta?.Host_id),
     Host_name: s(body.hostName || existingParsed?.meta?.Host_name || tenKhach),
     Created_at: n(existingParsed?.meta?.Created_at, Date.now()),
     Submitted_at: Date.now(),
     Updated_at: Date.now(),
+    Last_web_update_at: webUpdateTs,
+    Synced_by_admin: false,
+    Last_source: 'web',
   })
 
-  const dhTarget = dhEntries.find((e) => s(e.row.Ma_hoa_don).trim() === cleanOrderId)
-  const dhKey = dhTarget ? dhTarget.key : createRowKey()
   const dhRow = sanitizeRow({
     ...(dhTarget?.row || {}),
     Ma_hoa_don: cleanOrderId,
@@ -1642,9 +1865,19 @@ export async function submitCustomerOrder(body = {}) {
     Trang_thai: 'Chờ duyệt',
     Don_vi_tien_te: currency,
     Nguon_don: 'WEB',
+    ...(webUpdateTs > 0 ? { Last_web_update_at: webUpdateTs } : {}),
   })
 
   const preservedMembers = { ...(existingParsed?.rawMembers || {}) }
+  const nowMemberTs = Date.now()
+  for (const mk of Object.keys(preservedMembers)) {
+    if (!preservedMembers[mk] || typeof preservedMembers[mk] !== 'object') continue
+    preservedMembers[mk] = sanitizeRow({
+      ...preservedMembers[mk],
+      done: true,
+      updatedAt: nowMemberTs,
+    })
+  }
   const submitHostId = s(body.hostId || existingParsed?.meta?.Host_id)
   if (submitHostId) {
     const hKey = safeFirebaseKey(submitHostId)
@@ -1659,14 +1892,12 @@ export async function submitCustomerOrder(body = {}) {
     })
   }
 
-  const existingOrderStatus = s(existingParsed?.meta?.Trang_thai).trim()
-  const isNewOrderNotification =
-    !dhTarget && (!existingOrderStatus || existingOrderStatus === 'Nháp')
-
   const updates = {
     [`live_orders/${orderKey}`]: {
       meta: nextMeta,
+      submitted_meta: nextMeta,
       items: itemsObj,
+      submitted_items: itemsObj,
       members: preservedMembers,
     },
     [`don_hang/${dhKey}`]: dhRow,
@@ -1687,7 +1918,7 @@ export async function submitCustomerOrder(body = {}) {
       tongCong,
       donViTienTe: currency,
       items: resolvedList,
-      adminUrl: 'https://sakitchen.vercel.app/admin/don-hang',
+      adminUrl: 'https://checkscam8888.vercel.app/admin',
     })
   }
 
@@ -1812,7 +2043,18 @@ export async function adminSyncOrderItems(body = {}) {
 
   const tongCong = resolvedList.reduce((acc, it) => acc + n(it.Gia_ban) * n(it.So_luong), 0)
   const tongGiaGoc = resolvedList.reduce((acc, it) => acc + n(it.Gia_goc) * n(it.So_luong), 0)
-  const tongLoiNhuan = tongCong - tongGiaGoc
+  const tongLoiNhuan = resolvedList.reduce(
+    (acc, it) =>
+      acc +
+      calcOrderLineProfit({
+        giaBan: it.Gia_ban,
+        giaGoc: it.Gia_goc,
+        soLuong: it.So_luong,
+        nccLoaiGiam: it.Ncc_loai_giam,
+        nccGiaTriGiam: it.Ncc_gia_tri_giam,
+      }),
+    0,
+  )
   const currency =
     s(
       resolvedList[0]?.Don_vi_tien_te ||
@@ -1820,31 +2062,46 @@ export async function adminSyncOrderItems(body = {}) {
         liveParsed?.meta?.Don_vi_tien_te ||
         'P',
     ).trim() || 'P'
+  const phiShip =
+    metaPatch.Phi_ship !== undefined
+      ? Math.max(0, n(metaPatch.Phi_ship))
+      : n(liveParsed?.meta?.Phi_ship ?? dhTarget?.row?.Phi_ship)
 
   const updates = {}
 
-  // 1. Sync live_orders so Customer's cart updates in realtime
+  // 1. Sync live_orders so Customer's cart & submitted snapshot stay in sync
   if (liveParsed || curStatus === 'Chờ duyệt') {
+    const nextLiveMeta = sanitizeRow({
+      ...(liveParsed?.meta || {}),
+      Ma_hoa_don: maHoaDon,
+      So_hoa_don: soHoaDon,
+      Ma_khach_hang: maKH,
+      Trang_thai: curStatus,
+      Ngay_tao_duong_lich: nowStr,
+      Ten_khach_hang: tenKhach,
+      So_dien_thoai: sdt,
+      Dia_chi: diaChi,
+      Thoi_gian_nhan_hang: thoiGian,
+      Hinh_thuc_thanh_toan: thanhToan,
+      Ghi_chu: ghiChu,
+      Don_vi_tien_te: currency,
+      Phi_ship: phiShip,
+      Tong_cong: tongCong,
+      Synced_by_admin: true,
+      Last_source: 'admin',
+      Updated_at: Date.now(),
+    })
     updates[`live_orders/${orderKey}`] = {
-      meta: sanitizeRow({
-        ...(liveParsed?.meta || {}),
-        Ma_hoa_don: maHoaDon,
-        So_hoa_don: soHoaDon,
-        Ma_khach_hang: maKH,
-        Trang_thai: curStatus,
-        Ngay_tao_duong_lich: nowStr,
-        Ten_khach_hang: tenKhach,
-        So_dien_thoai: sdt,
-        Dia_chi: diaChi,
-        Thoi_gian_nhan_hang: thoiGian,
-        Hinh_thuc_thanh_toan: thanhToan,
-        Ghi_chu: ghiChu,
-        Don_vi_tien_te: currency,
-        Tong_cong: tongCong,
-        Updated_at: Date.now(),
-      }),
+      meta: nextLiveMeta,
+      submitted_meta: nextLiveMeta,
       items: itemsObj,
-      members: liveParsed?.rawMembers || {},
+      submitted_items: itemsObj,
+      members: buildSyncedLiveMembers(
+        liveParsed?.rawMembers,
+        resolvedList,
+        tenKhach,
+        s(liveParsed?.meta?.Host_id),
+      ),
     }
   }
 
@@ -1861,6 +2118,7 @@ export async function adminSyncOrderItems(body = {}) {
     Dia_chi: diaChi,
     Thoi_gian_nhan_hang: thoiGian,
     Tong_gia_ban: tongCong,
+    Phi_ship: phiShip,
     Ghi_chu: ghiChu,
     Hinh_thuc_thanh_toan: thanhToan,
     Trang_thai: curStatus,
@@ -1894,8 +2152,16 @@ export async function adminSyncOrderItems(body = {}) {
         Gia_ban: n(it.Gia_ban),
         Giam_gia: 0,
         Tien_chiet_khau: 0,
+        Ncc_loai_giam: normalizeNccDiscountType(it.Ncc_loai_giam),
+        Ncc_gia_tri_giam: normalizeNccDiscountValue(it.Ncc_gia_tri_giam),
         Thanh_tien: n(it.Thanh_tien),
-        Loi_nhuan: (n(it.Gia_ban) - n(it.Gia_goc)) * n(it.So_luong),
+        Loi_nhuan: calcOrderLineProfit({
+          giaBan: it.Gia_ban,
+          giaGoc: it.Gia_goc,
+          soLuong: it.So_luong,
+          nccLoaiGiam: it.Ncc_loai_giam,
+          nccGiaTriGiam: it.Ncc_gia_tri_giam,
+        }),
         Ghi_chu: s(it.Ghi_chu),
         Nguoi_dat: s(it.Nguoi_dat),
         Nguoi_dat_id: s(it.Nguoi_dat_id),
@@ -1996,7 +2262,11 @@ export async function getOrderForInvoice(orderId) {
     .filter((e) => s(e.row.Ma_hoa_don).trim() === maHoaDon)
     .map((e) => e.row)
 
-  const rawItems = ctItems.length ? ctItems : liveParsed?.itemsList || []
+  const liveSubmittedMeta = liveParsed?.submittedMeta || liveParsed?.meta
+  const liveSubmittedItems = liveParsed?.submittedItemsList?.length
+    ? liveParsed.submittedItemsList
+    : liveParsed?.itemsList || []
+  const rawItems = ctItems.length ? ctItems : liveSubmittedItems
   const resolvedItems = rawItems.map((raw) => {
     const resolved = resolveCanonicalViItem(raw, hhMap)
     const giaGoc = n(raw.Gia_goc !== undefined ? raw.Gia_goc : resolved.Gia_goc)
@@ -2006,16 +2276,35 @@ export async function getOrderForInvoice(orderId) {
     const ck = n(raw.Chiet_khau || 0)
     const thanhTien = n(raw.Thanh_tien) || giaBan * qty
     const tienCK = n(raw.Tien_chiet_khau)
+    const nccLoaiGiam = normalizeNccDiscountType(
+      raw.Ncc_loai_giam !== undefined ? raw.Ncc_loai_giam : resolved.Ncc_loai_giam,
+    )
+    const nccGiaTriGiam = normalizeNccDiscountValue(
+      raw.Ncc_gia_tri_giam !== undefined ? raw.Ncc_gia_tri_giam : resolved.Ncc_gia_tri_giam,
+    )
     const loiNhuan =
-      raw.Loi_nhuan !== undefined ? n(raw.Loi_nhuan) : (giaBan - giaGoc) * qty - tienCK
+      raw.Loi_nhuan !== undefined
+        ? n(raw.Loi_nhuan)
+        : calcOrderLineProfit({
+            giaBan,
+            giaGoc,
+            soLuong: qty,
+            giamGia,
+            ck1sp: qty > 0 ? tienCK / qty : 0,
+            nccLoaiGiam,
+            nccGiaTriGiam,
+          })
     return {
       ...resolved,
+      lineId: s(raw.lineId || resolved.lineId),
       Gia_goc: giaGoc,
       Gia_ban: giaBan,
       So_luong: qty,
       Giam_gia: giamGia,
       Chiet_khau: ck,
       Tien_chiet_khau: tienCK,
+      Ncc_loai_giam: nccLoaiGiam,
+      Ncc_gia_tri_giam: nccGiaTriGiam,
       Thanh_tien: thanhTien,
       Loi_nhuan: loiNhuan,
     }
@@ -2023,34 +2312,41 @@ export async function getOrderForInvoice(orderId) {
 
   const meta = {
     Ma_hoa_don: maHoaDon,
-    So_hoa_don: s(hdRow?.So_hoa_don || dhRow?.So_hoa_don || liveParsed?.meta?.So_hoa_don),
+    So_hoa_don: s(hdRow?.So_hoa_don || dhRow?.So_hoa_don || liveSubmittedMeta?.So_hoa_don),
     Ma_khach_hang: s(
-      hdRow?.Ma_khach_hang || dhRow?.Ma_khach_hang || liveParsed?.meta?.Ma_khach_hang,
+      hdRow?.Ma_khach_hang || dhRow?.Ma_khach_hang || liveSubmittedMeta?.Ma_khach_hang,
     ),
     Ten_khach_hang: s(
-      dhRow?.Ten_khach_hang || hdRow?.Ten_khach_hang || liveParsed?.meta?.Ten_khach_hang,
+      dhRow?.Ten_khach_hang || hdRow?.Ten_khach_hang || liveSubmittedMeta?.Ten_khach_hang,
     ),
-    So_dien_thoai: s(dhRow?.So_dien_thoai || liveParsed?.meta?.So_dien_thoai),
-    Dia_chi: s(dhRow?.Dia_chi || liveParsed?.meta?.Dia_chi),
+    So_dien_thoai: s(dhRow?.So_dien_thoai || liveSubmittedMeta?.So_dien_thoai),
+    Dia_chi: s(dhRow?.Dia_chi || liveSubmittedMeta?.Dia_chi),
     Thoi_gian_nhan_hang: s(
-      dhRow?.Thoi_gian_nhan_hang || hdRow?.Thoi_gian_nhan_hang || liveParsed?.meta?.Thoi_gian_nhan_hang,
+      dhRow?.Thoi_gian_nhan_hang || hdRow?.Thoi_gian_nhan_hang || liveSubmittedMeta?.Thoi_gian_nhan_hang,
     ),
     Hinh_thuc_thanh_toan: s(
       dhRow?.Hinh_thuc_thanh_toan ||
         hdRow?.Hinh_thuc_thanh_toan ||
-        liveParsed?.meta?.Hinh_thuc_thanh_toan ||
+        liveSubmittedMeta?.Hinh_thuc_thanh_toan ||
         'TIEN_MAT',
     ),
-    Ghi_chu: s(dhRow?.Ghi_chu || liveParsed?.meta?.Ghi_chu),
-    Trang_thai: s(dhRow?.Trang_thai || liveParsed?.meta?.Trang_thai || 'Chờ duyệt'),
+    Ghi_chu: s(dhRow?.Ghi_chu || liveSubmittedMeta?.Ghi_chu),
+    Trang_thai: s(dhRow?.Trang_thai || liveSubmittedMeta?.Trang_thai || 'Chờ duyệt'),
     Don_vi_tien_te: s(
       dhRow?.Don_vi_tien_te ||
-        liveParsed?.meta?.Don_vi_tien_te ||
+        liveSubmittedMeta?.Don_vi_tien_te ||
         resolvedItems[0]?.Don_vi_tien_te ||
         'P',
     ),
     Tong_giam_gia: n(hdRow?.Tong_giam_gia),
     Tong_tien_chiet_khau: n(hdRow?.Tong_tien_chiet_khau),
+    Phi_ship: n(liveSubmittedMeta?.Phi_ship ?? dhRow?.Phi_ship ?? 0),
+    Ngay_tao_duong_lich: s(
+      dhRow?.Ngay_tao_duong_lich ||
+        hdRow?.Ngay_tao_duong_lich ||
+        liveSubmittedMeta?.Ngay_tao_duong_lich,
+    ),
+    Submitted_at: n(liveSubmittedMeta?.Submitted_at || liveParsed?.meta?.Submitted_at || 0),
   }
 
   return {
@@ -2158,7 +2454,18 @@ export async function duyetDonHang(body = {}) {
 
   const tongCong = resolvedList.reduce((acc, it) => acc + n(it.Gia_ban) * n(it.So_luong), 0)
   const tongGiaGoc = resolvedList.reduce((acc, it) => acc + n(it.Gia_goc) * n(it.So_luong), 0)
-  const tongLoiNhuan = tongCong - tongGiaGoc
+  const tongLoiNhuan = resolvedList.reduce(
+    (acc, it) =>
+      acc +
+      calcOrderLineProfit({
+        giaBan: it.Gia_ban,
+        giaGoc: it.Gia_goc,
+        soLuong: it.So_luong,
+        nccLoaiGiam: it.Ncc_loai_giam,
+        nccGiaTriGiam: it.Ncc_gia_tri_giam,
+      }),
+    0,
+  )
   const currency =
     s(
       resolvedList[0]?.Don_vi_tien_te ||
@@ -2261,8 +2568,16 @@ export async function duyetDonHang(body = {}) {
       Gia_ban: n(it.Gia_ban),
       Giam_gia: 0,
       Tien_chiet_khau: 0,
+      Ncc_loai_giam: normalizeNccDiscountType(it.Ncc_loai_giam),
+      Ncc_gia_tri_giam: normalizeNccDiscountValue(it.Ncc_gia_tri_giam),
       Thanh_tien: n(it.Thanh_tien),
-      Loi_nhuan: (n(it.Gia_ban) - n(it.Gia_goc)) * n(it.So_luong),
+      Loi_nhuan: calcOrderLineProfit({
+        giaBan: it.Gia_ban,
+        giaGoc: it.Gia_goc,
+        soLuong: it.So_luong,
+        nccLoaiGiam: it.Ncc_loai_giam,
+        nccGiaTriGiam: it.Ncc_gia_tri_giam,
+      }),
       Ghi_chu: s(it.Ghi_chu),
       Nguoi_dat: s(it.Nguoi_dat),
       Nguoi_dat_id: s(it.Nguoi_dat_id),
@@ -2630,6 +2945,14 @@ async function nhapHangHoa(body) {
         Size: item.Size,
         Gia_goc: item.Gia_goc !== undefined && item.Gia_goc !== '' ? n(item.Gia_goc) : undefined,
         Gia_ban: item.Gia_ban !== undefined && item.Gia_ban !== '' ? n(item.Gia_ban) : undefined,
+        Ncc_loai_giam:
+          item.Ncc_loai_giam !== undefined
+            ? normalizeNccDiscountType(item.Ncc_loai_giam)
+            : undefined,
+        Ncc_gia_tri_giam:
+          item.Ncc_gia_tri_giam !== undefined
+            ? normalizeNccDiscountValue(item.Ncc_gia_tri_giam)
+            : undefined,
         Gia_Giam:
           item.Gia_Giam !== undefined
             ? item.Gia_Giam === '' || item.Gia_Giam === null
@@ -2682,6 +3005,8 @@ async function nhapHangHoa(body) {
       Dvt: s(item.Dvt),
       Gia_goc: n(item.Gia_goc),
       Gia_ban: n(item.Gia_ban),
+      Ncc_loai_giam: normalizeNccDiscountType(item.Ncc_loai_giam),
+      Ncc_gia_tri_giam: normalizeNccDiscountValue(item.Ncc_gia_tri_giam),
       Trang_thai: trangThaiMoi,
       Don_vi_tien_te: s(item.Don_vi_tien_te || 'P'),
       Gia_Giam: item.Gia_Giam !== undefined && item.Gia_Giam !== '' ? n(item.Gia_Giam) : '',
@@ -2783,8 +3108,19 @@ async function updateHangHoa(item) {
     if (k.startsWith('_')) continue
     if (k === 'Gia_goc' || k === 'Gia_ban') {
       target.row[k] = n(v)
+    } else if (k === 'Top_at') {
+      target.row[k] = Math.max(0, n(v, 0))
+    } else if (k === 'Thu_tu') {
+      const parsedOrder = Math.floor(n(v, 0))
+      target.row[k] = parsedOrder > 0 ? parsedOrder : 0
+    } else if (k === 'Ncc_gia_tri_giam') {
+      target.row[k] = normalizeNccDiscountValue(v)
+    } else if (k === 'Ncc_loai_giam') {
+      target.row[k] = normalizeNccDiscountType(v)
     } else if (k === 'Gia_Giam') {
       target.row[k] = v === '' || v === null ? '' : n(v)
+    } else if (k === 'Is_hidden') {
+      target.row[k] = v === true || String(v) === 'true'
     } else {
       target.row[k] = s(v)
     }
@@ -2832,6 +3168,258 @@ async function deleteHangHoa(body) {
 
   await remove(dbRef(db, `hang_hoa/${target.key}`))
   return { success: true }
+}
+
+function applyBulkPriceRule(currentVal, rule, allowEmptyZero = false) {
+  if (!rule || typeof rule !== 'object') return currentVal
+  const base = n(currentVal)
+  const mode = s(rule.mode).trim()
+  const val = Number(rule.value || 0)
+  const delta = Number.isFinite(val) ? val : 0
+
+  let next = base
+  if (mode === 'set') {
+    next = Math.max(0, delta)
+  } else if (mode === 'add_money') {
+    next = Math.max(0, base + delta)
+  } else if (mode === 'sub_money') {
+    next = Math.max(0, base - delta)
+  } else if (mode === 'add_percent') {
+    next = Math.max(0, Math.round(base * (1 + delta / 100)))
+  } else if (mode === 'sub_percent') {
+    next = Math.max(0, Math.round(base * (1 - delta / 100)))
+  }
+  if (allowEmptyZero && next <= 0) return ''
+  return next
+}
+
+async function bulkUpdateHangHoa(body = {}) {
+  const maHangs = Array.isArray(body.maHangs)
+    ? body.maHangs.map((m) => s(m).trim()).filter(Boolean)
+    : []
+  const patch = body.patch || {}
+  if (!maHangs.length) {
+    return { success: false, message: 'Chưa chọn sản phẩm nào' }
+  }
+
+  const targetSet = new Set(maHangs)
+  const orderIndexMap = new Map(maHangs.map((m, idx) => [m, idx]))
+  const baseTopAt = Date.now() + maHangs.length
+  const entries = await readSheetEntries('hang_hoa')
+  const updates = {}
+  let updated = 0
+
+  const lang = DATA_LANG_CODES.includes(patch.lang) ? patch.lang : 'vi'
+
+  for (const entry of entries) {
+    const code = s(entry.row?.Ma_hang).trim()
+    if (!targetSet.has(code)) continue
+
+    const row = { ...entry.row }
+    const nextI18n = normalizeProductI18n(row)
+
+    if (patch.Danh_muc !== undefined) {
+      const dm = s(patch.Danh_muc).trim()
+      nextI18n[lang].Danh_muc = dm
+      if (lang === 'vi') row.Danh_muc = dm
+    }
+    if (patch.Dvt !== undefined) {
+      const dvt = s(patch.Dvt).trim()
+      nextI18n[lang].Dvt = dvt
+      if (lang === 'vi') row.Dvt = dvt
+    }
+    if (patch.Size !== undefined) {
+      row.Size = s(patch.Size).trim()
+    }
+    if (patch.Don_vi_tien_te !== undefined) {
+      row.Don_vi_tien_te = s(patch.Don_vi_tien_te).trim() || 'P'
+    }
+    if (patch.Trang_thai !== undefined) {
+      row.Trang_thai = s(patch.Trang_thai) === 'Hết hàng' ? 'Hết hàng' : 'Còn hàng'
+    }
+    if (patch.Is_hidden !== undefined) {
+      row.Is_hidden = patch.Is_hidden === true || String(patch.Is_hidden) === 'true'
+    }
+    if (patch.Top_action === 'pin') {
+      const idx = orderIndexMap.get(code) ?? 0
+      row.Top_at = baseTopAt - idx
+    } else if (patch.Top_action === 'unpin') {
+      row.Top_at = 0
+    } else if (patch.Top_at !== undefined) {
+      row.Top_at = Math.max(0, n(patch.Top_at, 0))
+    }
+    if (patch.Ncc_discount !== undefined) {
+      row.Ncc_loai_giam = normalizeNccDiscountType(patch.Ncc_discount?.Ncc_loai_giam)
+      row.Ncc_gia_tri_giam = normalizeNccDiscountValue(patch.Ncc_discount?.Ncc_gia_tri_giam)
+    }
+    if (patch.Gia_goc !== undefined) {
+      row.Gia_goc = applyBulkPriceRule(row.Gia_goc, patch.Gia_goc, false)
+    }
+    if (patch.Gia_ban !== undefined) {
+      row.Gia_ban = applyBulkPriceRule(row.Gia_ban, patch.Gia_ban, false)
+    }
+    if (patch.Gia_Giam !== undefined) {
+      row.Gia_Giam = applyBulkPriceRule(row.Gia_Giam, patch.Gia_Giam, true)
+    }
+
+    row.i18n = nextI18n
+    delete row.So_luong_kho
+    delete row.Lang
+    delete row.Ma_nha_cung_cap
+    delete row.Ten_nha_cung_cap
+
+    updates[`hang_hoa/${entry.key}`] = sanitizeRow(syncProductWithI18n(row))
+    updated += 1
+  }
+
+  if (updated > 0) {
+    await update(dbRef(db), updates)
+  }
+  return { success: true, updated }
+}
+
+async function bulkDeleteHangHoa(body = {}) {
+  const maHangs = Array.isArray(body.maHangs)
+    ? body.maHangs.map((m) => s(m).trim()).filter(Boolean)
+    : []
+  if (!maHangs.length) {
+    return { success: false, message: 'Chưa chọn sản phẩm nào' }
+  }
+
+  const targetSet = new Set(maHangs)
+  const entries = await readSheetEntries('hang_hoa')
+  const updates = {}
+  let deleted = 0
+
+  for (const entry of entries) {
+    const code = s(entry.row?.Ma_hang).trim()
+    if (!targetSet.has(code)) continue
+    updates[`hang_hoa/${entry.key}`] = null
+    deleted += 1
+  }
+
+  if (deleted > 0) {
+    await update(dbRef(db), updates)
+  }
+  return { success: true, deleted }
+}
+
+function parseProductThuTuVal(row) {
+  const val = Number(row?.Thu_tu || 0)
+  return Number.isFinite(val) && val > 0 ? Math.floor(val) : Number.MAX_SAFE_INTEGER
+}
+
+async function reorderHangHoa(body = {}) {
+  const maHangs = Array.isArray(body.maHangs)
+    ? body.maHangs.map((m) => s(m).trim()).filter(Boolean)
+    : []
+  const topMap = body.topUpdates && typeof body.topUpdates === 'object' ? body.topUpdates : {}
+  const hasTopUpdates = Object.keys(topMap).length > 0
+
+  if (!maHangs.length && !hasTopUpdates) {
+    return { success: false, message: 'Danh sách sắp xếp trống' }
+  }
+
+  const entries = await readSheetEntries('hang_hoa')
+  if (!entries.length) return { success: true, updated: 0 }
+
+  const updates = {}
+  let updated = 0
+
+  if (maHangs.length) {
+    // Build stable global ranking across all items
+    const globallySorted = entries
+      .map((entry, idx) => ({
+        entry,
+        idx,
+        code: s(entry.row?.Ma_hang).trim(),
+        order: parseProductThuTuVal(entry.row),
+      }))
+      .sort((a, b) => {
+        if (a.order !== b.order) return a.order - b.order
+        return a.idx - b.idx
+      })
+
+    const currentRankByCode = new Map()
+    globallySorted.forEach((item, idx) => {
+      if (item.code && !currentRankByCode.has(item.code)) {
+        currentRankByCode.set(item.code, idx + 1)
+      }
+    })
+
+    // Assign sorted slots belonging to the reordered subset back in new visual order
+    const validSubset = maHangs.filter((code) => currentRankByCode.has(code))
+    const slots = validSubset.map((code) => currentRankByCode.get(code)).sort((a, b) => a - b)
+    const newRankByCode = new Map()
+    validSubset.forEach((code, idx) => {
+      newRankByCode.set(code, slots[idx])
+    })
+
+    for (const { entry, code } of globallySorted) {
+      const nextRank = newRankByCode.has(code)
+        ? newRankByCode.get(code)
+        : currentRankByCode.get(code) || 0
+      if (nextRank > 0 && Number(entry.row?.Thu_tu || 0) !== nextRank) {
+        updates[`hang_hoa/${entry.key}/Thu_tu`] = nextRank
+        updated += 1
+      }
+    }
+  }
+
+  if (hasTopUpdates) {
+    for (const entry of entries) {
+      const code = s(entry.row?.Ma_hang).trim()
+      if (!code || !Object.prototype.hasOwnProperty.call(topMap, code)) continue
+      const nextTop = Math.max(0, n(topMap[code], 0))
+      if (n(entry.row?.Top_at, 0) !== nextTop) {
+        updates[`hang_hoa/${entry.key}/Top_at`] = nextTop
+        updated += 1
+      }
+    }
+  }
+
+  if (updated > 0) {
+    await update(dbRef(db), updates)
+  }
+  return { success: true, updated }
+}
+
+async function saveDisplayConfig(body = {}) {
+  const d = body.data || {}
+  const existingEntries = await readSheetEntries('display_config')
+  const existingRow =
+    existingEntries.find((e) => s(e.row?.ID) === 'main')?.row || existingEntries[0]?.row || {}
+
+  const nextCategoryOrder = Array.isArray(d.categoryOrder)
+    ? [...new Set(d.categoryOrder.map((c) => s(c).trim()).filter(Boolean))]
+    : Array.isArray(existingRow.categoryOrder)
+      ? existingRow.categoryOrder
+      : []
+
+  const nextProductSortMode =
+    d.productSortMode !== undefined
+      ? s(d.productSortMode) === 'by_category'
+        ? 'by_category'
+        : 'flat'
+      : s(existingRow.productSortMode) === 'by_category'
+        ? 'by_category'
+        : 'flat'
+
+  const payload = sanitizeRow({
+    ID: 'main',
+    categoryOrder: nextCategoryOrder,
+    productSortMode: nextProductSortMode,
+    updatedAt: Date.now(),
+  })
+
+  const updates = {}
+  for (const e of existingEntries) {
+    if (e.key !== 'main') updates[`display_config/${e.key}`] = null
+  }
+  updates['display_config/main'] = payload
+  await update(dbRef(db), updates)
+
+  return { success: true, data: payload }
 }
 
 /* =========================================================
@@ -2982,17 +3570,52 @@ async function deleteById(sheetName, id) {
   return { success: true }
 }
 
-// --- thong_bao (with multi-language i18n) ---
+// --- thong_bao (with multi-language i18n, max 1 active per type) ---
+function normalizeNoticeType(val) {
+  return s(val).trim() === 'popup' ? 'popup' : 'marquee'
+}
+
+function isNoticeActiveFlag(val) {
+  return val !== false && String(val) !== 'false'
+}
+
 async function addThongBao(body) {
   const d = body.data || {}
-  const synced = syncNoticeWithI18n({
-    ID: s(d.ID || genShortId()),
-    Noi_dung: s(d.Noi_dung),
-    URL: s(d.URL),
-    is_Important: s(d.is_Important),
-    i18n: d.i18n,
-  })
-  await set(dbRef(db, `thong_bao/${createRowKey()}`), sanitizeRow(synced))
+  const loai = normalizeNoticeType(d.Loai_thong_bao)
+  const isActive = isNoticeActiveFlag(d.Kich_hoat)
+  const newKey = createRowKey()
+  const synced = sanitizeRow(
+    syncNoticeWithI18n({
+      ID: s(d.ID || genShortId()),
+      Noi_dung: s(d.Noi_dung),
+      URL: s(d.URL),
+      Loai_thong_bao: loai,
+      Popup_img: s(d.Popup_img),
+      Popup_link: s(d.Popup_link),
+      Kich_hoat: isActive,
+      is_Important: s(d.is_Important),
+      i18n: d.i18n,
+    }),
+  )
+
+  if (isActive) {
+    const entries = await readSheetEntries('thong_bao')
+    const updates = {
+      [`thong_bao/${newKey}`]: synced,
+    }
+    for (const entry of entries) {
+      if (
+        entry.row &&
+        normalizeNoticeType(entry.row.Loai_thong_bao) === loai &&
+        isNoticeActiveFlag(entry.row.Kich_hoat)
+      ) {
+        updates[`thong_bao/${entry.key}/Kich_hoat`] = false
+      }
+    }
+    await update(dbRef(db), updates)
+  } else {
+    await set(dbRef(db, `thong_bao/${newKey}`), synced)
+  }
   return { success: true }
 }
 
@@ -3008,14 +3631,44 @@ async function updateThongBao(body) {
     baseI18n.vi.Noi_dung = s(d.Noi_dung).trim()
   }
 
+  const nextLoai =
+    d.Loai_thong_bao !== undefined
+      ? normalizeNoticeType(d.Loai_thong_bao)
+      : normalizeNoticeType(target.row.Loai_thong_bao)
+
+  const nextActive =
+    d.Kich_hoat !== undefined
+      ? isNoticeActiveFlag(d.Kich_hoat)
+      : isNoticeActiveFlag(target.row.Kich_hoat)
+
   target.row = syncNoticeWithI18n({
     ID: s(d.ID),
     Noi_dung: baseI18n.vi.Noi_dung || s(d.Noi_dung),
     URL: d.URL !== undefined ? s(d.URL) : s(target.row.URL),
+    Loai_thong_bao: nextLoai,
+    Popup_img: d.Popup_img !== undefined ? s(d.Popup_img) : s(target.row.Popup_img),
+    Popup_link: d.Popup_link !== undefined ? s(d.Popup_link) : s(target.row.Popup_link),
+    Kich_hoat: nextActive,
     is_Important: d.is_Important !== undefined ? s(d.is_Important) : s(target.row.is_Important),
     i18n: baseI18n,
   })
-  await set(dbRef(db, `thong_bao/${target.key}`), sanitizeRow(target.row))
+
+  const updates = {
+    [`thong_bao/${target.key}`]: sanitizeRow(target.row),
+  }
+  if (nextActive) {
+    for (const entry of entries) {
+      if (
+        entry.key !== target.key &&
+        entry.row &&
+        normalizeNoticeType(entry.row.Loai_thong_bao) === nextLoai &&
+        isNoticeActiveFlag(entry.row.Kich_hoat)
+      ) {
+        updates[`thong_bao/${entry.key}/Kich_hoat`] = false
+      }
+    }
+  }
+  await update(dbRef(db), updates)
   return { success: true }
 }
 
@@ -3023,33 +3676,133 @@ async function deleteThongBao(body) {
   return deleteById('thong_bao', body.ID)
 }
 
-// --- banner ---
+// --- banner (ordered by Thu_tu ascending, fallback ID descending) ---
+function parseBannerOrder(val) {
+  const n = Number(val)
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : Number.MAX_SAFE_INTEGER
+}
+
+function sortBannerEntries(entries) {
+  return [...entries].sort((a, b) => {
+    const orderDiff = parseBannerOrder(a.row?.Thu_tu) - parseBannerOrder(b.row?.Thu_tu)
+    if (orderDiff !== 0) return orderDiff
+    return s(b.row?.ID).localeCompare(s(a.row?.ID))
+  })
+}
+
 async function addBanner(body) {
   const d = body.data || {}
-  await set(
-    dbRef(db, `banner/${createRowKey()}`),
-    sanitizeRow({
+  const entries = sortBannerEntries(await readSheetEntries('banner'))
+  const newKey = createRowKey()
+  const rawOrder = Number(d.Thu_tu)
+  const insertIdx =
+    Number.isFinite(rawOrder) && rawOrder > 0
+      ? Math.min(Math.max(Math.floor(rawOrder) - 1, 0), entries.length)
+      : 0
+
+  const newEntry = {
+    key: newKey,
+    row: {
       ID: s(d.ID || genShortId()),
       URL: s(d.URL),
       is_Important: s(d.is_Important),
-    }),
-  )
+      Thu_tu: insertIdx + 1,
+    },
+  }
+
+  const ordered = [...entries]
+  ordered.splice(insertIdx, 0, newEntry)
+
+  const updates = {}
+  ordered.forEach((entry, idx) => {
+    const pos = idx + 1
+    if (entry.key === newKey) {
+      updates[`banner/${newKey}`] = sanitizeRow({ ...entry.row, Thu_tu: pos })
+    } else if (parseBannerOrder(entry.row?.Thu_tu) !== pos) {
+      updates[`banner/${entry.key}/Thu_tu`] = pos
+    }
+  })
+
+  await update(dbRef(db), updates)
   return { success: true }
 }
 
 async function updateBanner(body) {
   const d = body.data || {}
   if (!d.ID) return { success: false }
-  const entries = await readSheetEntries('banner')
-  const target = entries.find((e) => s(e.row.ID) === s(d.ID))
-  if (!target) return { success: false }
+  const entries = sortBannerEntries(await readSheetEntries('banner'))
+  const currentIdx = entries.findIndex((e) => s(e.row.ID) === s(d.ID))
+  if (currentIdx === -1) return { success: false }
 
-  target.row = {
+  const target = entries[currentIdx]
+  const nextRow = {
     ID: s(d.ID),
-    URL: s(d.URL),
-    is_Important: s(d.is_Important),
+    URL: d.URL !== undefined ? s(d.URL) : s(target.row.URL),
+    is_Important: d.is_Important !== undefined ? s(d.is_Important) : s(target.row.is_Important),
+    Thu_tu: currentIdx + 1,
   }
-  await set(dbRef(db, `banner/${target.key}`), sanitizeRow(target.row))
+
+  const ordered = [...entries]
+  const hasOrderProp = d.Thu_tu !== undefined && d.Thu_tu !== null && d.Thu_tu !== ''
+  if (hasOrderProp) {
+    const parsed = Math.floor(Number(d.Thu_tu))
+    const destIdx = Number.isFinite(parsed)
+      ? Math.min(Math.max(parsed - 1, 0), ordered.length - 1)
+      : currentIdx
+    if (destIdx !== currentIdx) {
+      const [moved] = ordered.splice(currentIdx, 1)
+      ordered.splice(destIdx, 0, moved)
+    }
+  }
+
+  const updates = {}
+  ordered.forEach((entry, idx) => {
+    const pos = idx + 1
+    if (entry.key === target.key) {
+      updates[`banner/${target.key}`] = sanitizeRow({ ...nextRow, Thu_tu: pos })
+    } else if (parseBannerOrder(entry.row?.Thu_tu) !== pos) {
+      updates[`banner/${entry.key}/Thu_tu`] = pos
+    }
+  })
+
+  await update(dbRef(db), updates)
+  return { success: true }
+}
+
+async function reorderBanners(body) {
+  const ids = Array.isArray(body?.ids) ? body.ids.map((id) => s(id)).filter(Boolean) : []
+  if (!ids.length) return { success: false, message: 'Thiếu danh sách thứ tự banner' }
+
+  const entries = await readSheetEntries('banner')
+  const byId = new Map(entries.map((entry) => [s(entry.row?.ID), entry]))
+
+  const ordered = []
+  const usedKeys = new Set()
+  for (const id of ids) {
+    const found = byId.get(id)
+    if (found && !usedKeys.has(found.key)) {
+      ordered.push(found)
+      usedKeys.add(found.key)
+    }
+  }
+  for (const leftover of sortBannerEntries(entries)) {
+    if (!usedKeys.has(leftover.key)) {
+      ordered.push(leftover)
+      usedKeys.add(leftover.key)
+    }
+  }
+
+  const updates = {}
+  ordered.forEach((entry, idx) => {
+    const pos = idx + 1
+    if (parseBannerOrder(entry.row?.Thu_tu) !== pos) {
+      updates[`banner/${entry.key}/Thu_tu`] = pos
+    }
+  })
+
+  if (Object.keys(updates).length) {
+    await update(dbRef(db), updates)
+  }
   return { success: true }
 }
 
@@ -3316,10 +4069,29 @@ async function upsertOpenTime(data = {}) {
 }
 
 // --- thong_tin_chuyen_khoan ---
+async function clearOtherInvoiceQrFlags(excludeKey = '') {
+  const entries = await readSheetEntries('thong_tin_chuyen_khoan')
+  const updates = {}
+  for (const { key, row } of entries) {
+    if (key === excludeKey) continue
+    if (row?.Show_in_invoice) {
+      updates[`thong_tin_chuyen_khoan/${key}/Show_in_invoice`] = false
+    }
+  }
+  if (Object.keys(updates).length > 0) {
+    await update(dbRef(db), updates)
+  }
+}
+
 async function addThongTinChuyenKhoan(body) {
   const d = body.data || {}
+  const showInInvoice = Boolean(d.Show_in_invoice)
+  const newKey = createRowKey()
+  if (showInInvoice) {
+    await clearOtherInvoiceQrFlags(newKey)
+  }
   await set(
-    dbRef(db, `thong_tin_chuyen_khoan/${createRowKey()}`),
+    dbRef(db, `thong_tin_chuyen_khoan/${newKey}`),
     sanitizeRow({
       ID: s(d.ID || genShortId()),
       Tieu_de: s(d.Tieu_de),
@@ -3327,6 +4099,7 @@ async function addThongTinChuyenKhoan(body) {
       QR_IMG: s(d.QR_IMG),
       Ti_gia: n(d.Ti_gia, 1),
       Don_vi_tien_te: s(d.Don_vi_tien_te || 'VND'),
+      Show_in_invoice: showInInvoice,
     }),
   )
   return { success: true }
@@ -3339,6 +4112,12 @@ async function updateThongTinChuyenKhoan(body) {
   const target = entries.find((e) => s(e.row.ID) === s(d.ID))
   if (!target) return { success: false }
 
+  const showInInvoice =
+    d.Show_in_invoice !== undefined ? Boolean(d.Show_in_invoice) : Boolean(target.row.Show_in_invoice)
+  if (showInInvoice) {
+    await clearOtherInvoiceQrFlags(target.key)
+  }
+
   target.row = {
     ID: s(d.ID),
     Tieu_de: s(d.Tieu_de),
@@ -3346,6 +4125,7 @@ async function updateThongTinChuyenKhoan(body) {
     QR_IMG: s(d.QR_IMG),
     Ti_gia: n(d.Ti_gia, 1),
     Don_vi_tien_te: s(d.Don_vi_tien_te || 'VND'),
+    Show_in_invoice: showInInvoice,
   }
   await set(
     dbRef(db, `thong_tin_chuyen_khoan/${target.key}`),
@@ -3377,6 +4157,10 @@ const ACTION_HANDLERS = {
   nhapHangHoa,
   chongTrungMaHang: () => chongTrungMaHang(),
   updateHangHoa: (b) => updateHangHoa(b.data),
+  reorderHangHoa,
+  saveDisplayConfig,
+  bulkUpdateHangHoa,
+  bulkDeleteHangHoa,
   deleteHangHoa,
   updateKhachHang,
   deleteKhachHang,
@@ -3390,6 +4174,7 @@ const ACTION_HANDLERS = {
   deleteThongBao,
   addBanner,
   updateBanner,
+  reorderBanners,
   deleteBanner,
   addLogo,
   updateLogo,

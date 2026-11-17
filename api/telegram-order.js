@@ -1,6 +1,6 @@
 // Vercel Serverless Function: Send new customer order alerts to Telegram group/chat
 
-const DEFAULT_ADMIN_ORDERS_URL = 'https://sakitchen.vercel.app/admin/don-hang'
+const DEFAULT_ADMIN_ORDERS_URL = 'https://checkscam8888.vercel.app/admin'
 const TELEGRAM_MAX_TEXT = 3900
 
 function escapeHtml(value) {

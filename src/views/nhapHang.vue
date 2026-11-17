@@ -53,6 +53,9 @@
 
                   <div class="upload-wrap">
                     <input type="file" accept="image/*" @change="handleMainImageUpload" />
+                    <div class="upload-size-hint">
+                      Kích thước chuẩn: <strong>800 × 800 px – 1200 × 1200 px</strong> (vuông 1:1) · Tự nén ≤ 100KB
+                    </div>
 
                     <div v-if="uploadingImg" class="hint"> Đang upload ảnh...</div>
 
@@ -117,7 +120,7 @@
 
                 <!-- MOVED SUB IMAGES HERE -->
                 <div class="field span-12">
-                   <label>Ảnh phụ (tối đa 6 ảnh)</label>
+                   <label>Ảnh phụ (tối đa 6 ảnh) <span class="upload-size-hint-inline">· Kích thước chuẩn: 800 × 800 px – 1200 × 1200 px (vuông 1:1, ≤ 100KB)</span></label>
                    <div class="sub-images-grid">
                       <!-- IMG 1 -->
                       <div class="sub-img-item">
@@ -281,6 +284,37 @@
         />
       </div>
     </div>
+    <div class="field span-12">
+      <label>CK NCC (% giá gốc hoặc Tiền trực tiếp)</label>
+      <div class="ncc-disc-input-row">
+        <div class="ncc-type-toggle" role="group">
+          <button
+            type="button"
+            class="ncc-type-btn"
+            :class="{ active: form.Ncc_loai_giam !== 'money' }"
+            @click="form.Ncc_loai_giam = 'percent'"
+          >
+            %
+          </button>
+          <button
+            type="button"
+            class="ncc-type-btn"
+            :class="{ active: form.Ncc_loai_giam === 'money' }"
+            @click="form.Ncc_loai_giam = 'money'"
+          >
+            Tiền ({{ form.Don_vi_tien_te || 'P' }})
+          </button>
+        </div>
+        <input
+          type="number"
+          min="0"
+          step="any"
+          v-model.number="form.Ncc_gia_tri_giam"
+          placeholder="0"
+          class="ncc-val-input"
+        />
+      </div>
+    </div>
   </div>
 </div>
 
@@ -372,6 +406,9 @@
             <div v-if="uploadingBulkImg" class="hint" style="margin-top:10px">
               Đang upload ảnh hàng loạt...
             </div>
+            <div class="upload-size-hint" style="margin-top:8px">
+              Kích thước chuẩn ảnh hàng loạt: <strong>800 × 800 px – 1200 × 1200 px</strong> (vuông 1:1) · Tự nén ≤ 100KB
+            </div>
           </div>
         </section>
 
@@ -444,7 +481,12 @@
                   <td>{{ h.Danh_muc }}</td>
                   <td>{{ h.Dvt }}</td>
                   <td>{{ h.Size }}</td>
-                  <td class="money">{{ fmtMoney(h.Gia_goc) }}</td>
+                  <td class="money">
+                    {{ fmtMoney(h.Gia_goc) }}
+                    <div v-if="Number(h.Ncc_gia_tri_giam || 0) > 0" class="ncc-mini-tag">
+                      NCC {{ formatNccDiscountLabel(h, h.Don_vi_tien_te || 'P') }}
+                    </div>
+                  </td>
                   <td class="money strong">{{ fmtMoney(h.Gia_ban) }}</td>
                   <td><span class="tag currency">{{ h.Don_vi_tien_te || 'P' }}</span></td>
                   <td>
@@ -688,6 +730,9 @@
               <button type="button" class="btn primary" @click="editImageInput?.click()">
                 <i class="app-ico ri-image-add-line"></i>Đổi ảnh
               </button>
+              <div class="upload-size-hint">
+                Kích thước chuẩn: <strong>800 × 800 px – 1200 × 1200 px</strong> (vuông 1:1) · Tự nén ≤ 100KB
+              </div>
 
               <div v-if="uploadingEditImg" class="hint"> Đang upload ảnh...</div>
 
@@ -702,6 +747,9 @@
           </div>
 
           <div class="edit-sub-images">
+            <div class="upload-size-hint" style="margin-bottom:6px">
+              Ảnh phụ: kích thước chuẩn <strong>800 × 800 px – 1200 × 1200 px</strong> (vuông 1:1) · Tự nén ≤ 100KB
+            </div>
             <div class="sub-images-grid edit">
               <div
                 v-for="slot in 6"
@@ -823,6 +871,38 @@
             </div>
 
             <div class="field span-12">
+              <label>CK NCC (% giá gốc hoặc Tiền trực tiếp)</label>
+              <div class="ncc-disc-input-row">
+                <div class="ncc-type-toggle" role="group">
+                  <button
+                    type="button"
+                    class="ncc-type-btn"
+                    :class="{ active: editForm.Ncc_loai_giam !== 'money' }"
+                    @click="editForm.Ncc_loai_giam = 'percent'"
+                  >
+                    %
+                  </button>
+                  <button
+                    type="button"
+                    class="ncc-type-btn"
+                    :class="{ active: editForm.Ncc_loai_giam === 'money' }"
+                    @click="editForm.Ncc_loai_giam = 'money'"
+                  >
+                    Tiền ({{ editForm.Don_vi_tien_te || 'P' }})
+                  </button>
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  v-model.number="editForm.Ncc_gia_tri_giam"
+                  placeholder="0"
+                  class="ncc-val-input"
+                />
+              </div>
+            </div>
+
+            <div class="field span-12">
               <label>Trạng thái</label>
               <select v-model="editForm.Trang_thai">
                 <option value="Còn hàng">Còn hàng</option>
@@ -880,6 +960,11 @@ import * as XLSX from 'xlsx'
 import { onBeforeRouteLeave } from 'vue-router'
 import { getOneSheet, dispatchAction } from '@/config/api'
 import { uploadImageToImgBB } from '@/utils/imageUpload.js'
+import {
+  normalizeNccDiscountType,
+  normalizeNccDiscountValue,
+  formatNccDiscountLabel,
+} from '@/utils/nccDiscount'
 import {
   SUPPORTED_DATA_LANGS,
   createEmptyProductI18n,
@@ -992,6 +1077,8 @@ const emptyForm = () => ({
   Dvt: '',
   Gia_goc: '',
   Gia_ban: '',
+  Ncc_loai_giam: 'percent',
+  Ncc_gia_tri_giam: 0,
   Trang_thai: 'Còn hàng',
   Don_vi_tien_te: 'P',
   img_1: '',
@@ -1042,6 +1129,8 @@ function selectProduct(p) {
     Dvt: i18n.vi.Dvt || p.Dvt || '',
     Gia_goc: p.Gia_goc ?? '',
     Gia_ban: p.Gia_ban ?? '',
+    Ncc_loai_giam: normalizeNccDiscountType(p.Ncc_loai_giam),
+    Ncc_gia_tri_giam: normalizeNccDiscountValue(p.Ncc_gia_tri_giam),
     Trang_thai: p.Trang_thai || 'Còn hàng',
     Don_vi_tien_te: p.Don_vi_tien_te || 'P',
     img_1: p.img_1 || '',
@@ -1235,6 +1324,8 @@ function buildPayload() {
       Dvt: i.Dvt || '',
       Gia_goc: Number(i.Gia_goc || 0),
       Gia_ban: Number(i.Gia_ban || 0),
+      Ncc_loai_giam: normalizeNccDiscountType(i.Ncc_loai_giam),
+      Ncc_gia_tri_giam: normalizeNccDiscountValue(i.Ncc_gia_tri_giam),
       Trang_thai: i.Trang_thai || 'Còn hàng',
       Don_vi_tien_te: i.Don_vi_tien_te || 'P',
       img_1: i.img_1 || '',
@@ -1499,6 +1590,8 @@ function openEdit(index) {
   activeEditLang.value = 'vi'
   editForm.value = {
     ...target,
+    Ncc_loai_giam: normalizeNccDiscountType(target.Ncc_loai_giam),
+    Ncc_gia_tri_giam: normalizeNccDiscountValue(target.Ncc_gia_tri_giam),
     i18n: JSON.parse(JSON.stringify(i18n)),
     _fromExisting: Boolean(
       target._fromExisting ||
@@ -3052,5 +3145,69 @@ h2 {
   background: rgba(59, 130, 246, 0.18);
   border: 1px solid rgba(96, 165, 250, 0.35);
   color: #93c5fd;
+}
+
+.ncc-disc-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ncc-type-toggle {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.ncc-type-btn {
+  padding: 6px 10px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ncc-type-btn.active {
+  background: rgba(16, 185, 129, 0.24);
+  color: #6ee7b7;
+}
+
+.ncc-val-input {
+  flex: 1;
+  min-width: 90px;
+}
+
+.ncc-mini-tag {
+  margin-top: 3px;
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  background: rgba(16, 185, 129, 0.18);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.upload-size-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #93c5fd;
+  line-height: 1.4;
+}
+
+.upload-size-hint-inline {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #93c5fd;
+  text-transform: none;
 }
 </style>

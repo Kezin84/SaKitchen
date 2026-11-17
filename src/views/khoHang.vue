@@ -104,6 +104,9 @@
           <button class="menu-item" :class="{ active: filterStatus === 'out' }" @click="selectStatus('out')">
             <i class="ri-close-circle-fill text-danger"></i> Hết hàng
           </button>
+          <button class="menu-item" :class="{ active: filterStatus === 'hidden' }" @click="selectStatus('hidden')">
+            <i class="ri-eye-off-line text-hidden"></i> Đang ẩn
+          </button>
            <button class="menu-item" :class="{ active: filterStatus === 'all' }" @click="selectStatus('all')">
             <i class="ri-apps-line"></i> Tất cả
           </button>
@@ -152,7 +155,7 @@
   @click="
     selectedCategory = '';
     showCategoryFilter = false;
-    currentPage = 1;
+    resetVisibleCount();
   "
 >
 
@@ -168,7 +171,7 @@
   @click="
     selectedCategory = cat.name;
     showCategoryFilter = false;
-    currentPage = 1;
+    resetVisibleCount();
   "
 >
 
@@ -235,14 +238,15 @@
               <th style="width: 80px" class="text-center">Tiền tệ</th>
               <th style="width: 150px" class="text-center">Ngôn ngữ</th>
               <th style="width: 120px" class="text-center">Trạng thái</th>
-              <th style="width: 120px" class="text-center">Thao tác</th>
+              <th style="width: 245px" class="text-center">Thao tác</th>
             </tr>
           </thead>
           <tbody>
             <tr
-              v-for="(item, idx) in paginatedData"
+              v-for="(item, idx) in visibleProducts"
               :key="item.Ma_hang"
               class="table-row"
+              :class="{ 'is-product-hidden': isProductHidden(item), 'is-product-top': isTopProduct(item) }"
               @click="openEdit(item)"
             >
               <td @click.stop class="text-center">
@@ -253,13 +257,15 @@
                   class="checkbox"
                 />
               </td>
-              <td class="text-center">{{ (currentPage - 1) * pageSize + idx + 1 }}</td>
+              <td class="text-center">{{ idx + 1 }}</td>
               <td class="text-center">
                 <div class="product-image-cell">
                   <img
                     v-if="item.Main_img"
                     :src="item.Main_img"
                     :alt="item.Ten_hang"
+                    loading="lazy"
+                    decoding="async"
                     class="product-thumbnail"
                   />
                   <div v-else class="product-thumbnail-empty"><i class="ri-file-image-fill"></i></div>
@@ -278,6 +284,8 @@
                       v-if="item[key]"
                       :src="item[key]"
                       :alt="`${item.Ten_hang} ảnh phụ ${slotIndex + 1}`"
+                      loading="lazy"
+                      decoding="async"
                       class="supplementary-thumb"
                     />
                     <div v-else class="supplementary-thumb-empty" aria-hidden="true">
@@ -292,7 +300,12 @@
               <td class="text-center" @click.stop="openEdit(item, { focusField: 'Danh_muc' })">{{ item.Danh_muc }}</td>
               <td class="text-center" @click.stop="openEdit(item, { focusField: 'Size' })">{{ item.Size }}</td>
               <td class="text-center" @click.stop="openEdit(item, { focusField: 'Dvt' })">{{ item.Dvt }}</td>
-              <td class="text-center text-number" @click.stop="openEdit(item, { focusField: 'Gia_goc' })">{{ formatNumber(item.Gia_goc) }}</td>
+              <td class="text-center text-number" @click.stop="openEdit(item, { focusField: 'Gia_goc' })">
+                <div>{{ formatNumber(item.Gia_goc) }}</div>
+                <div v-if="Number(item.Ncc_gia_tri_giam || 0) > 0" class="ncc-kho-tag">
+                  NCC {{ formatNccDiscountLabel(item, item.Don_vi_tien_te || 'P') }}
+                </div>
+              </td>
               <td class="text-center text-number price-main" @click.stop="openEdit(item, { focusField: 'Gia_ban' })">{{ formatNumber(item.Gia_ban) }}</td>
               <td class="text-center text-number" @click.stop="openEdit(item, { focusField: 'Gia_Giam' })">
                 <span v-if="item.Gia_Giam && item.Gia_Giam > 0" class="price-sale">
@@ -317,77 +330,80 @@
                 </div>
               </td>
               <td class="text-center" @click.stop="quickToggleStatus(item)" title="Bấm để đổi nhanh Còn hàng / Hết hàng">
-                <span 
-                  class="badge" 
-                  style="cursor: pointer; user-select: none;"
-                  :class="item.Trang_thai === 'Hết hàng' ? 'badge-danger' : 'badge-success'"
-                >
-                  {{ item.Trang_thai === 'Hết hàng' ? 'Hết hàng' : 'Còn hàng' }}
-                </span>
+                <div class="status-cell-stack">
+                  <span 
+                    class="badge" 
+                    style="cursor: pointer; user-select: none;"
+                    :class="item.Trang_thai === 'Hết hàng' ? 'badge-danger' : 'badge-success'"
+                  >
+                    {{ item.Trang_thai === 'Hết hàng' ? 'Hết hàng' : 'Còn hàng' }}
+                  </span>
+                  <span v-if="isTopProduct(item)" class="badge badge-top-pill" title="Đang ghim lên đầu Menu Online">
+                    <i class="ri-pushpin-2-fill"></i>
+                    <span>TOP #{{ getTopRank(item) }}</span>
+                  </span>
+                  <span v-if="isProductHidden(item)" class="badge badge-hidden-pill">Đang ẩn</span>
+                </div>
               </td>
               <td @click.stop class="text-center">
-                <button class="btn-action-discount" @click="openDiscount(item)">
-                   GIẢM GIÁ
-                </button>
+                <div class="table-actions-wrap">
+                  <button class="btn-action-discount" @click="openDiscount(item)">
+                    GIẢM GIÁ
+                  </button>
+                  <button
+                    v-if="!isTopRankOne(item)"
+                    type="button"
+                    class="btn-action-top"
+                    title="Đẩy mặt hàng lên vị trí đầu tiên (Top #1)"
+                    @click="pushProductToTop(item)"
+                  >
+                    <i class="ri-arrow-up-double-line"></i>
+                    <span>Lên top</span>
+                  </button>
+                  <button
+                    v-if="isTopProduct(item)"
+                    type="button"
+                    class="btn-action-untop"
+                    title="Gỡ khỏi vị trí Top"
+                    @click="unpinProductFromTop(item)"
+                  >
+                    <i class="ri-unpin-line"></i>
+                    <span>Bỏ top</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-action-hide"
+                    :class="{ 'is-hidden': isProductHidden(item) }"
+                    :title="isProductHidden(item) ? 'Hiện lại sản phẩm lên Menu Online' : 'Ẩn sản phẩm khỏi Menu Online'"
+                    @click="toggleHideProduct(item)"
+                  >
+                    <i :class="isProductHidden(item) ? 'ri-eye-line' : 'ri-eye-off-line'"></i>
+                    <span>{{ isProductHidden(item) ? 'Hiện' : 'Ẩn' }}</span>
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
 </template>
-      <!-- Desktop Pagination -->
-      <div class="pagination-wrapper">
+      <!-- Desktop Lazy Load Sentinel -->
+      <div class="lazy-load-footer" ref="lazySentinelDesktopRef">
         <div class="pagination-info">
-          Hiển thị <strong>{{ startIndex }}-{{ endIndex }}</strong> / <strong>{{ ordered.length }}</strong> sản phẩm
-
+          Hiển thị <strong>{{ visibleProducts.length }}</strong> / <strong>{{ ordered.length }}</strong> sản phẩm
         </div>
-        <div class="pagination-controls" ref="paginationDesktopRef">
-          <button 
-            class="pagination-btn pagination-arrow" 
-            :disabled="currentPage === 1"
-            @click="goToPage(1)"
-            title="Trang đầu"
-          >
-            <i class="app-ico ri-skip-back-line"></i>
-          </button>
-          <button 
-            class="pagination-btn pagination-arrow" 
-            :disabled="currentPage === 1"
-            @click="goToPage(currentPage - 1)"
-            title="Trang trước"
-          >
-            <i class="app-ico ri-arrow-left-s-line"></i>
-          </button>
-          
-          <template v-for="page in displayPages" :key="page">
-            <button 
-              v-if="typeof page === 'number'"
-              class="pagination-btn pagination-number" 
-              :class="{ active: page === currentPage }"
-              @click="goToPage(page)"
-            >
-              {{ page }}
-            </button>
-            <span v-else class="pagination-ellipsis"><i class="app-ico ri-more-line"></i></span>
-          </template>
-          
-          <button 
-            class="pagination-btn pagination-arrow" 
-            :disabled="currentPage === totalPages"
-            @click="goToPage(currentPage + 1)"
-            title="Trang sau"
-          >
-            <i class="app-ico ri-arrow-right-s-line"></i>
-          </button>
-          <button 
-            class="pagination-btn pagination-arrow" 
-            :disabled="currentPage === totalPages"
-            @click="goToPage(totalPages)"
-            title="Trang cuối"
-          >
-            <i class="app-ico ri-skip-forward-line"></i>
-          </button>
-        </div>
+        <button
+          v-if="hasMoreProducts"
+          type="button"
+          class="btn-lazy-more"
+          @click="loadMoreProducts"
+        >
+          <i class="ri-arrow-down-line"></i>
+          <span>Tải thêm {{ Math.min(LAZY_STEP_COUNT, ordered.length - visibleProducts.length) }} sản phẩm</span>
+        </button>
+        <span v-else-if="ordered.length > 0" class="lazy-done-label">
+          Đã hiển thị toàn bộ danh sách
+        </span>
       </div>
     </section>
 
@@ -404,9 +420,10 @@
   <template v-else>
       <div class="cards-container">
         <div
-          v-for="item in paginatedData"
+          v-for="item in visibleProducts"
           :key="item.Ma_hang"
           class="product-card"
+          :class="{ 'is-product-top': isTopProduct(item) }"
           @click="openEdit(item)"
         >
           <div class="card-row">
@@ -415,6 +432,8 @@
                 v-if="item.Main_img"
                 :src="item.Main_img"
                 :alt="item.Ten_hang"
+                loading="lazy"
+                decoding="async"
                 class="card-image"
               />
               <div v-else class="card-image-empty"><i class="ri-file-image-fill"></i></div>
@@ -432,6 +451,11 @@
                     >
                       {{ item.Trang_thai === 'Hết hàng' ? 'Hết hàng' : 'Còn hàng' }}
                     </span>
+                    <span v-if="isTopProduct(item)" class="badge badge-top-pill">
+                      <i class="ri-pushpin-2-fill"></i>
+                      <span>TOP #{{ getTopRank(item) }}</span>
+                    </span>
+                    <span v-if="isProductHidden(item)" class="badge badge-hidden-pill">Đang ẩn</span>
                     <span class="card-code">{{ item.Ma_hang }}</span>
                   </div>
                 </div>
@@ -456,6 +480,10 @@
                   <span class="price-value sale">
                     {{ formatNumber(item.Gia_Giam) }} {{ item.Don_vi_tien_te || 'P' }}
                   </span>
+                </div>
+                <div v-if="Number(item.Ncc_gia_tri_giam || 0) > 0" class="price-row">
+                  <span class="price-label">CK NCC</span>
+                  <span class="ncc-kho-tag">{{ formatNccDiscountLabel(item, item.Don_vi_tien_te || 'P') }}</span>
                 </div>
                 <div class="price-row">
                   <span class="price-label">Ngôn ngữ</span>
@@ -483,9 +511,33 @@
               <span class="btn-icon"><i class="ri-refresh-line"></i></span>
               <span class="btn-text">{{ item.Trang_thai === 'Hết hàng' ? 'Bật Còn' : 'Báo Hết' }}</span>
             </button>
+            <button
+              class="card-action-btn btn-hide"
+              :class="{ 'is-hidden': isProductHidden(item) }"
+              @click.stop="toggleHideProduct(item)"
+            >
+              <span class="btn-icon"><i :class="isProductHidden(item) ? 'ri-eye-line' : 'ri-eye-off-line'"></i></span>
+              <span class="btn-text">{{ isProductHidden(item) ? 'Hiện' : 'Ẩn' }}</span>
+            </button>
             <button class="card-action-btn btn-discount" @click.stop="openDiscount(item)">
               <span class="btn-icon"><i class="ri-price-tag-3-line"></i></span>
               <span class="btn-text">Giảm giá</span>
+            </button>
+            <button
+              v-if="!isTopRankOne(item)"
+              class="card-action-btn btn-top"
+              @click.stop="pushProductToTop(item)"
+            >
+              <span class="btn-icon"><i class="ri-arrow-up-double-line"></i></span>
+              <span class="btn-text">Lên top</span>
+            </button>
+            <button
+              v-if="isTopProduct(item)"
+              class="card-action-btn btn-untop"
+              @click.stop="unpinProductFromTop(item)"
+            >
+              <span class="btn-icon"><i class="ri-unpin-line"></i></span>
+              <span class="btn-text">Bỏ top</span>
             </button>
             <button class="card-action-btn btn-delete" @click.stop="confirmDelete(item)">
               <span class="btn-icon"><i class="ri-delete-bin-fill"></i></span>
@@ -495,54 +547,23 @@
         </div>
       </div>
 </template>
-      <!-- Mobile Pagination -->
-      <div class="pagination-wrapper mobile-pagination">
+      <!-- Mobile Lazy Load Sentinel -->
+      <div class="lazy-load-footer mobile-lazy-footer" ref="lazySentinelMobileRef">
         <div class="pagination-info">
-          Trang <strong>{{ currentPage }}</strong> / <strong>{{ totalPages }}</strong>
+          Hiển thị <strong>{{ visibleProducts.length }}</strong> / <strong>{{ ordered.length }}</strong> sản phẩm
         </div>
-        <div class="pagination-controls" ref="paginationMobileRef">
-          <button 
-            class="pagination-btn pagination-arrow" 
-            :disabled="currentPage === 1"
-            @click="goToPage(1)"
-          >
-            ⏮
-          </button>
-          <button 
-            class="pagination-btn pagination-arrow" 
-            :disabled="currentPage === 1"
-            @click="goToPage(currentPage - 1)"
-          >
-            ◀
-          </button>
-          
-          <template v-for="page in displayPages" :key="page">
-            <button 
-              v-if="typeof page === 'number'"
-              class="pagination-btn pagination-number" 
-              :class="{ active: page === currentPage }"
-              @click="goToPage(page)"
-            >
-              {{ page }}
-            </button>
-            <span v-else class="pagination-ellipsis">...</span>
-          </template>
-          
-          <button 
-            class="pagination-btn pagination-arrow" 
-            :disabled="currentPage === totalPages"
-            @click="goToPage(currentPage + 1)"
-          >
-            ▶
-          </button>
-          <button 
-            class="pagination-btn pagination-arrow" 
-            :disabled="currentPage === totalPages"
-            @click="goToPage(totalPages)"
-          >
-            ⏭
-          </button>
-        </div>
+        <button
+          v-if="hasMoreProducts"
+          type="button"
+          class="btn-lazy-more"
+          @click="loadMoreProducts"
+        >
+          <i class="ri-arrow-down-line"></i>
+          <span>Tải thêm {{ Math.min(LAZY_STEP_COUNT, ordered.length - visibleProducts.length) }} sản phẩm</span>
+        </button>
+        <span v-else-if="ordered.length > 0" class="lazy-done-label">
+          Đã hiển thị toàn bộ danh sách
+        </span>
       </div>
     </section>
 
@@ -634,9 +655,12 @@
                     <span v-if="mainImageUploading"> Đang tải...</span>
                     <span v-else><i class="ri-chat-upload-fill"></i>Upload ảnh</span>
                   </button>
+                  <div class="upload-size-hint">
+                    Kích thước chuẩn: <strong>800 × 800 px – 1200 × 1200 px</strong> (vuông 1:1) · Tự nén ≤ 100KB
+                  </div>
                 </div>
                 <div class="form-group supplementary-images-group">
-                  <label class="form-label">Ảnh phụ</label>
+                  <label class="form-label">Ảnh phụ <span class="upload-size-hint-inline">(800×800 – 1200×1200px · 1:1 · ≤100KB)</span></label>
                   <div class="supplementary-images">
                     <div
                       v-for="(key, slotIndex) in supplementaryImageKeys"
@@ -736,6 +760,26 @@
                     </button>
                   </div>
                 </div>
+                <div class="form-group">
+                  <label class="hide-toggle-row">
+                    <input type="checkbox" v-model="edit.Is_hidden" @change="markAsEdited" />
+                    <span>Ẩn sản phẩm khỏi Menu Online</span>
+                  </label>
+                  <div class="top-modal-row">
+                    <label class="hide-toggle-row top-toggle-row">
+                      <input type="checkbox" v-model="editIsTop" />
+                      <span>Ghim lên Top Menu Online</span>
+                    </label>
+                    <button
+                      v-if="getProductTopAt(edit) > 0 && !isTopRankOne(edit)"
+                      type="button"
+                      class="btn-bump-top-inline"
+                      @click="bumpEditToTop"
+                    >
+                      <i class="ri-arrow-up-double-line"></i> Đẩy lên #1
+                    </button>
+                  </div>
+                </div>
                   <div class="form-group">
                     <label class="form-label">Danh mục ({{ getLangShort(activeEditLang) }})</label>
                     <input
@@ -811,6 +855,38 @@
         :class="{ 'form-control-highlight': isDiscountMode }"
         :value="fmtMoney(edit.Gia_Giam)"
         @input="onMoneyInput($event, 'Gia_Giam')"
+      />
+    </div>
+  </div>
+  <div class="ncc-edit-block">
+    <label class="form-label">CK NCC (% giá gốc hoặc Tiền trực tiếp)</label>
+    <div class="ncc-disc-input-row">
+      <div class="ncc-type-toggle" role="group">
+        <button
+          type="button"
+          class="ncc-type-btn"
+          :class="{ active: edit.Ncc_loai_giam !== 'money' }"
+          @click="edit.Ncc_loai_giam = 'percent'; markAsEdited()"
+        >
+          %
+        </button>
+        <button
+          type="button"
+          class="ncc-type-btn"
+          :class="{ active: edit.Ncc_loai_giam === 'money' }"
+          @click="edit.Ncc_loai_giam = 'money'; markAsEdited()"
+        >
+          Tiền ({{ edit.Don_vi_tien_te || 'P' }})
+        </button>
+      </div>
+      <input
+        type="number"
+        min="0"
+        step="any"
+        v-model.number="edit.Ncc_gia_tri_giam"
+        placeholder="0"
+        class="form-control ncc-val-input"
+        @input="markAsEdited"
       />
     </div>
   </div>
@@ -899,11 +975,14 @@
                       >
                         {{ mainImageUploading ? 'Đang tải lên...' : 'Đổi ảnh' }}
                       </button>
+                      <div class="upload-size-hint">
+                        Kích thước chuẩn: <strong>800 × 800 px – 1200 × 1200 px</strong> (vuông 1:1) · Tự nén ≤ 100KB
+                      </div>
                     </div>
                   </div>
                 </div>
                 <div class="modal-section-card modal-section-card--tight">
-                  <div class="modal-section-title">Ảnh phụ</div>
+                  <div class="modal-section-title">Ảnh phụ <span class="upload-size-hint-inline">(800×800 – 1200×1200px · 1:1 · ≤100KB)</span></div>
                   <div class="supplementary-images modal-supplementary-grid">
                     <div
                       v-for="(key, slotIndex) in supplementaryImageKeys"
@@ -1099,6 +1178,38 @@
       />
     </div>
   </div>
+  <div class="ncc-edit-block">
+    <label class="form-label">CK NCC (% giá gốc hoặc Tiền trực tiếp)</label>
+    <div class="ncc-disc-input-row">
+      <div class="ncc-type-toggle" role="group">
+        <button
+          type="button"
+          class="ncc-type-btn"
+          :class="{ active: edit.Ncc_loai_giam !== 'money' }"
+          @click="edit.Ncc_loai_giam = 'percent'; markAsEdited()"
+        >
+          %
+        </button>
+        <button
+          type="button"
+          class="ncc-type-btn"
+          :class="{ active: edit.Ncc_loai_giam === 'money' }"
+          @click="edit.Ncc_loai_giam = 'money'; markAsEdited()"
+        >
+          Tiền ({{ edit.Don_vi_tien_te || 'P' }})
+        </button>
+      </div>
+      <input
+        type="number"
+        min="0"
+        step="any"
+        v-model.number="edit.Ncc_gia_tri_giam"
+        placeholder="0"
+        class="form-control ncc-val-input"
+        @input="markAsEdited"
+      />
+    </div>
+  </div>
 </div>
                 </div>
                 <div class="modal-section-card modal-section-card--wide">
@@ -1112,6 +1223,24 @@
                       rows="3"
                       @input="onEditI18nChange"
                     ></textarea>
+                  </div>
+                  <label class="hide-toggle-row">
+                    <input type="checkbox" v-model="edit.Is_hidden" @change="markAsEdited" />
+                    <span>Ẩn sản phẩm khỏi Menu Online</span>
+                  </label>
+                  <div class="top-modal-row">
+                    <label class="hide-toggle-row top-toggle-row">
+                      <input type="checkbox" v-model="editIsTop" />
+                      <span>Ghim lên Top Menu Online</span>
+                    </label>
+                    <button
+                      v-if="getProductTopAt(edit) > 0 && !isTopRankOne(edit)"
+                      type="button"
+                      class="btn-bump-top-inline"
+                      @click="bumpEditToTop"
+                    >
+                      <i class="ri-arrow-up-double-line"></i> Đẩy lên #1
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1210,6 +1339,352 @@
       <i class="ri-arrow-up-line"></i>
     </button>
 
+    <!-- ===== FLOATING BULK ACTION BAR ===== -->
+    <transition name="fade-scale">
+      <div v-if="selected.length > 0 && !showBulkEditModal" class="bulk-floating-bar">
+        <div class="bfb-info">
+          <span class="bfb-count">{{ selected.length }}</span>
+          <span class="bfb-label">sản phẩm đã chọn</span>
+        </div>
+        <div class="bfb-actions">
+          <button type="button" class="bfb-btn bfb-btn-clear" @click="clearSelection">
+            Bỏ chọn
+          </button>
+          <button type="button" class="bfb-btn bfb-btn-edit" @click="openBulkEditModal">
+            <i class="ri-edit-box-line"></i>
+            <span>Sửa hàng loạt</span>
+          </button>
+        </div>
+      </div>
+    </transition>
+
+    <!-- ===== BULK EDIT MODAL ===== -->
+    <transition name="modal-fade">
+      <div v-if="showBulkEditModal" class="bulk-modal-overlay" @click.self="closeBulkEditModal">
+        <div class="bulk-modal-card" @click.stop>
+          <div class="bulk-modal-header">
+            <div>
+              <h2 class="bulk-modal-title">
+                <i class="ri-stack-line"></i>
+                Sửa hàng loạt ({{ selectedProducts.length }} sản phẩm)
+              </h2>
+              <p class="bulk-modal-sub">
+                Chỉ những mục được tick chọn bên dưới mới được áp dụng cập nhật; các mục khác giữ nguyên.
+              </p>
+            </div>
+            <button type="button" class="modal-close" @click="closeBulkEditModal">✕</button>
+          </div>
+
+          <div class="bulk-modal-body">
+            <!-- Selected preview chips -->
+            <div class="bulk-preview-strip">
+              <span
+                v-for="sp in selectedProducts.slice(0, 6)"
+                :key="sp.Ma_hang"
+                class="bulk-preview-chip"
+                :title="sp.Ma_hang"
+              >
+                {{ sp.Ten_hang }}
+              </span>
+              <span v-if="selectedProducts.length > 6" class="bulk-preview-chip is-more">
+                +{{ selectedProducts.length - 6 }} sản phẩm khác
+              </span>
+            </div>
+
+            <div class="bulk-fields-grid">
+              <!-- Danh mục -->
+              <div class="bulk-field-card" :class="{ active: bulkForm.enableDanhMuc }">
+                <label class="bulk-field-toggle">
+                  <input type="checkbox" v-model="bulkForm.enableDanhMuc" />
+                  <span>Danh mục ({{ getLangShort(selectedLanguage) }})</span>
+                </label>
+                <input
+                  v-model="bulkForm.Danh_muc"
+                  :disabled="!bulkForm.enableDanhMuc"
+                  placeholder="Nhập tên danh mục mới..."
+                  class="form-control"
+                />
+              </div>
+
+              <!-- Size -->
+              <div class="bulk-field-card" :class="{ active: bulkForm.enableSize }">
+                <label class="bulk-field-toggle">
+                  <input type="checkbox" v-model="bulkForm.enableSize" />
+                  <span>Size</span>
+                </label>
+                <input
+                  v-model="bulkForm.Size"
+                  :disabled="!bulkForm.enableSize"
+                  placeholder="VD: L, M, 500g..."
+                  class="form-control"
+                />
+              </div>
+
+              <!-- ĐVT -->
+              <div class="bulk-field-card" :class="{ active: bulkForm.enableDvt }">
+                <label class="bulk-field-toggle">
+                  <input type="checkbox" v-model="bulkForm.enableDvt" />
+                  <span>ĐVT ({{ getLangShort(selectedLanguage) }})</span>
+                </label>
+                <input
+                  v-model="bulkForm.Dvt"
+                  :disabled="!bulkForm.enableDvt"
+                  placeholder="VD: Phần, Hộp, Chai..."
+                  class="form-control"
+                />
+              </div>
+
+              <!-- Tiền tệ -->
+              <div class="bulk-field-card" :class="{ active: bulkForm.enableDonViTienTe }">
+                <label class="bulk-field-toggle">
+                  <input type="checkbox" v-model="bulkForm.enableDonViTienTe" />
+                  <span>Tiền tệ</span>
+                </label>
+                <input
+                  v-model="bulkForm.Don_vi_tien_te"
+                  :disabled="!bulkForm.enableDonViTienTe"
+                  placeholder="P / VND"
+                  class="form-control"
+                />
+              </div>
+
+              <!-- Trạng thái kho -->
+              <div class="bulk-field-card" :class="{ active: bulkForm.enableTrangThai }">
+                <label class="bulk-field-toggle">
+                  <input type="checkbox" v-model="bulkForm.enableTrangThai" />
+                  <span>Trạng thái kho</span>
+                </label>
+                <select
+                  v-model="bulkForm.Trang_thai"
+                  :disabled="!bulkForm.enableTrangThai"
+                  class="form-control"
+                >
+                  <option value="Còn hàng">Còn hàng</option>
+                  <option value="Hết hàng">Hết hàng</option>
+                </select>
+              </div>
+
+              <!-- Ẩn / Hiện trên Menu Web -->
+              <div class="bulk-field-card" :class="{ active: bulkForm.enableHidden }">
+                <label class="bulk-field-toggle">
+                  <input type="checkbox" v-model="bulkForm.enableHidden" />
+                  <span>Hiển thị Menu Online</span>
+                </label>
+                <div class="bulk-seg-group" :class="{ disabled: !bulkForm.enableHidden }">
+                  <button
+                    type="button"
+                    class="bulk-seg-btn"
+                    :class="{ active: !bulkForm.Is_hidden }"
+                    :disabled="!bulkForm.enableHidden"
+                    @click="bulkForm.Is_hidden = false"
+                  >
+                    <i class="ri-eye-line"></i> Hiện
+                  </button>
+                  <button
+                    type="button"
+                    class="bulk-seg-btn is-warn"
+                    :class="{ active: bulkForm.Is_hidden }"
+                    :disabled="!bulkForm.enableHidden"
+                    @click="bulkForm.Is_hidden = true"
+                  >
+                    <i class="ri-eye-off-line"></i> Ẩn
+                  </button>
+                </div>
+              </div>
+
+              <!-- Đẩy lên Top / Bỏ ghim Top -->
+              <div class="bulk-field-card bulk-span-2" :class="{ active: bulkForm.enableTop }">
+                <label class="bulk-field-toggle">
+                  <input type="checkbox" v-model="bulkForm.enableTop" />
+                  <span>Ưu tiên vị trí Top (Kho hàng & Menu Online)</span>
+                </label>
+                <div class="bulk-seg-group" :class="{ disabled: !bulkForm.enableTop }">
+                  <button
+                    type="button"
+                    class="bulk-seg-btn is-top"
+                    :class="{ active: bulkForm.topAction === 'pin' }"
+                    :disabled="!bulkForm.enableTop"
+                    @click="bulkForm.topAction = 'pin'"
+                  >
+                    <i class="ri-arrow-up-double-line"></i> Đẩy lên Top
+                  </button>
+                  <button
+                    type="button"
+                    class="bulk-seg-btn is-warn"
+                    :class="{ active: bulkForm.topAction === 'unpin' }"
+                    :disabled="!bulkForm.enableTop"
+                    @click="bulkForm.topAction = 'unpin'"
+                  >
+                    <i class="ri-unpin-line"></i> Bỏ ghim Top
+                  </button>
+                </div>
+              </div>
+
+              <!-- CK NCC -->
+              <div class="bulk-field-card bulk-span-2" :class="{ active: bulkForm.enableNccDiscount }">
+                <label class="bulk-field-toggle">
+                  <input type="checkbox" v-model="bulkForm.enableNccDiscount" />
+                  <span>CK NCC (% giá gốc hoặc Tiền trực tiếp)</span>
+                </label>
+                <div class="ncc-disc-input-row">
+                  <div class="ncc-type-toggle" role="group">
+                    <button
+                      type="button"
+                      class="ncc-type-btn"
+                      :class="{ active: bulkForm.Ncc_loai_giam !== 'money' }"
+                      :disabled="!bulkForm.enableNccDiscount"
+                      @click="bulkForm.Ncc_loai_giam = 'percent'"
+                    >
+                      %
+                    </button>
+                    <button
+                      type="button"
+                      class="ncc-type-btn"
+                      :class="{ active: bulkForm.Ncc_loai_giam === 'money' }"
+                      :disabled="!bulkForm.enableNccDiscount"
+                      @click="bulkForm.Ncc_loai_giam = 'money'"
+                    >
+                      Tiền
+                    </button>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    v-model.number="bulkForm.Ncc_gia_tri_giam"
+                    :disabled="!bulkForm.enableNccDiscount"
+                    placeholder="0"
+                    class="form-control ncc-val-input"
+                  />
+                </div>
+              </div>
+
+              <!-- Giá gốc -->
+              <div class="bulk-field-card bulk-span-2" :class="{ active: bulkForm.enableGiaGoc }">
+                <label class="bulk-field-toggle">
+                  <input type="checkbox" v-model="bulkForm.enableGiaGoc" />
+                  <span>Giá gốc</span>
+                </label>
+                <div class="bulk-price-row">
+                  <select
+                    v-model="bulkForm.giaGocMode"
+                    :disabled="!bulkForm.enableGiaGoc"
+                    class="form-control bulk-mode-select"
+                  >
+                    <option value="set">Gán giá cố định</option>
+                    <option value="add_money">Tăng thêm (+ tiền)</option>
+                    <option value="sub_money">Giảm bớt (- tiền)</option>
+                    <option value="add_percent">Tăng thêm (+ %)</option>
+                    <option value="sub_percent">Giảm bớt (- %)</option>
+                  </select>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    v-model.number="bulkForm.giaGocValue"
+                    :disabled="!bulkForm.enableGiaGoc"
+                    placeholder="0"
+                    class="form-control bulk-val-input"
+                  />
+                </div>
+              </div>
+
+              <!-- Giá bán -->
+              <div class="bulk-field-card bulk-span-2" :class="{ active: bulkForm.enableGiaBan }">
+                <label class="bulk-field-toggle">
+                  <input type="checkbox" v-model="bulkForm.enableGiaBan" />
+                  <span>Giá bán</span>
+                </label>
+                <div class="bulk-price-row">
+                  <select
+                    v-model="bulkForm.giaBanMode"
+                    :disabled="!bulkForm.enableGiaBan"
+                    class="form-control bulk-mode-select"
+                  >
+                    <option value="set">Gán giá cố định</option>
+                    <option value="add_money">Tăng thêm (+ tiền)</option>
+                    <option value="sub_money">Giảm bớt (- tiền)</option>
+                    <option value="add_percent">Tăng thêm (+ %)</option>
+                    <option value="sub_percent">Giảm bớt (- %)</option>
+                  </select>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    v-model.number="bulkForm.giaBanValue"
+                    :disabled="!bulkForm.enableGiaBan"
+                    placeholder="0"
+                    class="form-control bulk-val-input"
+                  />
+                </div>
+              </div>
+
+              <!-- Giá giảm -->
+              <div class="bulk-field-card bulk-span-2" :class="{ active: bulkForm.enableGiaGiam }">
+                <label class="bulk-field-toggle">
+                  <input type="checkbox" v-model="bulkForm.enableGiaGiam" />
+                  <span>Giá giảm (Gán 0 để tắt khuyến mãi)</span>
+                </label>
+                <div class="bulk-price-row">
+                  <select
+                    v-model="bulkForm.giaGiamMode"
+                    :disabled="!bulkForm.enableGiaGiam"
+                    class="form-control bulk-mode-select"
+                  >
+                    <option value="set">Gán giá cố định</option>
+                    <option value="add_money">Tăng thêm (+ tiền)</option>
+                    <option value="sub_money">Giảm bớt (- tiền)</option>
+                    <option value="add_percent">Tăng thêm (+ %)</option>
+                    <option value="sub_percent">Giảm bớt (- %)</option>
+                  </select>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    v-model.number="bulkForm.giaGiamValue"
+                    :disabled="!bulkForm.enableGiaGiam"
+                    placeholder="0"
+                    class="form-control bulk-val-input"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bulk-modal-footer">
+            <button
+              type="button"
+              class="btn-modal btn-danger"
+              :disabled="bulkSaving"
+              @click="bulkDeleteFromModal"
+            >
+              <i class="ri-delete-bin-2-fill"></i>
+              <span>Xóa hàng loạt ({{ selectedProducts.length }})</span>
+            </button>
+            <div class="bulk-footer-right">
+              <button
+                type="button"
+                class="btn-modal btn-secondary"
+                :disabled="bulkSaving"
+                @click="closeBulkEditModal"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                class="btn-modal btn-primary"
+                :disabled="bulkSaving || !hasAnyBulkFieldEnabled"
+                @click="saveBulkEdit"
+              >
+                <span v-if="bulkSaving" class="btn-spinner"></span>
+                <span>{{ bulkSaving ? 'Đang cập nhật...' : `Lưu thay đổi (${selectedProducts.length})` }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
+
   </div>
 </template>
 
@@ -1225,6 +1700,11 @@ import {
   getProductTranslatedLangs,
   productMatchesKeyword,
 } from '@/utils/i18nData'
+import {
+  normalizeNccDiscountType,
+  normalizeNccDiscountValue,
+  formatNccDiscountLabel,
+} from '@/utils/nccDiscount'
 
 const supplementaryImageKeys = ['img_1', 'img_2', 'img_3', 'img_4', 'img_5', 'img_6']
 const modalSupplementaryUploading = ref(supplementaryImageKeys.map(() => false))
@@ -1251,6 +1731,61 @@ const discountInputModal = ref(null)
 const statusSelect = ref(null)
 const statusSelectModal = ref(null)
 const isDiscountMode = ref(false)
+
+/* ===== BULK EDIT MODAL STATE ===== */
+const showBulkEditModal = ref(false)
+const bulkSaving = ref(false)
+const createDefaultBulkForm = () => ({
+  enableDanhMuc: false,
+  Danh_muc: '',
+  enableSize: false,
+  Size: '',
+  enableDvt: false,
+  Dvt: '',
+  enableDonViTienTe: false,
+  Don_vi_tien_te: 'P',
+  enableTrangThai: false,
+  Trang_thai: 'Còn hàng',
+  enableHidden: false,
+  Is_hidden: false,
+  enableTop: false,
+  topAction: 'pin',
+  enableNccDiscount: false,
+  Ncc_loai_giam: 'percent',
+  Ncc_gia_tri_giam: 0,
+  enableGiaGoc: false,
+  giaGocMode: 'set',
+  giaGocValue: 0,
+  enableGiaBan: false,
+  giaBanMode: 'set',
+  giaBanValue: 0,
+  enableGiaGiam: false,
+  giaGiamMode: 'set',
+  giaGiamValue: 0,
+})
+const bulkForm = ref(createDefaultBulkForm())
+
+const selectedProducts = computed(() => {
+  const chosenSet = new Set(selected.value || [])
+  return (list.value || []).filter((item) => chosenSet.has(item.Ma_hang))
+})
+
+const hasAnyBulkFieldEnabled = computed(() => {
+  const f = bulkForm.value
+  return Boolean(
+    f.enableDanhMuc ||
+      f.enableSize ||
+      f.enableDvt ||
+      f.enableDonViTienTe ||
+      f.enableTrangThai ||
+      f.enableHidden ||
+      f.enableTop ||
+      f.enableNccDiscount ||
+      f.enableGiaGoc ||
+      f.enableGiaBan ||
+      f.enableGiaGiam,
+  )
+})
 const statusOptionsVisible = ref(false)
 const previewImageUrl = ref('')
 
@@ -1271,8 +1806,8 @@ const scrollCheckInterval = ref(null)
 const scrollContainer = ref(null)
 const scrollTopHoldTimer = ref(null)
 const holdScrollTopVisible = ref(false)
-const paginationDesktopRef = ref(null)
-const paginationMobileRef = ref(null)
+const lazySentinelDesktopRef = ref(null)
+const lazySentinelMobileRef = ref(null)
 const raiseScrollTop = ref(false)
 const tableHovering = ref(false)
 const mainEl = ref(null)
@@ -1285,8 +1820,10 @@ const sidebarSupplementaryInputs = ref([])
 const uploading = ref(false)
 const mainImageUploading = ref(false)
 const saving = ref(false) // ✅ thêm
-const currentPage = ref(1)
-const pageSize = 15
+const LAZY_INITIAL_COUNT = 25
+const LAZY_STEP_COUNT = 25
+const visibleCount = ref(LAZY_INITIAL_COUNT)
+let lazyObserver = null
 const tableLoading = ref(true) 
 async function loadData() {
   tableLoading.value = true // ✅ dùng tableLoading
@@ -1298,6 +1835,7 @@ async function loadData() {
     showAlert('Không thể tải dữ liệu', 'error')
   } finally {
     tableLoading.value = false // ✅ tắt loading
+    nextTick(() => setupLazyObserver())
   }
 }
 /* ===== LIFECYCLE ===== */
@@ -1328,6 +1866,7 @@ onMounted(() => {
     }
 
     handleScrollTopVisibility()
+    setupLazyObserver()
     // extra check in case no scroll event fired yet
     setTimeout(handleScrollTopVisibility, 300)
   })
@@ -1335,6 +1874,10 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (lazyObserver) {
+    lazyObserver.disconnect()
+    lazyObserver = null
+  }
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('scroll', handleScrollTopVisibility)
   document.removeEventListener('scroll', handleScrollTopVisibility)
@@ -1385,11 +1928,14 @@ function handleScrollTopVisibility() {
 
   showScrollTop.value = sources.some(src => isScrolledPastTrigger(src, triggerEl))
 
-  // Lift the button when pagination is near the viewport bottom to avoid overlap
-  const pag = isMobile.value ? paginationMobileRef.value : paginationDesktopRef.value
+  // Lift the button when lazy footer is near the viewport bottom to avoid overlap
+  const pag = isMobile.value ? lazySentinelMobileRef.value : lazySentinelDesktopRef.value
   if (pag) {
     const rect = pag.getBoundingClientRect()
     raiseScrollTop.value = rect.bottom > window.innerHeight - 90
+    if (rect.top <= window.innerHeight + 260) {
+      loadMoreProducts()
+    }
   } else {
     raiseScrollTop.value = false
   }
@@ -1446,7 +1992,7 @@ const categories = computed(() => {
 /* ===== FILTER FUNCTIONS ===== */
 function togglePromotionFilter() {
   filterPromotion.value = !filterPromotion.value
-  currentPage.value = 1
+  resetVisibleCount()
 }
 
 function setStatusFilter(status) {
@@ -1455,7 +2001,7 @@ function setStatusFilter(status) {
   } else {
     filterStatus.value = status
   }
-  currentPage.value = 1
+  resetVisibleCount()
 }
 
 const hasActiveFilters = computed(() => {
@@ -1472,19 +2018,19 @@ function clearAllFilters() {
   selectedLanguage.value = 'vi'
   filterPromotion.value = false
   filterStatus.value = 'all'
-  currentPage.value = 1
+  resetVisibleCount()
 }
 
 function toggleSortOrder() {
   sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
-  currentPage.value = 1
+  resetVisibleCount()
 }
 
 function selectLanguage(lang) {
   selectedLanguage.value = lang || 'vi'
   selectedCategory.value = ''
   showLanguageMenu.value = false
-  currentPage.value = 1
+  resetVisibleCount()
 }
 
 function getLanguageLabel() {
@@ -1524,6 +2070,7 @@ const showLanguageMenu = ref(false)
 function getStatusLabel() {
   if (filterStatus.value === 'available') return 'Còn hàng'
   if (filterStatus.value === 'out') return 'Hết hàng'
+  if (filterStatus.value === 'hidden') return 'Đang ẩn'
   return 'Trạng thái'
 }
 
@@ -1543,12 +2090,12 @@ function selectExport(type) {
 
 /* ===== SEARCH ===== */
 function handleSearch() {
-  currentPage.value = 1
+  resetVisibleCount()
 }
 
 function clearSearch() {
   keyword.value = ''
-  currentPage.value = 1
+  resetVisibleCount()
 }
 
 /* ===== IMAGE UPLOAD ===== */
@@ -1670,8 +2217,67 @@ function matchesPromo(item) {
   return item.Gia_Giam && item.Gia_Giam > 0
 }
 
+function isProductHidden(item) {
+  return (
+    item?.Is_hidden === true ||
+    String(item?.Is_hidden) === 'true' ||
+    String(item?.Trang_thai || '').trim() === 'Ẩn'
+  )
+}
+
+function getProductTopAt(item) {
+  const val = Number(item?.Top_at || 0)
+  return Number.isFinite(val) && val > 0 ? val : 0
+}
+
+function isTopProduct(item) {
+  return getProductTopAt(item) > 0
+}
+
+function getNextTopTimestamp() {
+  const maxExisting = (list.value || []).reduce(
+    (max, item) => Math.max(max, getProductTopAt(item)),
+    0,
+  )
+  return Math.max(Date.now(), maxExisting + 1)
+}
+
+const topRankMap = computed(() => {
+  const pinned = (list.value || [])
+    .filter((item) => getProductTopAt(item) > 0)
+    .sort((a, b) => getProductTopAt(b) - getProductTopAt(a))
+  const map = new Map()
+  pinned.forEach((item, index) => {
+    map.set(item.Ma_hang, index + 1)
+  })
+  return map
+})
+
+function getTopRank(item) {
+  if (!item?.Ma_hang) return 0
+  return topRankMap.value.get(item.Ma_hang) || 0
+}
+
+function isTopRankOne(item) {
+  return getTopRank(item) === 1
+}
+
+const editIsTop = computed({
+  get: () => getProductTopAt(edit.value) > 0,
+  set: (checked) => {
+    edit.value.Top_at = checked ? getNextTopTimestamp() : 0
+    markAsEdited()
+  },
+})
+
+function bumpEditToTop() {
+  edit.value.Top_at = getNextTopTimestamp()
+  markAsEdited()
+}
+
 function matchesStatus(item, status) {
   if (status === 'all') return true
+  if (status === 'hidden') return isProductHidden(item)
   const isOut = String(item.Trang_thai || '').trim() === 'Hết hàng'
   if (status === 'out') return isOut
   if (status === 'available') return !isOut
@@ -1707,67 +2313,66 @@ const filtered = computed(() =>
 )
 
 const ordered = computed(() => {
-  const arr = [...filtered.value]
-  if (sortOrder.value === 'desc') {
-    return arr.reverse() // Mới → Cũ
-  }
-  return arr // Cũ → Mới
+  const baseArr =
+    sortOrder.value === 'desc' ? [...filtered.value].reverse() : [...filtered.value]
+  return baseArr
+    .map((item, idx) => {
+      const rawOrder = Number(item?.Thu_tu || 0)
+      const order = Number.isFinite(rawOrder) && rawOrder > 0 ? Math.floor(rawOrder) : Number.MAX_SAFE_INTEGER
+      return { item, idx, topAt: getProductTopAt(item), order }
+    })
+    .sort((a, b) => {
+      if (a.topAt !== b.topAt) return b.topAt - a.topAt
+      if (a.order !== b.order) return a.order - b.order
+      return a.idx - b.idx
+    })
+    .map((entry) => entry.item)
 })
 
-const totalPages = computed(() => Math.ceil(ordered.value.length / pageSize) || 1)
+const visibleProducts = computed(() => ordered.value.slice(0, visibleCount.value))
 
-const paginatedData = computed(() => {
-  const start = (currentPage.value - 1) * pageSize
-  return ordered.value.slice(start, start + pageSize)
+const hasMoreProducts = computed(() => visibleCount.value < ordered.value.length)
+
+const isAllSelected = computed(() => {
+  if (!ordered.value.length) return false
+  const selectedSet = new Set(selected.value)
+  return ordered.value.every((item) => selectedSet.has(item.Ma_hang))
 })
 
-const displayPages = computed(() => {
-  const total = totalPages.value
-  const current = currentPage.value
-  const pages = []
-
-  if (total <= 7) {
-    for (let i = 1; i <= total; i++) {
-      pages.push(i)
-    }
-  } else {
-    pages.push(1)
-
-    if (current <= 3) {
-      pages.push(2, 3, 4, '...', total)
-    } else if (current >= total - 2) {
-      pages.push('...', total - 3, total - 2, total - 1, total)
-    } else {
-      pages.push('...', current - 1, current, current + 1, '...', total)
-    }
-  }
-
-  return pages
-})
-
-const startIndex = computed(() => {
-  if (ordered.value.length === 0) return 0
-  return (currentPage.value - 1) * pageSize + 1
-})
-const endIndex = computed(() => Math.min(currentPage.value * pageSize, ordered.value.length))
-
-const isAllSelected = computed(() =>
-  paginatedData.value.length > 0 && 
-  paginatedData.value.every(item => selected.value.includes(item.Ma_hang))
-)
-
-watch(filtered, () => {
-  if (currentPage.value > totalPages.value) {
-    currentPage.value = 1
-  }
-})
-
-/* ===== PAGINATION ===== */
-function goToPage(page) {
-  if (page < 1 || page > totalPages.value) return
-  currentPage.value = page
-  scrollToTableTop({ hold: false })
+function resetVisibleCount() {
+  visibleCount.value = LAZY_INITIAL_COUNT
 }
+
+function loadMoreProducts() {
+  if (!hasMoreProducts.value) return
+  visibleCount.value = Math.min(ordered.value.length, visibleCount.value + LAZY_STEP_COUNT)
+}
+
+function setupLazyObserver() {
+  if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') return
+  if (lazyObserver) {
+    lazyObserver.disconnect()
+  }
+  lazyObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        loadMoreProducts()
+      }
+    },
+    { root: null, rootMargin: '260px 0px', threshold: 0.01 },
+  )
+  if (lazySentinelDesktopRef.value) lazyObserver.observe(lazySentinelDesktopRef.value)
+  if (lazySentinelMobileRef.value) lazyObserver.observe(lazySentinelMobileRef.value)
+}
+
+watch([filtered, sortOrder], () => {
+  resetVisibleCount()
+  nextTick(() => setupLazyObserver())
+})
+
+watch(isMobile, () => {
+  nextTick(() => setupLazyObserver())
+})
 
 function scrollToTableTop(options = { hold: true }) {
   const shouldHold = options.hold !== false
@@ -1821,7 +2426,7 @@ function getScrollParent(el) {
 }
 
 /* ===== EDIT TRACKING ===== */
-const numericFields = new Set(['Gia_goc', 'Gia_ban', 'Gia_Giam'])
+const numericFields = new Set(['Gia_goc', 'Gia_ban', 'Gia_Giam', 'Top_at', 'Thu_tu'])
 
 function normalizeString(val) {
   return (val ?? '').toString().trim()
@@ -1873,12 +2478,12 @@ function selectMobileStatus(value) {
 
 /* ===== ACTIONS ===== */
 function toggleSelectAll(e) {
+  const allIds = ordered.value.map((item) => item.Ma_hang)
   if (e.target.checked) {
-    const currentIds = paginatedData.value.map(item => item.Ma_hang)
-    selected.value = [...new Set([...selected.value, ...currentIds])]
+    selected.value = [...new Set([...selected.value, ...allIds])]
   } else {
-    const currentIds = paginatedData.value.map(item => item.Ma_hang)
-    selected.value = selected.value.filter(id => !currentIds.includes(id))
+    const allIdSet = new Set(allIds)
+    selected.value = selected.value.filter((id) => !allIdSet.has(id))
   }
 }
 
@@ -1966,6 +2571,10 @@ function prepareEditState(item) {
     Danh_muc: i18n.vi.Danh_muc || rawItem.Danh_muc || '',
     Dvt: i18n.vi.Dvt || rawItem.Dvt || '',
     Mo_ta: i18n.vi.Mo_ta || rawItem.Mo_ta || '',
+    Is_hidden: isProductHidden(rawItem),
+    Top_at: getProductTopAt(rawItem),
+    Ncc_loai_giam: normalizeNccDiscountType(rawItem.Ncc_loai_giam),
+    Ncc_gia_tri_giam: normalizeNccDiscountValue(rawItem.Ncc_gia_tri_giam),
     i18n: JSON.parse(JSON.stringify(i18n)),
   }
   delete cloned.Lang
@@ -2113,6 +2722,84 @@ function closeSidebar() {
   previewImageUrl.value = ''
 }
 
+async function updateProductTopAt(item, nextTopAt, successMsg, failMsg) {
+  if (!item?.Ma_hang) return
+  const rawItem = list.value.find((r) => r.Ma_hang === item.Ma_hang)
+  const prevTopAt = getProductTopAt(rawItem || item)
+
+  if (rawItem) rawItem.Top_at = nextTopAt
+  item.Top_at = nextTopAt
+
+  try {
+    const res = await dispatchAction({
+      action: 'updateHangHoa',
+      data: {
+        Ma_hang: item.Ma_hang,
+        Top_at: nextTopAt,
+      },
+    })
+    if (!res.success) throw new Error(res.message || failMsg)
+    showAlert(successMsg, 'success')
+  } catch (err) {
+    console.error(err)
+    if (rawItem) rawItem.Top_at = prevTopAt
+    item.Top_at = prevTopAt
+    showAlert(failMsg, 'error')
+  }
+}
+
+async function pushProductToTop(item) {
+  if (!item?.Ma_hang) return
+  await updateProductTopAt(
+    item,
+    getNextTopTimestamp(),
+    `Đã đẩy "${item.Ten_hang}" lên Top #1`,
+    'Đẩy mặt hàng lên top thất bại',
+  )
+}
+
+async function unpinProductFromTop(item) {
+  if (!item?.Ma_hang) return
+  await updateProductTopAt(
+    item,
+    0,
+    `Đã gỡ "${item.Ten_hang}" khỏi vị trí Top`,
+    'Bỏ ghim top thất bại',
+  )
+}
+
+async function toggleHideProduct(item) {
+  if (!item?.Ma_hang) return
+  const rawItem = list.value.find((r) => r.Ma_hang === item.Ma_hang)
+  const prevHidden = isProductHidden(rawItem || item)
+  const nextHidden = !prevHidden
+
+  if (rawItem) rawItem.Is_hidden = nextHidden
+  item.Is_hidden = nextHidden
+
+  try {
+    const res = await dispatchAction({
+      action: 'updateHangHoa',
+      data: {
+        Ma_hang: item.Ma_hang,
+        Is_hidden: nextHidden,
+      },
+    })
+    if (!res.success) throw new Error(res.message || 'Không thể cập nhật hiển thị')
+    showAlert(
+      nextHidden
+        ? `Đã ẩn "${item.Ten_hang}" khỏi Menu Online`
+        : `Đã hiện lại "${item.Ten_hang}" trên Menu Online`,
+      'success',
+    )
+  } catch (err) {
+    console.error(err)
+    if (rawItem) rawItem.Is_hidden = prevHidden
+    item.Is_hidden = prevHidden
+    showAlert('Cập nhật ẩn/hiện thất bại', 'error')
+  }
+}
+
 async function quickToggleStatus(item) {
   if (!item?.Ma_hang) return
   const rawItem = list.value.find((r) => r.Ma_hang === item.Ma_hang)
@@ -2240,6 +2927,105 @@ async function confirmAction() {
   } finally {
     confirmBusy.value = false
     confirmData.value = null
+  }
+}
+
+/* ===== BULK EDIT / DELETE ACTIONS ===== */
+function clearSelection() {
+  selected.value = []
+}
+
+function openBulkEditModal() {
+  if (!selected.value.length) {
+    showAlert('Vui lòng tick chọn ít nhất 1 sản phẩm', 'error')
+    return
+  }
+  bulkForm.value = createDefaultBulkForm()
+  showBulkEditModal.value = true
+}
+
+function closeBulkEditModal() {
+  if (bulkSaving.value) return
+  showBulkEditModal.value = false
+}
+
+async function saveBulkEdit() {
+  if (bulkSaving.value || !hasAnyBulkFieldEnabled.value) return
+  const maHangs = selectedProducts.value.map((p) => p.Ma_hang).filter(Boolean)
+  if (!maHangs.length) return
+
+  const f = bulkForm.value
+  const patch = {
+    lang: selectedLanguage.value || 'vi',
+  }
+  if (f.enableDanhMuc) patch.Danh_muc = String(f.Danh_muc || '').trim()
+  if (f.enableSize) patch.Size = String(f.Size || '').trim()
+  if (f.enableDvt) patch.Dvt = String(f.Dvt || '').trim()
+  if (f.enableDonViTienTe) patch.Don_vi_tien_te = String(f.Don_vi_tien_te || '').trim() || 'P'
+  if (f.enableTrangThai) patch.Trang_thai = f.Trang_thai === 'Hết hàng' ? 'Hết hàng' : 'Còn hàng'
+  if (f.enableHidden) patch.Is_hidden = Boolean(f.Is_hidden)
+  if (f.enableTop) patch.Top_action = f.topAction === 'unpin' ? 'unpin' : 'pin'
+  if (f.enableNccDiscount) {
+    patch.Ncc_discount = {
+      Ncc_loai_giam: normalizeNccDiscountType(f.Ncc_loai_giam),
+      Ncc_gia_tri_giam: normalizeNccDiscountValue(f.Ncc_gia_tri_giam),
+    }
+  }
+  if (f.enableGiaGoc) {
+    patch.Gia_goc = { mode: f.giaGocMode, value: Number(f.giaGocValue || 0) }
+  }
+  if (f.enableGiaBan) {
+    patch.Gia_ban = { mode: f.giaBanMode, value: Number(f.giaBanValue || 0) }
+  }
+  if (f.enableGiaGiam) {
+    patch.Gia_Giam = { mode: f.giaGiamMode, value: Number(f.giaGiamValue || 0) }
+  }
+
+  bulkSaving.value = true
+  try {
+    const res = await dispatchAction({
+      action: 'bulkUpdateHangHoa',
+      maHangs,
+      patch,
+    })
+    if (!res?.success) throw new Error(res?.message || 'Cập nhật hàng loạt thất bại')
+    showAlert(`Đã cập nhật ${res.updated || maHangs.length} sản phẩm`, 'success')
+    showBulkEditModal.value = false
+    selected.value = []
+    await loadData()
+  } catch (err) {
+    console.error('Bulk update error:', err)
+    showAlert('Cập nhật hàng loạt thất bại', 'error')
+  } finally {
+    bulkSaving.value = false
+  }
+}
+
+function bulkDeleteFromModal() {
+  const maHangs = selectedProducts.value.map((p) => p.Ma_hang).filter(Boolean)
+  if (!maHangs.length) return
+
+  confirmData.value = {
+    title: 'Xác nhận xóa hàng loạt',
+    message: `Bạn có chắc chắn muốn xóa ${maHangs.length} sản phẩm đã chọn khỏi kho hàng? Hành động này không thể hoàn tác.`,
+    confirmText: `Xóa ${maHangs.length} sản phẩm`,
+    loadingText: 'Đang xóa hàng loạt...',
+    action: async () => {
+      try {
+        const res = await dispatchAction({
+          action: 'bulkDeleteHangHoa',
+          maHangs,
+        })
+        if (!res?.success) throw new Error(res?.message || 'Xóa hàng loạt thất bại')
+        showAlert(`Đã xóa ${res.deleted || maHangs.length} sản phẩm`, 'success')
+        showBulkEditModal.value = false
+        selected.value = []
+        await loadData()
+      } catch (err) {
+        console.error('Bulk delete error:', err)
+        showAlert('Xóa hàng loạt thất bại', 'error')
+      }
+    },
   }
 }
 
@@ -2937,6 +3723,263 @@ function onMoneyInput(e, key) {
   background: linear-gradient(135deg, #f1a208, #c27a00);
   border-color: #f1a208;
   transform: translateY(-1px);
+}
+
+.table-actions-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.btn-action-top,
+.btn-action-untop {
+  padding: 8px 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.btn-action-top {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  border: 1px solid rgba(96, 165, 250, 0.7);
+  color: #ffffff;
+  box-shadow: 0 6px 12px rgba(37, 99, 235, 0.22);
+}
+
+.btn-action-top:hover {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  transform: translateY(-1px);
+}
+
+.btn-action-untop {
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  color: #fde68a;
+}
+
+.btn-action-untop:hover {
+  background: rgba(245, 158, 11, 0.28);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.btn-action-hide {
+  padding: 8px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(100, 116, 139, 0.25);
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 10px;
+  color: #e2e8f0;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-action-hide:hover {
+  background: rgba(100, 116, 139, 0.42);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.btn-action-hide.is-hidden {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: rgba(52, 211, 153, 0.65);
+  color: #6ee7b7;
+}
+
+.status-cell-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge-top-pill {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.26), rgba(217, 119, 6, 0.26));
+  color: #fde68a;
+  border: 1px solid rgba(251, 191, 36, 0.65);
+  font-size: 10.5px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.table-row.is-product-top {
+  background: rgba(245, 158, 11, 0.055);
+}
+
+.product-card.is-product-top {
+  border-color: rgba(251, 191, 36, 0.45);
+  box-shadow: 0 8px 20px rgba(245, 158, 11, 0.08);
+}
+
+.badge-hidden-pill {
+  background: rgba(100, 116, 139, 0.28);
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  font-size: 10.5px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.table-row.is-product-hidden {
+  opacity: 0.68;
+}
+
+.text-hidden {
+  color: #94a3b8;
+}
+
+.hide-toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e2e8f0;
+  cursor: pointer;
+}
+
+.hide-toggle-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: #10b981;
+}
+
+.top-modal-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.top-toggle-row {
+  margin-top: 0;
+}
+
+.top-toggle-row input {
+  accent-color: #f59e0b;
+}
+
+.btn-bump-top-inline {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(96, 165, 250, 0.65);
+  background: rgba(37, 99, 235, 0.24);
+  color: #bfdbfe;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-bump-top-inline:hover {
+  background: rgba(37, 99, 235, 0.42);
+  color: #ffffff;
+}
+
+.card-action-btn.btn-top {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  border: 1px solid rgba(96, 165, 250, 0.65);
+  color: #ffffff;
+}
+
+.card-action-btn.btn-untop {
+  background: rgba(245, 158, 11, 0.22);
+  border: 1px solid rgba(251, 191, 36, 0.6);
+  color: #fde68a;
+}
+
+.bulk-seg-btn.is-top.active {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  border-color: rgba(96, 165, 250, 0.75);
+  color: #ffffff;
+}
+
+.card-action-btn.btn-hide {
+  background: rgba(100, 116, 139, 0.25);
+  border-color: rgba(148, 163, 184, 0.4);
+  color: #e2e8f0;
+}
+
+.card-action-btn.btn-hide.is-hidden {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: rgba(52, 211, 153, 0.65);
+  color: #6ee7b7;
+}
+
+.ncc-kho-tag {
+  margin-top: 3px;
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  background: rgba(16, 185, 129, 0.18);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.ncc-edit-block {
+  margin-top: 10px;
+}
+
+.ncc-disc-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.ncc-type-toggle {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.ncc-type-btn {
+  padding: 6px 10px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ncc-type-btn.active {
+  background: rgba(16, 185, 129, 0.24);
+  color: #6ee7b7;
+}
+
+.ncc-val-input {
+  flex: 1;
+  min-width: 90px;
 }
 
 .checkbox {
@@ -4634,6 +5677,380 @@ function onMoneyInput(e, key) {
 .lang-tab-dot.filled {
   background: #10b981;
   box-shadow: 0 0 6px rgba(16, 185, 129, 0.8);
+}
+
+.upload-size-hint {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: #93c5fd;
+  line-height: 1.4;
+}
+
+.upload-size-hint-inline {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: none;
+  color: #93c5fd;
+  margin-left: 4px;
+}
+
+/* ===== FLOATING BULK ACTION BAR ===== */
+.bulk-floating-bar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 950;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 14px 10px 16px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.96);
+  backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(34, 197, 94, 0.55);
+  box-shadow: 0 14px 36px rgba(2, 6, 23, 0.55), 0 0 0 3px rgba(34, 197, 94, 0.14);
+}
+
+.bfb-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.bfb-count {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #10b981;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bfb-label {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.bfb-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bfb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.16s ease;
+}
+
+.bfb-btn-clear {
+  background: rgba(148, 163, 184, 0.16);
+  color: #cbd5e1;
+}
+
+.bfb-btn-clear:hover {
+  background: rgba(148, 163, 184, 0.28);
+  color: #ffffff;
+}
+
+.bfb-btn-edit {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+}
+
+.bfb-btn-edit:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.45);
+}
+
+/* ===== BULK EDIT MODAL ===== */
+.bulk-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  background: rgba(2, 6, 23, 0.78);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.bulk-modal-card {
+  width: 100%;
+  max-width: 720px;
+  max-height: 90vh;
+  background: #0f172a;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.bulk-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(2, 6, 23, 0.55);
+}
+
+.bulk-modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #86efac;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bulk-modal-sub {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: #94a3b8;
+}
+
+.bulk-modal-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bulk-preview-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bulk-preview-chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  background: rgba(59, 130, 246, 0.16);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  color: #bfdbfe;
+  max-width: 210px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bulk-preview-chip.is-more {
+  background: rgba(148, 163, 184, 0.16);
+  border-color: rgba(148, 163, 184, 0.3);
+  color: #cbd5e1;
+}
+
+.bulk-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bulk-field-card {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.16s ease, background 0.16s ease;
+}
+
+.bulk-field-card.active {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(34, 197, 94, 0.48);
+}
+
+.bulk-span-2 {
+  grid-column: span 2;
+}
+
+.bulk-field-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #e2e8f0;
+  cursor: pointer;
+}
+
+.bulk-field-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: #10b981;
+  cursor: pointer;
+}
+
+.bulk-field-card .form-control:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.bulk-seg-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.bulk-seg-group.disabled {
+  opacity: 0.45;
+}
+
+.bulk-seg-btn {
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.65);
+  color: #cbd5e1;
+  font-size: 12.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.bulk-seg-btn.active {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: #10b981;
+  color: #6ee7b7;
+}
+
+.bulk-seg-btn.is-warn.active {
+  background: rgba(100, 116, 139, 0.35);
+  border-color: #94a3b8;
+  color: #f8fafc;
+}
+
+.bulk-price-row {
+  display: grid;
+  grid-template-columns: 185px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.bulk-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(2, 6, 23, 0.65);
+  flex-wrap: wrap;
+}
+
+.bulk-footer-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .bulk-floating-bar {
+    bottom: 76px;
+    width: calc(100% - 24px);
+    max-width: 460px;
+    border-radius: 14px;
+    padding: 10px 12px;
+  }
+
+  .bulk-fields-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bulk-span-2 {
+    grid-column: span 1;
+  }
+
+  .bulk-price-row {
+    grid-template-columns: 1fr;
+  }
+
+  .bulk-modal-footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .bulk-footer-right {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ===== LAZY LOAD FOOTER ===== */
+.lazy-load-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.mobile-lazy-footer {
+  margin-top: 12px;
+  border-top: none;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.btn-lazy-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  background: rgba(14, 165, 233, 0.16);
+  color: #7dd3fc;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.btn-lazy-more:hover {
+  background: rgba(14, 165, 233, 0.28);
+  color: #e0f2fe;
+}
+
+.lazy-done-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #64748b;
 }
 </style>
 

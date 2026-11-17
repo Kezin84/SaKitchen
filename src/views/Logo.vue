@@ -261,7 +261,7 @@ onMounted(loadData)
                   <div v-else class="upload-placeholder">
                     <div class="placeholder-icon"><i class="ri-image-line"></i></div>
                     <p><strong>Click để chọn ảnh</strong></p>
-                    <p class="placeholder-hint">PNG, JPG, WebP · Tự động nén JPG (~100KB)</p>
+                    <p class="placeholder-hint">Kích thước chuẩn: 500 × 500 px – 1000 × 1000 px (vuông 1:1) · Tự nén ≤ 100KB</p>
                   </div>
                   <input
                     ref="fileInput"
@@ -270,6 +270,9 @@ onMounted(loadData)
                     hidden
                     @change="onFileChange"
                   />
+                </div>
+                <div class="upload-size-hint">
+                  Kích thước chuẩn: <strong>500 × 500 px – 1000 × 1000 px</strong> (tỉ lệ vuông 1:1) · PNG, JPG, WebP · Tự nén ≤ 100KB
                 </div>
               </div>
 
@@ -971,5 +974,12 @@ onMounted(loadData)
     font-size: 13px;
     padding: 10px 20px;
   }
+}
+
+.upload-size-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #93c5fd;
+  line-height: 1.45;
 }
 </style>

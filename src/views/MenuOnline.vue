@@ -2,6 +2,7 @@
   <div
     class="sa-storefront"
     :class="[themeMode === 'dark' ? 'theme-dark' : 'theme-light', { 'is-mobile-view': isMobile }]"
+    :style="pcLayoutStyle"
   >
     <!-- ========== DESKTOP TOP HEADER (1A) ========== -->
     <header v-if="!isMobile" class="desktop-top-header">
@@ -171,7 +172,7 @@
             <i class="ri-shopping-basket-2-fill"></i>
             <span class="dcp-badge">{{ cartQtyTotal }}</span>
             <span class="dcp-amount">
-              {{ cartQtyTotal > 0 ? formatPrice(totalAmount, cartCurrency) : $t('mobile.cart') }}
+              {{ cartQtyTotal > 0 ? formatPrice(customerPayableTotal, cartCurrency) : $t('mobile.cart') }}
             </span>
           </button>
           </div>
@@ -180,11 +181,14 @@
     </header>
 
     <div
+      ref="layoutRef"
       class="layout"
       :class="{
         'hide-left': !showCategories,
-        'hide-right': !showCart
+        'hide-right': !showCart,
+        'is-resizing-sidebar': isResizingSidebar
       }"
+      :style="pcLayoutStyle"
     >
       <!-- ========== SIDEBAR LEFT (CHỈ DÙNG DRAWER MOBILE NẾU CẦN) ========== -->
       <aside v-if="isMobile" class="sidebar-left" :class="{ collapsed: !showCategories }">
@@ -502,7 +506,7 @@
             <div v-if="showAllCatsDrawer" class="sct-all-cats-dropdown" @click.stop>
               <div class="sct-all-cats-header">
                 <span>{{ $t('menu.allCategories') }} ({{ categories.length }})</span>
-                <span class="sct-alpha-badge">A → Z</span>
+                <span class="sct-alpha-badge">{{ displayConfig.categoryOrder.length ? 'Thứ tự' : 'A → Z' }}</span>
               </div>
               <div class="sct-all-cats-grid">
                 <button
@@ -712,12 +716,17 @@
             <div class="card-img-wrap">
               <transition name="card-fade" mode="out-in">
                 <img
+                  v-if="getCardImage(m)"
                   :key="getCardImageKey(m)"
                   :src="getCardImage(m)"
                   loading="lazy"
                   decoding="async"
-                  alt=""
+                  :alt="m.Ten_hang || ''"
+                  @error="onCardImgError(m, getCardImage(m))"
                 />
+                <div v-else :key="'fallback-' + m.Ma_hang" class="card-img-name-fallback">
+                  <span>{{ m.Ten_hang }}</span>
+                </div>
               </transition>
 
               <!-- TAG GIẢM GIÁ -->
@@ -745,8 +754,8 @@
               <h4 class="name">{{ m.Ten_hang }}</h4>
 
               <!-- MÔ TẢ -->
-              <p class="desc">
-                {{ m.Mo_ta || m.Ten_hang }}
+              <p v-if="String(m.Mo_ta || '').trim()" class="desc">
+                {{ m.Mo_ta }}
               </p>
 
               <!-- GIÁ + CHI TIẾT / GHI CHÚ -->
@@ -959,8 +968,8 @@
   </h3>
 
   <!-- MÔ TẢ -->
-  <p class="modal-desc">
-    {{ selectedItem.Mo_ta || selectedItem.Ten_hang }}
+  <p v-if="String(selectedItem.Mo_ta || '').trim()" class="modal-desc">
+    {{ selectedItem.Mo_ta }}
   </p>
 
   <!-- GIÁ -->
@@ -1036,6 +1045,16 @@
       class="mobile-sheet-backdrop is-cart"
       @click="closeCart"
     ></div>
+    <div
+      v-if="!isMobile && showCart"
+      class="pc-sidebar-resizer"
+      :class="{ active: isResizingSidebar }"
+      title="Kéo để chỉnh độ rộng giỏ hàng • Double-click để đặt lại mặc định"
+      @mousedown.prevent="startSidebarResize"
+      @dblclick="resetSidebarWidth"
+    >
+      <span class="pc-sidebar-resizer-grip"></span>
+    </div>
     <aside class="sidebar-right" :class="{ collapsed: !showCart }" @wheel="forwardWheelToMain">
       <div v-if="showCart" class="sidebar-content cart-box">
         <!-- ===== LAYER 1 & 2 HEADER: ĐƠN HÀNG + GHÉP ĐƠN CÙNG HÀNG ===== -->
@@ -1054,7 +1073,7 @@
                 :disabled="creatingGroupSession"
                 @click="openGroupShareModal"
               >
-                <i class="ri-qr-code-line"></i>
+                <i class="ri-team-fill"></i>
                 <span>{{ $t('group.groupOrderBtn') }}</span>
               </button>
 
@@ -1309,80 +1328,58 @@
 
         <!-- ===== STICKY FOOTER: TỔNG CỘNG -> FREESHIP -> TRẠNG THÁI ĐƠN -> TIẾP TỤC ===== -->
         <div class="cart-sticky-footer">
-          <!-- 3. TỔNG CỘNG + NÚT PHÓNG TO MODAL -->
-          <div class="cart-total-row">
-            <div class="cart-total">
-              <span class="cart-total-label">{{ $t('cart.total') }}</span>
-              <strong class="cart-total-value">{{ formatPrice(totalAmount, cartCurrency) }}</strong>
+          <div class="cart-summary-card">
+            <template v-if="syncedShippingFee > 0 || syncedAdminDiscount > 0">
+              <div class="cart-items-subtotal-row">
+                <span>{{ syncedItemsLabel }}</span>
+                <strong>{{ formatPrice(itemsSubtotalAmount, cartCurrency) }}</strong>
+              </div>
+              <div v-if="syncedAdminDiscount > 0" class="cart-discount-row">
+                <span>{{ syncedDiscountLabel }}</span>
+                <strong>-{{ formatPrice(syncedAdminDiscount, cartCurrency) }}</strong>
+              </div>
+              <div v-if="syncedShippingFee > 0" class="cart-ship-row">
+                <span>{{ syncedShippingLabel }}</span>
+                <strong>+{{ formatPrice(syncedShippingFee, cartCurrency) }}</strong>
+              </div>
+              <div class="cart-summary-divider"></div>
+            </template>
+            <!-- 3. TỔNG CỘNG + NÚT PHÓNG TO MODAL -->
+            <div class="cart-total-row">
+              <div class="cart-total">
+                <span class="cart-total-label">{{ $t('cart.total') }}</span>
+                <strong class="cart-total-value">{{ formatPrice(customerPayableTotal, cartCurrency) }}</strong>
+              </div>
+              <button
+                type="button"
+                class="cart-total-expand-btn"
+                :title="$t('cart.expandCart')"
+                :aria-label="$t('cart.expandCart')"
+                @click="showFullCartModal = true"
+              >
+                <i class="ri-fullscreen-line"></i>
+              </button>
             </div>
-            <button
-              type="button"
-              class="cart-total-expand-btn"
-              :title="$t('cart.expandCart')"
-              :aria-label="$t('cart.expandCart')"
-              @click="showFullCartModal = true"
-            >
-              <i class="ri-fullscreen-line"></i>
-            </button>
           </div>
 
-          <!-- 4. MỐC ƯU ĐÃI / FREESHIP (DẠNG CHECKPOINT, KHÔNG BADGE) -->
+          <!-- 4. CHECKLIST ƯU ĐÃI DỌC (NGAY BÊN DƯỚI HÀNG TỔNG CỘNG TRONG SIDEBAR) -->
           <div
             v-if="milestoneCheckpoints.length > 0"
-            class="milestone-checkpoint-box"
+            class="cart-promo-checklist"
             :class="{ unlocked: isAllMilestonesUnlocked }"
           >
-            <div class="mcp-headline">
-              <i
-                :class="
-                  isAllMilestonesUnlocked
-                    ? 'ri-checkbox-circle-fill'
-                    : nextMilestone?.type === 'GIFT'
-                      ? 'ri-gift-line'
-                      : 'ri-truck-line'
-                "
-              ></i>
-              <span>{{ milestoneHeadlineText }}</span>
-            </div>
-
-            <div class="mcp-stepper">
-              <div class="mcp-rail-wrap">
-                <div class="mcp-rail">
-                  <div
-                    class="mcp-rail-fill"
-                    :style="{ width: `${milestoneTrackFillPercent}%` }"
-                  ></div>
-                  <span
-                    class="mcp-origin-dot"
-                    :class="{ active: totalAmount > 0 }"
-                  ></span>
-                  <span
-                    v-for="cp in milestoneCheckpoints"
-                    :key="'sb-dot-' + cp.key"
-                    class="mcp-point"
-                    :class="{ 'is-unlocked': cp.unlocked, 'is-next': cp.isNext }"
-                    :style="{ left: `${cp.posPct}%` }"
-                    :title="`${cp.thresholdText}: ${cp.label}`"
-                  ></span>
-                </div>
-              </div>
-
-              <div
-                class="mcp-checkpoints-grid"
-                :style="{
-                  gridTemplateColumns: `repeat(${milestoneCheckpoints.length}, minmax(0, 1fr))`
-                }"
-              >
-                <div
-                  v-for="cp in milestoneCheckpoints"
-                  :key="'sb-lbl-' + cp.key"
-                  class="mcp-cp-col"
-                  :class="{ 'is-unlocked': cp.unlocked, 'is-next': cp.isNext }"
-                >
-                  <span class="mcp-cp-amount">{{ cp.thresholdText }}</span>
-                  <span class="mcp-cp-reward">{{ cp.label }}</span>
-                </div>
-              </div>
+            <div
+              v-for="cp in milestoneCheckpoints"
+              :key="'sb-cp-' + cp.key"
+              class="mpcb-item"
+              :class="{ 'is-unlocked': cp.unlocked, 'is-next': cp.isNext }"
+            >
+              <span class="mpcb-check" aria-hidden="true">
+                <i v-if="cp.unlocked" class="ri-check-line"></i>
+              </span>
+              <span class="mpcb-prefix">{{ cp.actionPrefix }}</span>
+              <span class="mpcb-sep">—</span>
+              <span class="mpcb-reward">{{ cp.label }}</span>
             </div>
           </div>
 
@@ -1444,12 +1441,21 @@
           <!-- 6. NÚT TIẾP TỤC (SOLO/HOST) HOẶC HOÀN THÀNH CHỌN MÓN (GUEST 2B) -->
           <template v-if="isGroupGuest">
             <button
-              v-if="isOrderLocked"
+              v-if="isOrderTerminal"
               type="button"
               class="finish-btn new-order-finish-btn"
               @click="startNewOrder"
             >
               + {{ $t('group.newOrderBtn') }}
+            </button>
+            <button
+              v-else-if="isOrderLocked"
+              type="button"
+              class="finish-btn view-progress-finish-btn"
+              @click="onOrderStatusClick"
+            >
+              <i class="ri-route-line"></i>
+              <span>{{ $t('cart.viewProgressBtn') }}</span>
             </button>
             <button
               v-else-if="!isMyGuestSelectionDone"
@@ -1522,7 +1528,8 @@
   </div>
     <button
     class="scroll-top-fab"
-    v-show="showScrollTop && !showCart && !showProgressModal && !showCategoryModal && !showContactModal && !showExportModal && !showDetailSidebar"
+    :class="{ show: showScrollTop, 'is-dock-hidden': isMobile && isMobileDockHidden }"
+    v-show="showScrollTop && (!isMobile || !showCart) && !showProgressModal && !showCategoryModal && !showContactModal && !showExportModal && !showDetailSidebar"
     :title="$t('common.scrollTop')"
     aria-label="Scroll to top"
     @click="scrollToPageTop"
@@ -1612,6 +1619,97 @@
       </div>
     </div>
   </aside>
+
+  <!-- ===== POPUP THÔNG BÁO KHI VÀO TRANG ORDER ===== -->
+  <div
+    v-if="showEntryNoticePopup && activeEntryPopup"
+    class="epn-overlay"
+    @click="closeEntryNoticePopup"
+  >
+    <div
+      class="epn-modal"
+      :class="{ 'is-text-only': !activeEntryPopup.imageUrl }"
+      @click.stop
+    >
+      <button
+        type="button"
+        class="epn-close-btn"
+        :class="{ 'on-light': !activeEntryPopup.imageUrl }"
+        aria-label="Close"
+        @click="closeEntryNoticePopup"
+      >
+        <i class="ri-close-line"></i>
+      </button>
+
+      <div class="epn-scroll-body">
+        <div v-if="!activeEntryPopup.imageUrl" class="epn-text-hero">
+          <div class="epn-hero-ico">
+            <i class="ri-notification-3-fill"></i>
+          </div>
+        </div>
+
+        <component
+          :is="activeEntryPopup.linkUrl ? 'a' : 'div'"
+          class="epn-content-link"
+          :class="{ 'is-clickable': Boolean(activeEntryPopup.linkUrl) }"
+          :href="activeEntryPopup.linkUrl || undefined"
+          :target="isExternalPopupLink(activeEntryPopup.linkUrl) ? '_blank' : undefined"
+          :rel="isExternalPopupLink(activeEntryPopup.linkUrl) ? 'noopener noreferrer' : undefined"
+          @click="handleEntryPopupLinkClick($event, activeEntryPopup)"
+        >
+          <div v-if="activeEntryPopup.imageUrl" class="epn-img-wrap">
+            <img
+              :src="activeEntryPopup.imageUrl"
+              :alt="activeEntryPopup.text || 'Popup notice'"
+              class="epn-img"
+            />
+          </div>
+
+          <div v-if="activeEntryPopup.text" class="epn-caption">
+            <h4 v-if="activeEntryPopupParts.headline" class="epn-headline">
+              {{ activeEntryPopupParts.headline }}
+            </h4>
+            <p v-if="activeEntryPopupParts.body" class="epn-text">
+              {{ activeEntryPopupParts.body }}
+            </p>
+          </div>
+        </component>
+      </div>
+
+      <div class="epn-footer-actions">
+        <button
+          type="button"
+          class="epn-dismiss-btn"
+          @click="closeEntryNoticePopup"
+        >
+          <span>OKAY</span>
+        </button>
+      </div>
+
+      <div v-if="popupNotices.length > 1" class="epn-pager">
+        <button
+          type="button"
+          class="epn-pager-btn"
+          aria-label="Previous"
+          @click="stepEntryNoticePopup(-1)"
+        >
+          <i class="ri-arrow-left-s-line"></i>
+        </button>
+        <div class="epn-pager-dots">
+          {{ entryPopupIndex + 1 }} / {{ popupNotices.length }}
+        </div>
+        <button
+          type="button"
+          class="epn-pager-btn"
+          aria-label="Next"
+          @click="stepEntryNoticePopup(1)"
+        >
+          <i class="ri-arrow-right-s-line"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== MODAL CHI TIẾT SẢN PHẨM ===== -->
 <!-- ===== MODAL CHI TIẾT SẢN PHẨM ===== -->
 <div v-if="showDetail && !isMobile" class="modal-overlay" @click="closeDetail" >
@@ -1693,8 +1791,8 @@
           {{ selectedItem.Ten_hang }}
         </h3>
 
-        <p class="modal-desc">
-          {{ selectedItem.Mo_ta || selectedItem.Ten_hang }}
+        <p v-if="String(selectedItem.Mo_ta || '').trim()" class="modal-desc">
+          {{ selectedItem.Mo_ta }}
         </p>
 
 <div class="modal-price price-discount">
@@ -1794,7 +1892,7 @@
       </div>
       <span class="exm-stat-dot">•</span>
       <div class="exm-stat-item is-price">
-        <strong>{{ formatPrice(totalAmount, cartCurrency) }}</strong>
+        <strong>{{ formatPrice(customerPayableTotal, cartCurrency) }}</strong>
       </div>
       <span class="exm-stat-dot">•</span>
       <div class="exm-stat-item">
@@ -2034,6 +2132,7 @@
       && activeMobilePanel !== 'progress'
     "
     class="mobile-cart-bar"
+    :class="{ 'is-dock-hidden': isMobileDockHidden }"
   >
     <!-- 1. ĐƠN HÀNG ĐANG TRONG TIẾN TRÌNH HOẶC ĐÃ KẾT THÚC -->
     <div
@@ -2059,7 +2158,7 @@
             <span v-if="!orderStatusProgress.isCancelled">
               {{ orderStatusProgress.activeIndex + 1 }}/{{ orderStatusProgress.steps.length }}
             </span>
-            <span v-if="cartItems.length > 0">• {{ formatPrice(totalAmount, cartCurrency) }}</span>
+            <span v-if="cartItems.length > 0">• {{ formatPrice(customerPayableTotal, cartCurrency) }}</span>
           </div>
         </div>
 
@@ -2082,6 +2181,15 @@
             @click="startNewOrder"
           >
             + {{ $t('group.newOrderBtn') }}
+          </button>
+          <button
+            v-else-if="liveStatus === 'Chờ duyệt' && hasOrderChangesAfterSubmit && isGroupHost"
+            type="button"
+            class="mcb-action-cta is-update-red"
+            @click="onContinueToFullModal"
+          >
+            <i class="ri-refresh-line"></i>
+            <span>{{ $t('mobile.updateOrderShort') }}</span>
           </button>
           <button
             v-else
@@ -2120,7 +2228,7 @@
         <div class="mcb-tracker-info">
           <div class="mcb-tracker-title">{{ $t('group.doneStatus') }}</div>
           <div class="mcb-tracker-sub">
-            {{ cartQtyTotal }} {{ $t('group.itemsCount') }} • {{ formatPrice(totalAmount, cartCurrency) }}
+            {{ cartQtyTotal }} {{ $t('group.itemsCount') }} • {{ formatPrice(customerPayableTotal, cartCurrency) }}
           </div>
         </div>
         <span class="mcb-action-cta">
@@ -2147,13 +2255,17 @@
               : $t('mobile.checkout')
           }}
         </span>
-        <span class="cart-bar-total">{{ formatPrice(totalAmount, cartCurrency) }}</span>
+        <span class="cart-bar-total">{{ formatPrice(customerPayableTotal, cartCurrency) }}</span>
       </button>
     </div>
   </div>
 </transition>
 
-<div v-if="isMobile" class="mobile-bottom-bar">
+<div
+  v-if="isMobile"
+  class="mobile-bottom-bar"
+  :class="{ 'is-dock-hidden': isMobileDockHidden }"
+>
   <!-- HOME -->
   <button
     :class="{ active: activeMobilePanel === 'home' }"
@@ -2199,7 +2311,7 @@
     <div class="btn-inner">
       <div class="btn-scale">
         <div class="cart-icon-wrap">
-          <i class="ri-shopping-cart-2-fill" :style="{ color: activeMobilePanel === 'cart' ? '#ffffff' : '#16a34a' }"></i>
+          <i class="ri-shopping-cart-2-fill dock-accent-ico"></i>
 
           <span
             v-if="cartItems.length && (!liveStatus || liveStatus === 'Nháp')"
@@ -2260,6 +2372,7 @@
       <div class="btn-scale">
         <div class="send-icon-wrap">
           <i
+            class="dock-accent-ico"
             :class="
               isGroupGuest
                 ? isMyGuestSelectionDone
@@ -2267,7 +2380,6 @@
                   : 'ri-check-double-line'
                 : 'ri-send-plane-fill'
             "
-            :style="{ color: activeMobilePanel === 'export' ? '#ffffff' : '#16a34a' }"
           ></i>
           <span
             v-if="cartItems.length && (!liveStatus || liveStatus === 'Nháp')"
@@ -2453,6 +2565,10 @@
               <span class="mps-info-lbl">{{ $t('group.orderCode') }}</span>
               <strong class="mps-info-val is-code">#{{ activeOrderId }}</strong>
             </div>
+            <div v-if="liveCreatedAt && liveStatus && liveStatus !== 'Nháp'" class="mps-info-row">
+              <span class="mps-info-lbl">{{ createdAtLabel }}</span>
+              <span class="mps-info-val">{{ liveCreatedAt }}</span>
+            </div>
             <div v-if="tenKhach || memberName" class="mps-info-row">
               <span class="mps-info-lbl">{{ $t('cart.name') }}</span>
               <span class="mps-info-val">{{ tenKhach || memberName }}</span>
@@ -2573,9 +2689,31 @@
             </span>
           </div>
 
-          <div class="mps-grand-total">
-            <span>{{ $t('cart.total') }}</span>
-            <strong>{{ formatPrice(totalAmount, cartCurrency) }}</strong>
+          <div class="mps-summary-group">
+            <template v-if="syncedShippingFee > 0 || syncedAdminDiscount > 0">
+              <div class="mps-items-subtotal-row">
+                <span>{{ syncedItemsLabel }}</span>
+                <strong>{{ formatPrice(itemsSubtotalAmount, cartCurrency) }}</strong>
+              </div>
+
+              <div v-if="syncedAdminDiscount > 0" class="mps-discount-row">
+                <span>{{ syncedDiscountLabel }}</span>
+                <strong>-{{ formatPrice(syncedAdminDiscount, cartCurrency) }}</strong>
+              </div>
+
+              <div v-if="syncedShippingFee > 0" class="mps-ship-row">
+                <span>{{ syncedShippingLabel }}</span>
+                <strong>+{{ formatPrice(syncedShippingFee, cartCurrency) }}</strong>
+              </div>
+            </template>
+
+            <div
+              class="mps-grand-total"
+              :class="{ 'has-breakdown': syncedShippingFee > 0 || syncedAdminDiscount > 0 }"
+            >
+              <span>{{ $t('cart.total') }}</span>
+              <strong>{{ formatPrice(customerPayableTotal, cartCurrency) }}</strong>
+            </div>
           </div>
         </section>
 
@@ -2648,6 +2786,7 @@
               <span>{{ $t('group.messageShopBtn') }}</span>
             </button>
             <button
+              v-if="!isOrderInDeliveryProgress"
               type="button"
               class="mps-secondary-action-btn"
               @click="startNewOrder"
@@ -2892,6 +3031,15 @@
           <i class="ri-radar-line"></i>
           <span>#{{ activeOrderId }}</span>
         </div>
+
+        <span
+          v-if="!isMobile && activeOrderId && liveCreatedAt && liveStatus && liveStatus !== 'Nháp'"
+          class="fcm-created-pill"
+          :title="createdAtLabel"
+        >
+          <i class="ri-calendar-check-line"></i>
+          <span>{{ liveCreatedAt }}</span>
+        </span>
       </div>
 
       <div class="fcm-header-right">
@@ -2911,18 +3059,27 @@
           <span>#{{ activeOrderId }}</span>
         </div>
 
+        <span
+          v-if="isMobile && activeOrderId && liveCreatedAt && liveStatus && liveStatus !== 'Nháp'"
+          class="fcm-created-pill"
+          :title="createdAtLabel"
+        >
+          <i class="ri-calendar-check-line"></i>
+          <span>{{ liveCreatedAt }}</span>
+        </span>
+
         <button
           type="button"
           class="group-invite-btn fcm-invite-btn"
           :disabled="creatingGroupSession"
           @click="openGroupShareModal"
         >
-          <i class="ri-qr-code-line"></i>
+          <i class="ri-team-fill"></i>
           <span>{{ $t('group.groupOrderBtn') }}</span>
         </button>
 
         <button
-          v-if="activeOrderId && (liveStatus === 'Nháp' || isOrderLocked)"
+          v-if="activeOrderId && (liveStatus === 'Nháp' || isOrderLocked) && !isOrderInDeliveryProgress"
           type="button"
           class="lob-new-btn fcm-new-btn"
           @click="startNewOrder"
@@ -3524,9 +3681,26 @@
 
         <!-- PINNED CHECKOUT FOOTER: TỔNG CỘNG -> CHECKPOINT ƯU ĐÃI -> TRẠNG THÁI ĐƠN -> GỬI ĐƠN -->
         <div class="fcm-checkout-footer">
-          <div class="cart-total fcm-grand-total">
-            <span>{{ $t('cart.total') }}</span>
-            <strong>{{ formatPrice(totalAmount, cartCurrency) }}</strong>
+          <div class="fcm-summary-card">
+            <template v-if="syncedShippingFee > 0 || syncedAdminDiscount > 0">
+              <div class="fcm-items-subtotal-row">
+                <span>{{ syncedItemsLabel }}</span>
+                <strong>{{ formatPrice(itemsSubtotalAmount, cartCurrency) }}</strong>
+              </div>
+              <div v-if="syncedAdminDiscount > 0" class="fcm-discount-row">
+                <span>{{ syncedDiscountLabel }}</span>
+                <strong>-{{ formatPrice(syncedAdminDiscount, cartCurrency) }}</strong>
+              </div>
+              <div v-if="syncedShippingFee > 0" class="fcm-ship-row">
+                <span>{{ syncedShippingLabel }}</span>
+                <strong>+{{ formatPrice(syncedShippingFee, cartCurrency) }}</strong>
+              </div>
+              <div class="fcm-summary-divider"></div>
+            </template>
+            <div class="cart-total fcm-grand-total">
+              <span>{{ $t('cart.total') }}</span>
+              <strong>{{ formatPrice(customerPayableTotal, cartCurrency) }}</strong>
+            </div>
           </div>
 
           <div
@@ -3681,12 +3855,21 @@
 
           <template v-else>
             <button
-              v-if="isOrderLocked"
+              v-if="isOrderTerminal"
               type="button"
               class="finish-btn new-order-finish-btn fcm-submit-btn"
               @click="startNewOrder"
             >
               + {{ $t('group.newOrderBtn') }}
+            </button>
+            <button
+              v-else-if="isOrderLocked"
+              type="button"
+              class="finish-btn view-progress-finish-btn fcm-submit-btn"
+              @click="onOrderStatusClick"
+            >
+              <i class="ri-route-line"></i>
+              <span>{{ $t('cart.viewProgressBtn') }}</span>
             </button>
             <button
               v-else-if="!isMyGuestSelectionDone"
@@ -3793,6 +3976,63 @@
   </div>
 </div>
 
+<!-- ===== MODAL KHI ĐƠN CHỜ DUYỆT BỊ XÓA SẠCH GIỎ ===== -->
+<div
+  v-if="showEmptyPendingOrderModal"
+  class="modal-overlay z-top"
+  @click="showEmptyPendingOrderModal = false"
+>
+  <div class="modal-card empty-pending-order-modal" @click.stop>
+    <button
+      type="button"
+      class="modal-close"
+      :disabled="emptyPendingActionBusy"
+      @click="showEmptyPendingOrderModal = false"
+    >
+      ✕
+    </button>
+    <div class="epo-content">
+      <div class="epo-icon-badge">
+        <i class="ri-error-warning-line"></i>
+      </div>
+      <h3 class="epo-title">{{ emptyPendingModalCopy.title }}</h3>
+      <p class="epo-desc">{{ emptyPendingModalCopy.desc }}</p>
+
+      <div class="epo-actions">
+        <button
+          type="button"
+          class="epo-btn is-restore"
+          :disabled="emptyPendingActionBusy"
+          @click="restoreEmptyPendingOrder"
+        >
+          <i class="ri-history-line"></i>
+          <span>{{ emptyPendingModalCopy.restoreBtn }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="epo-btn is-cancel"
+          :disabled="emptyPendingActionBusy"
+          @click="cancelEmptyPendingOrder"
+        >
+          <i class="ri-close-circle-line"></i>
+          <span>{{ emptyPendingModalCopy.cancelBtn }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="epo-btn is-pick"
+          :disabled="emptyPendingActionBusy"
+          @click="pickMoreFromEmptyPendingModal"
+        >
+          <i class="ri-add-circle-line"></i>
+          <span>{{ emptyPendingModalCopy.pickBtn }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== MODAL THÔNG BÁO ĐƠN ĐANG CHUẨN BỊ / GIAO -> NHẮN TIN QUÁN ===== -->
 <div
   v-if="showLockedOrderContactModal"
@@ -3870,6 +4110,7 @@
         <span>{{ $t('cart.viewProgressBtn') }}</span>
       </button>
       <button
+        v-if="!isOrderInDeliveryProgress"
         type="button"
         class="locm-sec-btn is-new"
         @click="startNewOrderFromLockedModal"
@@ -3974,15 +4215,6 @@
         @change="onMemberNameChange"
       />
     </div>
-
-    <button
-      v-if="activeOrderId && (liveStatus === 'Nháp' || isOrderLocked)"
-      type="button"
-      class="gsm-new-order-btn"
-      @click="startNewOrder(); showGroupShareModal = false"
-    >
-      + {{ $t('group.newOrderBtn') }}
-    </button>
   </div>
 </div>
 
@@ -4227,7 +4459,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch, nextTick, onUnmounted } from 'vue'
 import L from 'leaflet'
 import QrcodeVue from 'qrcode.vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -4238,12 +4470,15 @@ import {
   subscribeLiveOrder,
   ensureLiveOrderSession,
   upsertLiveOrderMember,
+  markAllLiveOrderMembersDone,
   rejoinLiveOrderMember,
   removeLiveOrderMember,
   upsertLiveOrderItem,
   removeLiveOrderItem,
   updateLiveOrderMeta,
+  restoreSubmittedLiveOrderDraft,
   submitCustomerOrder,
+  dispatchAction,
   genOrderId,
   makeLineId,
   IMGBB_KEY,
@@ -4253,6 +4488,13 @@ import {
   productMatchesKeyword,
   resolveNoticeText,
 } from '@/utils/i18nData'
+import {
+  normalizeDisplayConfig,
+  sortProductsFlat,
+  sortLocalizedCategories,
+  sortProductsByCategoryOrder,
+  DISPLAY_MODE_BY_CATEGORY,
+} from '@/utils/displayOrder'
 const route = useRoute()
 const router = useRouter()
 const { locale, t } = useI18n()
@@ -4365,8 +4607,20 @@ const BANNER_FADE_MS = 450
 const tempQty = ref({})
 /* ===== STATE ===== */
 const rawMenu = ref([])
+const displayConfigRows = ref([])
+const displayConfig = computed(() => normalizeDisplayConfig(displayConfigRows.value))
+
+const isProductHidden = (item) =>
+  item?.Is_hidden === true ||
+  String(item?.Is_hidden) === 'true' ||
+  String(item?.Trang_thai || '').trim() === 'Ẩn'
+
 const menu = computed(() =>
-  rawMenu.value.map((m) => localizeProduct(m, currentLang.value))
+  sortProductsFlat(
+    rawMenu.value
+      .filter((m) => !isProductHidden(m))
+      .map((m) => localizeProduct(m, currentLang.value)),
+  ),
 )
 const thongBao = ref([])
 const banners = ref([])
@@ -4461,6 +4715,7 @@ const toastState = ref({ show: false, message: '', type: 'success' })
 let unsubLiveOrder = null
 let unsubHangHoaLive = null
 let unsubKhuyenMaiLive = null
+let unsubDisplayConfigLive = null
 let metaSyncTimer = null
 let toastTimer = null
 let applyingRemoteMeta = false
@@ -4518,8 +4773,21 @@ function saveCustomerFormLocal() {
 }
 
 const liveStatus = computed(() => String(liveOrderData.value?.meta?.Trang_thai || '').trim())
+const liveCreatedAt = computed(() =>
+  String(liveOrderData.value?.meta?.Ngay_tao_duong_lich || '').trim(),
+)
+const createdAtLabel = computed(() => {
+  const lang = currentLang.value
+  if (lang === 'en') return 'Created at'
+  if (lang === 'zh') return '下单时间'
+  if (lang === 'ko') return '주문 시간'
+  return 'Thời gian tạo đơn'
+})
 const isOrderTerminal = computed(
   () => liveStatus.value === 'Hoàn thành' || liveStatus.value === 'Đã hủy',
+)
+const isOrderInDeliveryProgress = computed(
+  () => liveStatus.value === 'Đang xử lý' || liveStatus.value === 'Đang ship',
 )
 const isOrderLocked = computed(() =>
   ['Đang xử lý', 'Đang ship', 'Hoàn thành', 'Đã hủy'].includes(liveStatus.value),
@@ -4805,6 +5073,21 @@ async function executeRemoveMember(grp) {
 async function proceedPastUnfinishedWarning() {
   const target = unfinishedActionTarget.value
   showUnfinishedGuestsModal.value = false
+  if (activeOrderId.value && isGroupHost.value && !isOrderLocked.value) {
+    if (liveOrderData.value?.membersList) {
+      liveOrderData.value = {
+        ...liveOrderData.value,
+        membersList: liveOrderData.value.membersList.map((m) => ({
+          ...m,
+          done: true,
+        })),
+      }
+    }
+    await markAllLiveOrderMembersDone({
+      orderId: activeOrderId.value,
+      requesterId: memberId,
+    }).catch(() => {})
+  }
   if (target === 'finish') {
     await onFinish({ skipUnfinishedCheck: true })
   } else {
@@ -5084,7 +5367,12 @@ function connectLiveOrder(orderId, { fromUrl = false, syncUrl = false } = {}) {
       setOrderQueryParam(cleanId)
     }
 
-    if (!isEditingMeta.value && snap.meta) {
+    const isSnapLocked = ['Đang xử lý', 'Đang ship', 'Hoàn thành', 'Đã hủy'].includes(st)
+    if (isSnapLocked) {
+      isEditingMeta.value = false
+    }
+
+    if ((!isEditingMeta.value || isSnapLocked) && snap.meta) {
       applyingRemoteMeta = true
       if (snap.meta.Ten_khach_hang !== undefined) tenKhach.value = snap.meta.Ten_khach_hang || ''
       if (snap.meta.So_dien_thoai !== undefined) sdt.value = snap.meta.So_dien_thoai || ''
@@ -5097,6 +5385,9 @@ function connectLiveOrder(orderId, { fromUrl = false, syncUrl = false } = {}) {
       }
       if (snap.meta.Ghi_chu !== undefined) {
         ghiChu.value = stripAutoPromoTag(snap.meta.Ghi_chu || '')
+      }
+      if (isSnapLocked && (!snap.meta?.Host_id || snap.meta.Host_id === memberId)) {
+        saveCustomerFormLocal()
       }
       nextTick(() => {
         applyingRemoteMeta = false
@@ -5137,7 +5428,6 @@ function connectLiveOrder(orderId, { fromUrl = false, syncUrl = false } = {}) {
       seenAsMemberInSession = true
     }
     const alreadyInMembers = Boolean(myMemberRec)
-    const isSnapLocked = ['Đang xử lý', 'Đang ship', 'Hoàn thành', 'Đã hủy'].includes(st)
 
     const incomingNudgeAt = Number(snap.meta?.Host_nudge_at || 0)
     if (!initializedNudgeWatch) {
@@ -5202,10 +5492,7 @@ function scheduleSyncLiveMeta() {
         Dia_chi: diaChi.value,
         Thoi_gian_nhan_hang: thoiGian.value,
         Hinh_thuc_thanh_toan: hinhThucTT.value,
-        Ghi_chu:
-          liveStatus.value === 'Chờ duyệt'
-            ? buildSubmittedNoteWithPromo(ghiChu.value, earnedPromoViSummary.value)
-            : stripAutoPromoTag(ghiChu.value),
+        Ghi_chu: stripAutoPromoTag(ghiChu.value),
         ...(liveStatus.value === 'Chờ duyệt'
           ? { Khuyen_mai_dat_duoc: earnedPromoViSummary.value }
           : {}),
@@ -5578,6 +5865,10 @@ function onPendingProgressClick() {
 }
 
 function onContinueToFullModal() {
+  if (liveStatus.value === 'Chờ duyệt' && cartItems.value.length === 0 && isGroupHost.value) {
+    showEmptyPendingOrderModal.value = true
+    return
+  }
   const hasSubmittedState = Boolean(liveStatus.value && liveStatus.value !== 'Nháp')
   if (isCartVisuallyEmpty.value && !hasSubmittedState) {
     showEmptyCartModal.value = true
@@ -5592,6 +5883,11 @@ function onContinueToFullModal() {
     showUnfinishedGuestsModal.value = true
     nudgeUnfinishedGuests()
     return
+  }
+  if (isMobile.value) {
+    activeMobilePanel.value = null
+    showCart.value = false
+    showProgressModal.value = false
   }
   showFullCartModal.value = true
 }
@@ -5623,7 +5919,120 @@ const thongTinChuyenKhoan = ref([])
 const showCKModal = ref(false)
 const showFullCartModal = ref(false)
 const showEmptyCartModal = ref(false)
+const showEmptyPendingOrderModal = ref(false)
+const emptyPendingActionBusy = ref(false)
 const showLockedOrderContactModal = ref(false)
+const isMobileDockHidden = ref(false)
+let lastMobileScrollY = 0
+
+const emptyPendingModalCopy = computed(() => {
+  const code = activeOrderId.value ? `#${activeOrderId.value}` : ''
+  const lang = currentLang.value
+  if (lang === 'en') {
+    return {
+      title: `Pending order ${code} has no items`,
+      desc: 'You removed all items from this pending order. Would you like to restore your previous items, add new items, or cancel this order?',
+      restoreBtn: 'Restore previous items',
+      cancelBtn: 'Cancel this order',
+      pickBtn: 'Add more items',
+      cancelledToast: 'Order cancelled',
+      restoredToast: 'Previous order items restored',
+    }
+  }
+  if (lang === 'zh-CN') {
+    return {
+      title: `待确认订单 ${code} 购物车为空`,
+      desc: '您已清空该待确认订单中的全部商品。您可以恢复之前提交的商品、继续加购，或取消该订单。',
+      restoreBtn: '恢复已点商品',
+      cancelBtn: '取消此订单',
+      pickBtn: '继续选购商品',
+      cancelledToast: '已取消订单',
+      restoredToast: '已恢复之前提交的商品',
+    }
+  }
+  if (lang === 'fil') {
+    return {
+      title: `Walang laman ang pending order ${code}`,
+      desc: 'Tinanggal mo ang lahat ng item sa pending order na ito. Gusto mo bang ibalik ang mga naunang item, magdagdag ng iba, o i-cancel ang order?',
+      restoreBtn: 'Ibalik ang mga naunang item',
+      cancelBtn: 'I-cancel ang order',
+      pickBtn: 'Magdagdag ng item',
+      cancelledToast: 'Na-cancel ang order',
+      restoredToast: 'Naibalik ang mga naunang item',
+    }
+  }
+  if (lang === 'ko') {
+    return {
+      title: `확인 대기 중인 주문 ${code}이 비어 있습니다`,
+      desc: '대기 중인 주문의 모든 상품을 삭제했습니다. 이전 상품을 복구하거나, 새 상품을 담거나, 주문을 취소할 수 있습니다.',
+      restoreBtn: '이전 주문 상품 복구',
+      cancelBtn: '이 주문 취소하기',
+      pickBtn: '새 상품 담기',
+      cancelledToast: '주문이 취소되었습니다',
+      restoredToast: '이전 주문 상품을 복구했습니다',
+    }
+  }
+  return {
+    title: `Đơn đang xác nhận ${code} chưa có món`,
+    desc: 'Bạn đã xóa hết món khỏi giỏ hàng của đơn đang chờ xác nhận. Bạn muốn khôi phục lại các món đã đặt, chọn thêm món mới, hay hủy đơn này?',
+    restoreBtn: 'Khôi phục món đã đặt',
+    cancelBtn: 'Hủy đơn hàng này',
+    pickBtn: 'Chọn thêm món mới',
+    cancelledToast: 'Đã hủy đơn hàng',
+    restoredToast: 'Đã khôi phục các món đã đặt trước đó',
+  }
+})
+
+async function restoreEmptyPendingOrder() {
+  if (!activeOrderId.value || emptyPendingActionBusy.value) return
+  emptyPendingActionBusy.value = true
+  try {
+    const res = await restoreSubmittedLiveOrderDraft({ orderId: activeOrderId.value })
+    if (!res?.success) {
+      triggerToast(res?.message || 'Không thể khôi phục đơn hàng', 'warn')
+      return
+    }
+    showEmptyPendingOrderModal.value = false
+    triggerToast(emptyPendingModalCopy.value.restoredToast, 'success')
+  } catch (err) {
+    console.error('restoreEmptyPendingOrder error:', err)
+    triggerToast('Lỗi khôi phục món, vui lòng thử lại', 'warn')
+  } finally {
+    emptyPendingActionBusy.value = false
+  }
+}
+
+async function cancelEmptyPendingOrder() {
+  if (!activeOrderId.value || emptyPendingActionBusy.value) return
+  emptyPendingActionBusy.value = true
+  try {
+    const res = await dispatchAction({
+      action: 'huyDonHang',
+      Ma_hoa_don: activeOrderId.value,
+    })
+    if (!res?.success) {
+      triggerToast(res?.message || 'Không thể hủy đơn hàng', 'warn')
+      return
+    }
+    showEmptyPendingOrderModal.value = false
+    showFullCartModal.value = false
+    triggerToast(emptyPendingModalCopy.value.cancelledToast, 'success')
+  } catch (err) {
+    console.error('cancelEmptyPendingOrder error:', err)
+    triggerToast('Lỗi hủy đơn hàng, vui lòng thử lại', 'warn')
+  } finally {
+    emptyPendingActionBusy.value = false
+  }
+}
+
+function pickMoreFromEmptyPendingModal() {
+  showEmptyPendingOrderModal.value = false
+  showFullCartModal.value = false
+  if (isMobile.value) {
+    activeMobilePanel.value = null
+    showCart.value = false
+  }
+}
 
 function openLockedOrderContactPrompt() {
   showLockedOrderContactModal.value = true
@@ -5675,8 +6084,80 @@ const ckListStyle = computed(() => {
   }
 })
 
+const layoutRef = ref(null)
+const SA_PC_SIDEBAR_W_KEY = 'sa_menu_pc_sidebar_w_v1'
+const pcSidebarWidth = ref(null)
+const isResizingSidebar = ref(false)
+let sidebarDragState = null
+
+try {
+  const savedW = Number(localStorage.getItem(SA_PC_SIDEBAR_W_KEY))
+  if (Number.isFinite(savedW) && savedW >= 280) {
+    pcSidebarWidth.value = Math.round(savedW)
+  }
+} catch {}
+
+const pcLayoutStyle = computed(() => {
+  if (isMobile.value || !showCart.value || pcSidebarWidth.value === null) return undefined
+  return { '--pc-sidebar-w': `${Math.round(pcSidebarWidth.value)}px` }
+})
+
+function clampPcSidebarWidthToViewport() {
+  if (isMobile.value || pcSidebarWidth.value === null) return
+  const layoutW = layoutRef.value?.clientWidth || window.innerWidth
+  const maxW = Math.min(720, Math.max(340, layoutW - 420))
+  pcSidebarWidth.value = Math.round(Math.min(maxW, Math.max(280, pcSidebarWidth.value)))
+}
+
+function onSidebarResizeMove(e) {
+  if (!sidebarDragState) return
+  const dx = e.clientX - sidebarDragState.startX
+  const maxW = Math.min(720, Math.max(340, sidebarDragState.layoutWidth - 420))
+  pcSidebarWidth.value = Math.round(
+    Math.min(maxW, Math.max(280, sidebarDragState.startWidth - dx)),
+  )
+}
+
+function stopSidebarResize() {
+  if (!sidebarDragState && !isResizingSidebar.value) return
+  sidebarDragState = null
+  isResizingSidebar.value = false
+  window.removeEventListener('mousemove', onSidebarResizeMove)
+  window.removeEventListener('mouseup', stopSidebarResize)
+  try {
+    if (pcSidebarWidth.value === null) {
+      localStorage.removeItem(SA_PC_SIDEBAR_W_KEY)
+    } else {
+      localStorage.setItem(SA_PC_SIDEBAR_W_KEY, String(Math.round(pcSidebarWidth.value)))
+    }
+  } catch {}
+}
+
+function startSidebarResize(e) {
+  if (isMobile.value || !showCart.value) return
+  const layoutEl = layoutRef.value
+  const sidebarEl = layoutEl?.querySelector('.sidebar-right')
+  if (!layoutEl || !sidebarEl) return
+  isResizingSidebar.value = true
+  sidebarDragState = {
+    startX: e.clientX,
+    startWidth: sidebarEl.getBoundingClientRect().width,
+    layoutWidth: layoutEl.clientWidth || window.innerWidth,
+  }
+  window.addEventListener('mousemove', onSidebarResizeMove)
+  window.addEventListener('mouseup', stopSidebarResize)
+}
+
+function resetSidebarWidth() {
+  pcSidebarWidth.value = null
+  try {
+    localStorage.removeItem(SA_PC_SIDEBAR_W_KEY)
+  } catch {}
+}
+
 function checkMobile() {
   isMobile.value = window.innerWidth <= 768
+  clampPcSidebarWidthToViewport()
 }
 function openCartMobile() {
   if (isMobile.value) {
@@ -5740,6 +6221,10 @@ onMounted(() => {
 
   unsubKhuyenMaiLive = subscribeSheet('khuyenmai_info', (rows) => {
     khuyenMaiInfo.value = rows || []
+  })
+
+  unsubDisplayConfigLive = subscribeSheet('display_config', (rows) => {
+    displayConfigRows.value = rows || []
   })
 
   const savedLang = localStorage.getItem('APP_LANG')
@@ -5994,24 +6479,13 @@ function addToCartFromModal(m) {
 /* ===== COMPUTED ===== */
 const categories = computed(() => {
   const activeLocale = String(locale.value || 'vi').trim() || 'vi'
-  const uniqueSorted = [
-    ...new Set(
-      menu.value
-        .map((m) => String(m.Danh_muc || '').trim())
-        .filter((name) => name && name !== 'Tất cả' && name !== 'Sale')
-    )
-  ].sort((a, b) =>
-    a.localeCompare(b, activeLocale, { sensitivity: 'base', numeric: true })
-  )
-
-  // kiểm tra có hàng giảm không
   const hasSale = menu.value.some((m) => isDiscount(m))
-
-  return [
-    'Tất cả',
-    ...(hasSale ? ['Sale'] : []),
-    ...uniqueSorted
-  ]
+  return sortLocalizedCategories(
+    menu.value,
+    activeLocale,
+    displayConfig.value.categoryOrder,
+    hasSale,
+  )
 })
 
 const allCategoryLabel = computed(() => categories.value[0] || '')
@@ -6055,9 +6529,16 @@ const filteredMenu = computed(() => {
   else if (priceSort.value === 'desc') {
     list.sort((a, b) => finalPrice(b) - finalPrice(a))
   }
-  else {
-    // Đã bỏ list.reverse() theo yêu cầu để đảo ngược lại vị trí mặc định từ API
-    // list.reverse()
+  else if (
+    currentCategory.value === allCategoryLabel.value &&
+    !keyword.value &&
+    displayConfig.value.productSortMode === DISPLAY_MODE_BY_CATEGORY
+  ) {
+    list = sortProductsByCategoryOrder(
+      list,
+      displayConfig.value.categoryOrder,
+      locale.value || 'vi',
+    )
   }
 
   return list
@@ -6193,21 +6674,31 @@ const cartItems = computed(() => {
         ? t('group.addedByShop')
         : String(li.Nguoi_dat || '').trim() || t('group.guestDefault')
       const baseRegularPrice = matched ? Number(matched.Gia_ban || 0) : unitPrice
+      const grossLine = qty * unitPrice
+      const itemDiscountAmt = Math.max(
+        0,
+        Number(li.Giam_gia || 0) * qty + Number(li.Tien_chiet_khau || 0),
+      )
+      const netLine =
+        li.Thanh_tien_sau_giam !== undefined
+          ? Number(li.Thanh_tien_sau_giam)
+          : Math.max(0, grossLine - itemDiscountAmt)
 
       return {
         ...(matched || {}),
         lineId: li.lineId,
         Ma_hang: li.Ma_hang || matched?.Ma_hang || li.lineId,
         Ten_hang: matched ? matched.Ten_hang : li.Ten_hang,
+        Size: li.Size || matched?.Size || '',
         Dvt: matched ? matched.Dvt : li.Dvt || '',
         Main_img: matched?.Main_img || li.Main_img || '',
         Don_vi_tien_te:
           li.Don_vi_tien_te || matched?.Don_vi_tien_te || menu.value[0]?.Don_vi_tien_te || 'P',
         unitPrice,
         Gia_ban: unitPrice,
-        isDiscounted: baseRegularPrice > 0 && unitPrice < baseRegularPrice,
+        isDiscounted: (baseRegularPrice > 0 && unitPrice < baseRegularPrice) || itemDiscountAmt > 0,
         qty,
-        thanhTien: qty * unitPrice,
+        thanhTien: netLine,
         note: String(li.Ghi_chu || '').trim(),
         displayAuthor,
         rawAuthor: String(li.Nguoi_dat || '').trim(),
@@ -6269,9 +6760,66 @@ const cartQtyTotal = computed(() =>
 )
 
 
-const totalAmount = computed(() =>
-  cartItems.value.reduce((sum, i) => sum + i.thanhTien, 0)
+const itemsSubtotalAmount = computed(() =>
+  cartItems.value.reduce((sum, i) => sum + i.thanhTien, 0),
 )
+
+const totalAmount = computed(() => {
+  if (
+    activeOrderId.value &&
+    isOrderLocked.value &&
+    liveOrderData.value?.meta?.Synced_by_admin &&
+    liveOrderData.value?.meta?.Tong_cong !== undefined &&
+    liveOrderData.value?.meta?.Trang_thai !== 'Hoàn thành'
+  ) {
+    return Math.max(0, Number(liveOrderData.value.meta.Tong_cong || 0))
+  }
+  return itemsSubtotalAmount.value
+})
+
+const syncedAdminDiscount = computed(() => {
+  if (
+    !activeOrderId.value ||
+    !isOrderLocked.value ||
+    !liveOrderData.value?.meta?.Synced_by_admin ||
+    liveOrderData.value?.meta?.Trang_thai === 'Hoàn thành'
+  ) {
+    return 0
+  }
+  return Math.max(0, itemsSubtotalAmount.value - totalAmount.value)
+})
+
+const syncedDiscountLabel = computed(() => {
+  const lang = currentLang.value
+  if (lang === 'en') return 'Order discount'
+  if (lang === 'zh' || lang === 'zh-CN') return '订单优惠'
+  if (lang === 'ko') return '주문 할인'
+  if (lang === 'fil' || lang === 'tl') return 'Order discount'
+  return 'Giảm giá / CK'
+})
+
+const syncedShippingFee = computed(() => {
+  if (!activeOrderId.value || liveStatus.value === 'Đã hủy') return 0
+  return Math.max(0, Number(liveOrderData.value?.meta?.Phi_ship || 0))
+})
+
+const customerPayableTotal = computed(() => totalAmount.value + syncedShippingFee.value)
+
+const syncedShippingLabel = computed(() => {
+  const lang = currentLang.value
+  if (lang === 'en' || lang === 'fil' || lang === 'tl') return 'Shipping fee'
+  if (lang === 'zh' || lang === 'zh-CN') return '运费'
+  if (lang === 'ko') return '배송비'
+  return 'Phí ship'
+})
+
+const syncedItemsLabel = computed(() => {
+  const lang = currentLang.value
+  if (lang === 'en' || lang === 'fil' || lang === 'tl') return 'Items subtotal'
+  if (lang === 'zh' || lang === 'zh-CN') return '商品金额'
+  if (lang === 'ko') return '상품 금액'
+  return 'Tiền hàng'
+})
 
 const cartMemberGroups = computed(() => {
   // 1) LIVE / GROUP ORDER MODE
@@ -6466,12 +7014,28 @@ const exportText = computed(() => {
   const promoLine = earnedPromoLocalSummary.value
     ? `\n${t('promo.exportEarned')}: ${earnedPromoLocalSummary.value}`
     : ''
+  const createdLine =
+    liveCreatedAt.value && liveStatus.value && liveStatus.value !== 'Nháp'
+      ? `${createdAtLabel.value}: ${liveCreatedAt.value}\n`
+      : ''
+  const goodsLine =
+    syncedShippingFee.value > 0 || syncedAdminDiscount.value > 0
+      ? `${syncedItemsLabel.value}: ${formatPrice(itemsSubtotalAmount.value, cartCurrency.value)}\n`
+      : ''
+  const discountLine =
+    syncedAdminDiscount.value > 0
+      ? `${syncedDiscountLabel.value}: -${formatPrice(syncedAdminDiscount.value, cartCurrency.value)}\n`
+      : ''
+  const shipLine =
+    syncedShippingFee.value > 0
+      ? `${syncedShippingLabel.value}: +${formatPrice(syncedShippingFee.value, cartCurrency.value)}\n`
+      : ''
 
   return `${headerLine}${itemsBody}
 
-${t('export.total')}: ${formatPrice(totalAmount.value, cartCurrency.value)} (${paymentLabel})${promoLine}
+${goodsLine}${discountLine}${shipLine}${t('export.total')}: ${formatPrice(customerPayableTotal.value, cartCurrency.value)} (${paymentLabel})${promoLine}
 
-${t('cart.name')}: ${tenKhach.value || memberName.value}
+${createdLine}${t('cart.name')}: ${tenKhach.value || memberName.value}
 ${t('export.address')}: ${diaChi.value}
 ${t('export.phone')}: ${sdt.value}
 ${t('export.time')}: ${thoiGian.value}
@@ -6484,16 +7048,118 @@ const thongBaoList = computed(() =>
   })
 )
 
+const isNoticeActive = (item) =>
+  item?.Kich_hoat !== false && String(item?.Kich_hoat) !== 'false'
+
+const normalizePopupLink = (raw) => {
+  const url = String(raw || '').trim()
+  if (!url) return ''
+  if (/^(https?:\/\/|mailto:|tel:|\/)/i.test(url)) return url
+  if (/^[a-z0-9.-]+\.[a-z]{2,}(\/|$)/i.test(url)) return `https://${url}`
+  return ''
+}
+
+const isExternalPopupLink = (url) => Boolean(url && !url.startsWith('/'))
+
 const thongBaoTexts = computed(() =>
   thongBaoList.value
+    .filter((item) => item?.Loai_thong_bao !== 'popup' && isNoticeActive(item))
     .map((item) => resolveNoticeText(item, currentLang.value))
     .filter(Boolean)
+    .slice(0, 1)
+)
+
+const popupNotices = computed(() =>
+  thongBaoList.value
+    .filter((item) => item?.Loai_thong_bao === 'popup' && isNoticeActive(item))
+    .map((item) => ({
+      ...item,
+      imageUrl: String(item?.Popup_img || '').trim(),
+      text: resolveNoticeText(item, currentLang.value),
+      linkUrl: normalizePopupLink(item?.Popup_link),
+    }))
+    .filter((item) => item.imageUrl || item.text)
+    .slice(0, 1)
+)
+
+const showEntryNoticePopup = ref(false)
+const entryPopupIndex = ref(0)
+const hasTriggeredEntryPopup = ref(false)
+
+const activeEntryPopup = computed(() => {
+  const list = popupNotices.value
+  if (!list.length) return null
+  const idx = Math.min(Math.max(entryPopupIndex.value, 0), list.length - 1)
+  return list[idx] || null
+})
+
+const activeEntryPopupParts = computed(() => {
+  const raw = String(activeEntryPopup.value?.text || '').trim()
+  if (!raw) return { headline: '', body: '' }
+  const lines = raw
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+  if (lines.length >= 2) {
+    return {
+      headline: lines[0],
+      body: lines.slice(1).join('\n'),
+    }
+  }
+  return {
+    headline: !activeEntryPopup.value?.imageUrl ? lines[0] : '',
+    body: activeEntryPopup.value?.imageUrl ? lines[0] : '',
+  }
+})
+
+const closeEntryNoticePopup = () => {
+  showEntryNoticePopup.value = false
+}
+
+const stepEntryNoticePopup = (delta) => {
+  const total = popupNotices.value.length
+  if (total <= 1) return
+  entryPopupIndex.value = (entryPopupIndex.value + delta + total) % total
+}
+
+const handleEntryPopupLinkClick = (event, item) => {
+  const url = item?.linkUrl
+  if (!url) {
+    event?.preventDefault?.()
+    return
+  }
+  if (url.startsWith('/') && !url.startsWith('//')) {
+    event?.preventDefault?.()
+    closeEntryNoticePopup()
+    router.push(url)
+    return
+  }
+  closeEntryNoticePopup()
+}
+
+watch(
+  [() => loadingMain.value, () => popupNotices.value.length],
+  ([isLoading, total]) => {
+    if (!isLoading && total > 0 && !hasTriggeredEntryPopup.value) {
+      hasTriggeredEntryPopup.value = true
+      entryPopupIndex.value = 0
+      showEntryNoticePopup.value = true
+    }
+  },
+  { immediate: true }
 )
 
 
+const parseBannerOrder = (item) => {
+  const n = Number(item?.Thu_tu)
+  return Number.isFinite(n) && n > 0 ? n : Number.MAX_SAFE_INTEGER
+}
+
 const bannerList = computed(() =>
   [...(banners.value || [])].sort((a, b) => {
-    // ID mới (thời gian lớn hơn) lên trước
+    const orderDiff = parseBannerOrder(a) - parseBannerOrder(b)
+    if (orderDiff !== 0) return orderDiff
+    // Fallback: ID mới (thời gian lớn hơn) lên trước
     return String(b.ID).localeCompare(String(a.ID))
   })
 )
@@ -6913,6 +7579,7 @@ const showDetail = ref(false)
 const selectedItem = ref(null)
 const supplementaryImageKeys = ['img_1', 'img_2', 'img_3', 'img_4', 'img_5', 'img_6']
 const cardImageIndex = ref({})
+const failedCardImgUrls = reactive({})
 let cardImageTimer = null
 const CARD_IMAGE_INTERVAL = 2600
 const activeModalIndex = ref(0)
@@ -6921,12 +7588,27 @@ const hasModalThumbs = computed(() => modalImages.value.length > 1)
 // sidebar mới (mobile)
 const showDetailSidebar = ref(false)
 
+function getCardImgFailKey(item, url) {
+  return `${item?.Ma_hang || 'item'}::${url || ''}`
+}
+
+function onCardImgError(item, url) {
+  if (!url) return
+  failedCardImgUrls[getCardImgFailKey(item, url)] = true
+}
+
 function getItemImages(item) {
   if (!item) return []
   return [
     item.Main_img,
     ...supplementaryImageKeys.map((key) => item[key])
-  ].filter(Boolean)
+  ]
+    .map((u) => String(u || '').trim())
+    .filter(Boolean)
+}
+
+function getValidItemImages(item) {
+  return getItemImages(item).filter((u) => !failedCardImgUrls[getCardImgFailKey(item, u)])
 }
 
 function getModalImages(item) {
@@ -6940,9 +7622,9 @@ function getCardImageIndex(item) {
 }
 
 function getCardImage(item) {
-  const images = getItemImages(item)
+  const images = getValidItemImages(item)
   if (!images.length) return ''
-  const idx = getCardImageIndex(item)
+  const idx = getCardImageIndex(item) % images.length
   return images[idx] || images[0]
 }
 
@@ -7105,14 +7787,6 @@ function stripAutoPromoTag(rawNote) {
     .trim()
 }
 
-function buildSubmittedNoteWithPromo(rawNote, promoViText) {
-  const cleanBase = stripAutoPromoTag(rawNote)
-  const cleanPromo = String(promoViText || '').trim()
-  if (!cleanPromo) return cleanBase
-  const tag = `[KM ĐẠT ĐƯỢC: ${cleanPromo}]`
-  return cleanBase ? `${cleanBase} ${tag}` : tag
-}
-
 function getMilestoneRewardLabel(m, langCode) {
   const customText = resolveNoticeText(m, langCode)
   if (m?.Kieu_uu_dai === 'GIFT') {
@@ -7193,15 +7867,35 @@ const milestoneCheckpoints = computed(() => {
   const list = activeMilestones.value
   const count = list.length
   const nextId = nextMilestone.value?.ID
+  const lang = currentLang.value
   return list.map((m, idx) => {
     const unlocked = totalAmount.value >= m.threshold
+    const remaining = Math.max(0, m.threshold - totalAmount.value)
+    const remainingText = formatPrice(remaining, cartCurrency.value)
     const isNext =
       !unlocked && (nextId ? m.ID === nextId : idx === unlockedMilestones.value.length)
     const posPct = count > 0 ? ((idx + 1) / count) * 100 : 100
+    let actionPrefix = ''
+    if (unlocked) {
+      if (lang === 'en') actionPrefix = 'Unlocked'
+      else if (lang === 'zh' || lang === 'zh-CN') actionPrefix = '已解锁'
+      else if (lang === 'ko') actionPrefix = '달성 완료'
+      else if (lang === 'fil' || lang === 'tl') actionPrefix = 'Nakuha na'
+      else actionPrefix = 'Đã đạt'
+    } else {
+      if (lang === 'en') actionPrefix = `Add ${remainingText} more`
+      else if (lang === 'zh' || lang === 'zh-CN') actionPrefix = `再买 ${remainingText}`
+      else if (lang === 'ko') actionPrefix = `${remainingText} 더 담기`
+      else if (lang === 'fil' || lang === 'tl') actionPrefix = `Magdagdag pa ng ${remainingText}`
+      else actionPrefix = `Mua thêm ${remainingText}`
+    }
     return {
       key: m.ID || `ms-${idx}-${m.threshold}`,
       threshold: m.threshold,
       thresholdText: formatPrice(m.threshold, cartCurrency.value),
+      remaining,
+      remainingText,
+      actionPrefix,
       label: m.label,
       type: m.type,
       unlocked,
@@ -7450,8 +8144,28 @@ function updateScrollTopVisibility() {
   }
 
   if (isMobile.value) {
-    const scrollY = window.scrollY || document.documentElement.scrollTop || 0
+    const scrollY = Math.max(0, window.scrollY || document.documentElement.scrollTop || 0)
     showScrollTop.value = scrollY > 260
+
+    if (
+      activeMobilePanel.value ||
+      showFullCartModal.value ||
+      selectedItem.value ||
+      scrollY <= 36
+    ) {
+      isMobileDockHidden.value = false
+      lastMobileScrollY = scrollY
+    } else {
+      const delta = scrollY - lastMobileScrollY
+      if (delta > 10) {
+        isMobileDockHidden.value = true
+        lastMobileScrollY = scrollY
+      } else if (delta < -8) {
+        isMobileDockHidden.value = false
+        lastMobileScrollY = scrollY
+      }
+    }
+
     checkLoadMoreOnScroll()
     return
   }
@@ -7551,6 +8265,9 @@ function applyData(data) {
   khuyenMaiInfo.value = data.khuyenmai_info || []
   times.value = data.time || []
   thongTinChuyenKhoan.value = data.thong_tin_chuyen_khoan || []
+  if (data.display_config) {
+    displayConfigRows.value = data.display_config
+  }
 }
 
 const UNIFIED_MENU_CACHE_KEY = 'MENU_CACHE_SA_UNIFIED'
@@ -7642,7 +8359,7 @@ async function submitOrderToWebCore({ silentToast = false } = {}) {
         Dia_chi: diaChi.value.trim(),
         Thoi_gian_nhan_hang: thoiGian.value.trim(),
         Hinh_thuc_thanh_toan: hinhThucTT.value || 'TIEN_MAT',
-        Ghi_chu: buildSubmittedNoteWithPromo(ghiChu.value, earnedPromoViSummary.value),
+        Ghi_chu: stripAutoPromoTag(ghiChu.value),
         Khuyen_mai_dat_duoc: earnedPromoViSummary.value,
         Submitted_sig: nextSubmittedSig,
         Don_vi_tien_te: cartCurrency.value,
@@ -7669,6 +8386,12 @@ async function submitOrderToWebCore({ silentToast = false } = {}) {
           ...(prevLive.meta || {}),
           Ma_hoa_don: res.orderId,
           Trang_thai: 'Chờ duyệt',
+          Ngay_tao_duong_lich:
+            prevLive.meta?.Trang_thai &&
+            prevLive.meta?.Trang_thai !== 'Nháp' &&
+            prevLive.meta?.Ngay_tao_duong_lich
+              ? prevLive.meta.Ngay_tao_duong_lich
+              : format24hDateTimeObj(new Date()),
           Ten_khach_hang: recipientName,
           So_dien_thoai: sdt.value.trim(),
           Dia_chi: diaChi.value.trim(),
@@ -7776,7 +8499,11 @@ async function onFinish(arg) {
     return
   }
   if (cartItems.value.length === 0) {
-    showEmptyCartModal.value = true
+    if (liveStatus.value === 'Chờ duyệt' && activeOrderId.value) {
+      showEmptyPendingOrderModal.value = true
+    } else {
+      showEmptyCartModal.value = true
+    }
     return
   }
   const hasContact =
@@ -7849,6 +8576,10 @@ async function onFinish(arg) {
 
 function onMobileSendTab() {
   if (!isMobile.value) return
+  if (liveStatus.value === 'Chờ duyệt' && cartItems.value.length === 0 && isGroupHost.value) {
+    showEmptyPendingOrderModal.value = true
+    return
+  }
   const hasSubmittedState = Boolean(liveStatus.value && liveStatus.value !== 'Nháp')
   if (isCartVisuallyEmpty.value && !hasSubmittedState) {
     showEmptyCartModal.value = true
@@ -7883,6 +8614,7 @@ function onMobileSendTab() {
 }
 function openMobilePanel(name) {
   if (!isMobile.value) return
+  isMobileDockHidden.value = false
 
   if (name === 'cart' && isOrderLocked.value) {
     name = 'progress'
@@ -8005,6 +8737,7 @@ async function reloadData() {
       khuyenmai_info: json.data.khuyenmai_info || [],
       time: json.data.time || [],
       thong_tin_chuyen_khoan: json.data.thong_tin_chuyen_khoan || [],
+      display_config: json.data.display_config || [],
     }
 
     setCache(UNIFIED_MENU_CACHE_KEY, freshData)
@@ -8060,11 +8793,16 @@ onUnmounted(() => {
     unsubKhuyenMaiLive()
     unsubKhuyenMaiLive = null
   }
+  if (unsubDisplayConfigLive) {
+    unsubDisplayConfigLive()
+    unsubDisplayConfigLive = null
+  }
   if (metaSyncTimer) clearTimeout(metaSyncTimer)
   if (toastTimer) clearTimeout(toastTimer)
   window.removeEventListener('resize', checkMobile)
   window.removeEventListener('scroll', onWindowScroll)
   document.removeEventListener('click', onDocumentClick)
+  stopSidebarResize()
   if (mainRef.value) {
     mainRef.value.removeEventListener('scroll', updateScrollTopVisibility)
   }
@@ -8263,7 +9001,7 @@ async function changeCartItemQtyDirect(item, delta) {
   }
 }
 const soTienChuyenKhoan = (c) => {
-  const tong = Number(totalAmount.value || 0)
+  const tong = Number(customerPayableTotal.value || 0)
 
   const tiGia = Number(c.Ti_gia || 1)
   const donViCK = c.Don_vi_tien_te || ''
@@ -8274,7 +9012,7 @@ const soTienChuyenKhoan = (c) => {
 }
 
 const calcOnlyTransferAmount = (c) => {
-  const tong = Number(totalAmount.value || 0)
+  const tong = Number(customerPayableTotal.value || 0)
   const tiGia = Number(c.Ti_gia || 1)
   const donViCK = c.Don_vi_tien_te || ''
   const sauQuyDoi = tong * tiGia
@@ -8336,8 +9074,8 @@ const hasSale = computed(() =>
   --sa-sale: #e11d48;
   --sa-qty-bg: #f1f5f9;
   --sa-qty-text: #0f172a;
-  --sa-card-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 14px rgba(15, 23, 42, 0.035);
-  --sa-card-hover-shadow: 0 10px 26px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04);
+  --sa-card-shadow: 0 4px 12px rgba(15, 23, 42, 0.08), 0 12px 24px -6px rgba(15, 23, 42, 0.11);
+  --sa-card-hover-shadow: 0 14px 30px rgba(15, 23, 42, 0.16), 0 4px 10px rgba(5, 150, 105, 0.14);
   --sa-notice-bg: #fff5f5;
   --sa-notice-border: rgba(220, 38, 38, 0.22);
   --sa-notice-text: #dc2626;
@@ -8387,8 +9125,8 @@ const hasSale = computed(() =>
   --sa-sale: #fb7185;
   --sa-qty-bg: #1c2536;
   --sa-qty-text: #f8fafc;
-  --sa-card-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
-  --sa-card-hover-shadow: 0 12px 30px rgba(0, 0, 0, 0.42);
+  --sa-card-shadow: 0 8px 22px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.34);
+  --sa-card-hover-shadow: 0 16px 36px rgba(0, 0, 0, 0.65), 0 4px 14px rgba(16, 185, 129, 0.18);
   --sa-notice-bg: rgba(239, 68, 68, 0.12);
   --sa-notice-border: rgba(248, 113, 113, 0.3);
   --sa-notice-text: #f87171;
@@ -9315,7 +10053,7 @@ const hasSale = computed(() =>
    ========================================================= */
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(336px, 24.5vw, 368px);
+  grid-template-columns: minmax(0, 1fr) 8px var(--pc-sidebar-w, clamp(336px, 24.5vw, 368px));
   min-height: calc(100vh - var(--sa-header-h));
   background: var(--sa-bg);
   width: 100%;
@@ -9324,9 +10062,49 @@ const hasSale = computed(() =>
   transition: grid-template-columns 0.24s ease;
 }
 
+.layout.is-resizing-sidebar {
+  transition: none !important;
+}
+
+.layout.is-resizing-sidebar,
+.layout.is-resizing-sidebar * {
+  user-select: none !important;
+  cursor: col-resize !important;
+}
+
 .layout.hide-right,
 .layout.hide-left.hide-right {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.pc-sidebar-resizer {
+  position: sticky;
+  top: var(--sa-header-h);
+  height: calc(100vh - var(--sa-header-h));
+  width: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  z-index: 25;
+  background: var(--sa-bg);
+  touch-action: none;
+}
+
+.pc-sidebar-resizer-grip {
+  width: 3px;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--sa-border);
+  transition: all 0.16s ease;
+}
+
+.pc-sidebar-resizer:hover .pc-sidebar-resizer-grip,
+.pc-sidebar-resizer.active .pc-sidebar-resizer-grip {
+  width: 4px;
+  height: 76px;
+  background: #22c55e;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
 }
 
 .menu {
@@ -10602,6 +11380,7 @@ const hasSale = computed(() =>
 /* ===== CARD META ROW: PRICE LEFT + DETAIL/NOTE RIGHT ===== */
 .card-meta-row {
   margin-top: auto;
+  padding-top: 4px;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -10618,13 +11397,15 @@ const hasSale = computed(() =>
   margin-bottom: 8px;
 }
 
+.sa-storefront .price,
 .price {
   font-size: 16.5px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--sa-price);
   letter-spacing: -0.2px;
 }
 
+.sa-storefront .price.is-sale-price,
 .price.is-sale-price {
   color: var(--sa-sale);
 }
@@ -10664,7 +11445,7 @@ const hasSale = computed(() =>
   padding: 0 12px;
   transition: background-color 0.16s ease, transform 0.12s ease, box-shadow 0.16s ease;
   border: none;
-  border-radius: 10px;
+  border-radius: 999px;
   background: var(--sa-accent);
   color: #ffffff;
   font-size: 13.5px;
@@ -11273,13 +12054,15 @@ const hasSale = computed(() =>
   flex-wrap: wrap;
 }
 
+.sa-storefront .price,
 .price {
   font-size: 16.5px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--sa-price);
   letter-spacing: -0.2px;
 }
 
+.sa-storefront .price.is-sale-price,
 .price.is-sale-price {
   color: var(--sa-sale);
 }
@@ -11853,6 +12636,7 @@ const hasSale = computed(() =>
   text-shadow: none;
 }
 
+.sa-storefront .price .unit,
 .price .unit {
   font-size: 12px;
   font-weight: 500;
@@ -11984,16 +12768,31 @@ const hasSale = computed(() =>
 }
 
 /* CLEAN RECEIPT SUMMARY ROW */
+.cart-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 2px 0 4px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+
+.cart-summary-divider {
+  border-top: 1px dashed var(--sa-border);
+  margin: 2px 0;
+}
+
 .cart-total {
   flex: 1;
   margin: 0;
-  padding: 10px 12px;
+  padding: 0;
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  background: var(--sa-surface-2);
-  border: 1px solid var(--sa-border);
-  border-radius: 11px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
 }
 
 .cart-total span,
@@ -12780,23 +13579,27 @@ const hasSale = computed(() =>
 /* ===== GLOBAL SCROLL TO TOP FAB ===== */
 .scroll-top-fab {
   position: fixed;
-  right: calc(clamp(336px, 24.5vw, 368px) + 20px);
+  right: calc(var(--pc-sidebar-w, clamp(336px, 24.5vw, 368px)) + 26px);
   bottom: 24px;
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  border: 1px solid var(--sa-border);
-  background: var(--sa-surface);
-  color: var(--sa-heading);
+  border: none;
+  background: linear-gradient(135deg, #f59e0b, #eab308);
+  color: #ffffff;
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 1200;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 8px 22px rgba(245, 158, 11, 0.36);
   transition: all 0.2s ease;
+}
+
+.sa-storefront:has(.layout.is-resizing-sidebar) .scroll-top-fab {
+  transition: none !important;
 }
 
 /* ===== CARD IMAGE ===== */
@@ -12829,12 +13632,35 @@ const hasSale = computed(() =>
   transform: scale(1.04);
 }
 
+.card-img-name-fallback {
+  width: 100%;
+  height: 100%;
+  padding: 28px 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: linear-gradient(145deg, var(--sa-img-bg) 0%, var(--sa-surface-2) 100%);
+}
+
+.card-img-name-fallback span {
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.35;
+  color: var(--sa-heading);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
 .scroll-top-fab:hover {
   transform: translateY(-2px);
-  background: var(--sa-accent);
-  border-color: var(--sa-accent);
+  background: linear-gradient(135deg, #d97706, #f59e0b);
   color: #ffffff;
-  box-shadow: 0 10px 26px rgba(5, 150, 105, 0.28);
+  box-shadow: 0 10px 26px rgba(245, 158, 11, 0.45);
 }
 
 .scroll-top-fab:active {
@@ -13353,14 +14179,19 @@ const hasSale = computed(() =>
 
   .scroll-top-fab {
     right: 14px !important;
-    bottom: 138px !important;
+    bottom: calc(146px + env(safe-area-inset-bottom)) !important;
     width: 44px;
     height: 44px;
     z-index: 1150;
-    background: var(--sa-accent);
+    background: linear-gradient(135deg, #f59e0b, #eab308);
     color: #ffffff;
     border-color: transparent;
-    box-shadow: 0 8px 22px rgba(5, 150, 105, 0.36);
+    box-shadow: 0 8px 22px rgba(245, 158, 11, 0.38);
+    transition: bottom 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease, transform 0.2s ease;
+  }
+
+  .scroll-top-fab.is-dock-hidden {
+    bottom: calc(78px + env(safe-area-inset-bottom)) !important;
   }
 
   /* =====================================================
@@ -13409,42 +14240,6 @@ const hasSale = computed(() =>
     gap: 10px;
   }
 
-  /* ===== BOTTOM BAR ===== */
-  .mobile-bottom-bar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-
-    height: 70px;
-    background: #ffffff;
-
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    align-items: center;
-
-    border-top: 2px solid #22c55e;
-    z-index: 1100;
-  }
-
-  .mobile-bottom-bar button {
-    background: none;
-    border: none;
-
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-
-    font-size: 18px;
-    font-weight: 800;
-    color: #16a34a;
-  }
-
-  .mobile-bottom-bar span {
-    font-size: 11px;
-    margin-top: 2px;
-  }
   /* giới hạn chiều cao modal */
 .detail-back {
   position: absolute;
@@ -14015,7 +14810,7 @@ const hasSale = computed(() =>
 /* ================= MOBILE CART BAR ================= */
 .mobile-cart-bar {
   position: fixed;
-  bottom: 76px;
+  bottom: calc(82px + env(safe-area-inset-bottom));
   left: 12px;
   right: 12px;
   display: flex;
@@ -14023,6 +14818,11 @@ const hasSale = computed(() =>
   align-items: stretch;
   gap: 6px;
   z-index: 1200;
+  transition: bottom 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mobile-cart-bar.is-dock-hidden {
+  bottom: calc(12px + env(safe-area-inset-bottom));
 }
 
 .mcb-pills-row {
@@ -14308,6 +15108,19 @@ const hasSale = computed(() =>
   background: #d97706;
 }
 
+.mcb-tracker-pill .mcb-action-cta.is-update-red {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+  color: #ffffff;
+  gap: 4px;
+  padding: 0 11px;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.36);
+}
+
+.mcb-tracker-pill .mcb-action-cta.is-update-red:active {
+  background: #b91c1c !important;
+  transform: scale(0.96);
+}
+
 .mcb-tracker-pill.is-approved {
   border-color: rgba(16, 185, 129, 0.55);
 }
@@ -14381,22 +15194,58 @@ const hasSale = computed(() =>
   opacity: 0;
 }
 
-/* ================= MOBILE BOTTOM BAR – CLEAN GLASS ================= */
+/* ================= MOBILE BOTTOM BAR – LIQUID GLASS DOCK ================= */
 .mobile-bottom-bar {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 66px;
-  padding-bottom: env(safe-area-inset-bottom);
-  background: var(--sa-bottom-bar-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  bottom: calc(10px + env(safe-area-inset-bottom));
+  left: 10px;
+  right: 10px;
+  max-width: 520px;
+  margin: 0 auto;
+  height: 62px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: linear-gradient(
+    165deg,
+    rgba(255, 255, 255, 0.56) 0%,
+    rgba(241, 245, 249, 0.28) 55%,
+    rgba(255, 255, 255, 0.44) 100%
+  );
+  backdrop-filter: blur(26px) saturate(195%) brightness(1.06);
+  -webkit-backdrop-filter: blur(26px) saturate(195%) brightness(1.06);
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   align-items: center;
-  border-top: 1px solid var(--sa-border);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 14px 36px rgba(15, 23, 42, 0.16),
+    0 4px 12px rgba(15, 23, 42, 0.08),
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.92),
+    inset 0 -1.5px 2px rgba(148, 163, 184, 0.25);
   z-index: 1100;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease;
+  will-change: transform, opacity;
+}
+
+.mobile-bottom-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.42) 0%,
+    rgba(255, 255, 255, 0.06) 44%,
+    rgba(255, 255, 255, 0.14) 100%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.mobile-bottom-bar.is-dock-hidden {
+  transform: translateY(calc(100% + 28px));
+  opacity: 0;
+  pointer-events: none;
 }
 
 .mobile-bottom-bar button {
@@ -14408,21 +15257,32 @@ const hasSale = computed(() =>
   padding: 0 2px;
   cursor: pointer;
   min-width: 0;
+  z-index: 1;
 }
 
 .mobile-bottom-bar button::before {
   content: '';
   position: absolute;
-  inset: 7px 3px;
-  border-radius: 12px;
-  background: var(--sa-surface-soft);
+  inset: 5px 2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.82) 0%,
+    rgba(240, 253, 244, 0.56) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 4px 12px rgba(15, 23, 42, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transform: scale(0.94);
+  transition: opacity 0.2s ease, transform 0.2s ease;
   z-index: 0;
 }
 
 .mobile-bottom-bar button.active::before {
   opacity: 1;
+  transform: scale(1);
 }
 
 .mobile-bottom-bar .btn-inner {
@@ -14445,17 +15305,21 @@ const hasSale = computed(() =>
 
 .mobile-bottom-bar button i {
   font-size: 20px;
-  color: var(--sa-muted);
-  transition: color 0.18s ease;
+  color: #0f172a;
+  transition: color 0.18s ease, transform 0.18s ease;
   animation: none;
+}
+
+.mobile-bottom-bar button i.dock-accent-ico {
+  color: #15803d;
 }
 
 .mobile-bottom-bar .btn-label {
   font-size: 9.5px;
   margin-top: 2px;
-  color: var(--sa-muted);
+  color: #1e293b;
   transition: color 0.18s ease;
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
   max-width: 100%;
   overflow: hidden;
@@ -14487,8 +15351,10 @@ const hasSale = computed(() =>
 }
 
 .mobile-bottom-bar button.active i,
+.mobile-bottom-bar button.active i.dock-accent-ico,
 .mobile-bottom-bar button.active .btn-label {
-  color: var(--sa-price);
+  color: #047857;
+  font-weight: 800;
 }
 
 .mobile-bottom-bar button:active .btn-scale {
@@ -14765,7 +15631,7 @@ const hasSale = computed(() =>
     min-height: 42px;
     font-size: 14.5px;
     font-weight: 700;
-    border-radius: 12px;
+    border-radius: 999px;
     margin-top: 6px;
   }
 
@@ -14905,8 +15771,10 @@ const hasSale = computed(() =>
     gap: 4px;
   }
 
+  .sa-storefront .card .price,
   .price {
     font-size: 14.5px;
+    font-weight: 800;
   }
 
   .detail-link {
@@ -14952,7 +15820,7 @@ const hasSale = computed(() =>
     padding: 0 12px;
     font-size: 13.5px;
     font-weight: 700;
-    border-radius: 10px;
+    border-radius: 999px;
   }
 
   .card-img-wrap .card-status-pill {
@@ -14972,21 +15840,21 @@ const hasSale = computed(() =>
 
 @media (max-width: 360px) {
   .menu { gap: 8px; }
-  .mobile-bottom-bar { height: 60px; }
-  .btn-label { font-size: 10px; }
-  .mobile-bottom-bar i { font-size: 20px; }
+  .mobile-bottom-bar { height: 58px; left: 8px; right: 8px; }
+  .btn-label { font-size: 9.5px; }
+  .mobile-bottom-bar i { font-size: 19px; }
   .sidebar-left { width: 92%; }
 }
 @media (min-width: 361px) and (max-width: 430px) {
   .menu { gap: 10px; }
-  .mobile-bottom-bar { height: 64px; }
-  .btn-label { font-size: 10.5px; }
+  .mobile-bottom-bar { height: 62px; }
+  .btn-label { font-size: 10px; }
   .mobile-bottom-bar i { font-size: 20px; }
 }
 @media (min-width: 431px) and (max-width: 480px) {
   .menu { gap: 10px; }
-  .mobile-bottom-bar { height: 66px; }
-  .mobile-bottom-bar i { font-size: 21px; }
+  .mobile-bottom-bar { height: 64px; }
+  .mobile-bottom-bar i { font-size: 20px; }
 }
 @media (min-width: 481px) and (max-width: 600px) {
   .menu {
@@ -15007,12 +15875,16 @@ const hasSale = computed(() =>
   .mobile-bottom-bar { display: none; }
 
   .layout {
-    grid-template-columns: minmax(0, 1fr) clamp(296px, 31vw, 326px);
+    grid-template-columns: minmax(0, 1fr) 8px var(--pc-sidebar-w, clamp(296px, 31vw, 326px));
   }
 
   .layout.hide-right,
   .layout.hide-left.hide-right {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .scroll-top-fab {
+    right: calc(var(--pc-sidebar-w, clamp(296px, 31vw, 326px)) + 26px);
   }
 
   .dth-inner {
@@ -15269,15 +16141,15 @@ const hasSale = computed(() =>
   padding: 0;
   border-radius: 16px;
   background: var(--sa-surface);
-  border: 1px solid var(--sa-border);
+  border: 1px solid var(--sa-border-strong);
   box-shadow: var(--sa-card-shadow);
   overflow: hidden;
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .card-border:hover {
-  transform: translateY(-3px);
-  border-color: var(--sa-border-strong);
+  transform: translateY(-4px);
+  border-color: var(--sa-border-green);
   box-shadow: var(--sa-card-hover-shadow);
 }
 
@@ -16390,14 +17262,14 @@ const hasSale = computed(() =>
   gap: 5px;
   padding: 5px 10px;
   border-radius: 8px;
-  border: 1px solid var(--sa-border-green);
-  background: var(--sa-surface-soft);
-  color: var(--sa-price);
+  border: 1px solid #eab308;
+  background: linear-gradient(135deg, #fef08a 0%, #fde047 100%);
+  color: #166534;
   font-size: 11.5px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
-  box-shadow: none;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, transform 0.12s ease;
+  box-shadow: 0 2px 6px rgba(234, 179, 8, 0.24);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -16408,9 +17280,14 @@ const hasSale = computed(() =>
 
 .group-invite-btn:hover,
 .group-invite-btn.copied {
-  background: var(--sa-accent);
-  border-color: var(--sa-accent);
-  color: #ffffff;
+  background: linear-gradient(135deg, #fde047 0%, #facc15 100%);
+  border-color: #ca8a04;
+  color: #14532d;
+  box-shadow: 0 3px 10px rgba(202, 138, 4, 0.34);
+}
+
+.group-invite-btn:active {
+  transform: scale(0.97);
 }
 
 .live-order-banner {
@@ -17366,18 +18243,19 @@ const hasSale = computed(() =>
 
 .cart-total-row {
   display: flex;
-  align-items: stretch;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
 }
 
 .cart-total-expand-btn {
-  width: 42px;
-  min-width: 42px;
-  border-radius: 11px;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  border-radius: 9px;
   border: 1px solid var(--sa-border);
-  background: var(--sa-surface-2);
+  background: var(--sa-surface);
   color: var(--sa-price);
-  font-size: 17px;
+  font-size: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -18024,10 +18902,28 @@ const hasSale = computed(() =>
   color: var(--sa-price);
 }
 
+.fcm-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 0;
+  margin: 0 0 10px;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+}
+
+.fcm-summary-divider {
+  border-top: 1px dashed var(--sa-border);
+  margin: 2px 0;
+}
+
 .fcm-grand-total {
-  padding: 11px 14px;
-  margin: 0 0 12px;
-  border-radius: 12px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  border-radius: 0;
 }
 
 .fcm-submit-btn {
@@ -18270,8 +19166,58 @@ const hasSale = computed(() =>
 }
 
 .sa-storefront.theme-dark .mobile-bottom-bar {
-  background: var(--sa-bottom-bar-bg);
-  border-top-color: var(--sa-border);
+  background: linear-gradient(
+    165deg,
+    rgba(30, 41, 59, 0.56) 0%,
+    rgba(15, 23, 42, 0.42) 55%,
+    rgba(30, 41, 59, 0.52) 100%
+  );
+  backdrop-filter: blur(26px) saturate(190%) brightness(1.08);
+  -webkit-backdrop-filter: blur(26px) saturate(190%) brightness(1.08);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  box-shadow:
+    0 16px 38px rgba(2, 6, 23, 0.58),
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.34),
+    inset 0 -1.5px 2px rgba(0, 0, 0, 0.36);
+}
+
+.sa-storefront.theme-dark .mobile-bottom-bar::after {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.14) 0%,
+    rgba(255, 255, 255, 0.02) 45%,
+    rgba(255, 255, 255, 0.06) 100%
+  );
+}
+
+.sa-storefront.theme-dark .mobile-bottom-bar button::before {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.22) 0%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.sa-storefront.theme-dark .mobile-bottom-bar button i {
+  color: #f8fafc;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+}
+
+.sa-storefront.theme-dark .mobile-bottom-bar button i.dock-accent-ico {
+  color: #4ade80;
+}
+
+.sa-storefront.theme-dark .mobile-bottom-bar .btn-label {
+  color: #e2e8f0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+.sa-storefront.theme-dark .mobile-bottom-bar button.active i,
+.sa-storefront.theme-dark .mobile-bottom-bar button.active i.dock-accent-ico,
+.sa-storefront.theme-dark .mobile-bottom-bar button.active .btn-label {
+  color: #4ade80;
 }
 
 .sa-storefront.theme-dark .detail-sidebar {
@@ -19171,7 +20117,10 @@ const hasSale = computed(() =>
 }
 
 .fcm-grand-total {
-  margin: 0 0 8px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
 }
 
 /* GROUP ORDER SHARE MODAL (QR + LINK) */
@@ -19368,25 +20317,6 @@ const hasSale = computed(() =>
 .gsm-name-input:focus {
   border-color: var(--sa-accent);
   box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
-}
-
-.gsm-new-order-btn {
-  width: 100%;
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--sa-border-strong);
-  background: transparent;
-  color: var(--sa-muted);
-  font-family: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-
-.gsm-new-order-btn:hover {
-  background: var(--sa-surface-2);
-  color: var(--sa-heading);
 }
 
 /* =========================================================
@@ -21559,15 +22489,30 @@ const hasSale = computed(() =>
   text-align: right;
 }
 
+.mps-summary-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 2px 0 0;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+}
+
 .mps-grand-total {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 8px;
-  border-top: 1px solid var(--sa-border);
+  padding-top: 0;
+  border-top: none;
   font-size: 14px;
   font-weight: 700;
   color: var(--sa-heading);
+}
+
+.mps-grand-total.has-breakdown {
+  padding-top: 7px;
+  border-top: 1px dashed var(--sa-border);
 }
 
 .mps-grand-total strong {
@@ -21591,7 +22536,7 @@ const hasSale = computed(() =>
   gap: 8px;
 }
 
-.mps-secondary-action-btn {
+  .mps-secondary-action-btn {
   width: 100%;
   height: 42px;
   border-radius: 12px;
@@ -21605,6 +22550,468 @@ const hasSale = computed(() =>
   justify-content: center;
   gap: 6px;
   cursor: pointer;
+}
+
+.cart-items-subtotal-row,
+.mps-items-subtotal-row,
+.fcm-items-subtotal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sa-muted, #94a3b8);
+  padding-bottom: 4px;
+}
+
+.cart-discount-row,
+.mps-discount-row,
+.fcm-discount-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  color: #f87171;
+  padding-bottom: 4px;
+}
+
+.cart-ship-row,
+.mps-ship-row,
+.fcm-ship-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  color: #38bdf8;
+  padding-bottom: 4px;
+}
+
+.fcm-created-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.14);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: var(--sa-muted);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* SIDEBAR PROMO CHECKLIST (VERTICAL, BELOW TOTAL ROW) */
+.cart-promo-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 2px 0;
+}
+
+.mpcb-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--sa-muted);
+  line-height: 1.3;
+}
+
+.mpcb-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 1.5px solid var(--sa-border-strong, #94a3b8);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 800;
+  color: #ffffff;
+  flex-shrink: 0;
+  transition: all 0.16s ease;
+}
+
+.mpcb-prefix {
+  font-weight: 700;
+  color: var(--sa-text);
+}
+
+.mpcb-sep {
+  opacity: 0.55;
+}
+
+.mpcb-item.is-next .mpcb-check {
+  border-color: #f59e0b;
+}
+
+.mpcb-item.is-next .mpcb-prefix,
+.mpcb-item.is-next .mpcb-reward {
+  color: var(--sa-heading);
+  font-weight: 700;
+}
+
+.mpcb-item.is-unlocked .mpcb-check {
+  background: #10b981;
+  border-color: #10b981;
+  color: #ffffff;
+}
+
+.mpcb-item.is-unlocked .mpcb-prefix,
+.mpcb-item.is-unlocked .mpcb-reward {
+  color: #10b981;
+  font-weight: 700;
+}
+
+/* ===== ENTRY NOTICE POPUP MODAL ===== */
+.epn-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  background: rgba(15, 23, 42, 0.58);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.epn-modal {
+  position: relative;
+  width: 100%;
+  max-width: 450px;
+  max-height: 90vh;
+  background: var(--sa-surface, #ffffff);
+  border: 1px solid var(--sa-border, #e2e8f0);
+  border-radius: 22px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.34);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: epnPopIn 0.22s ease-out;
+}
+
+@keyframes epnPopIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.epn-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 4;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  background: rgba(15, 23, 42, 0.56);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #ffffff;
+  font-size: 19px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.25);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.18s ease, transform 0.15s ease;
+}
+
+.epn-close-btn.on-light {
+  background: var(--sa-surface-2, #f1f5f9);
+  border-color: var(--sa-border-strong, #cbd5e1);
+  color: var(--sa-heading, #0f172a);
+  box-shadow: none;
+}
+
+.epn-close-btn:hover {
+  transform: scale(1.06);
+}
+
+.epn-scroll-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.epn-text-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 22px 52px 12px;
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.14) 0%, transparent 100%);
+  text-align: center;
+}
+
+.epn-hero-ico {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  box-shadow: 0 10px 22px rgba(5, 150, 105, 0.28);
+}
+
+.epn-content-link {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+}
+
+.epn-content-link.is-clickable {
+  cursor: pointer;
+}
+
+.epn-img-wrap {
+  width: 100%;
+  background: var(--sa-img-bg, #f8fafc);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--sa-border, #e2e8f0);
+}
+
+.epn-img {
+  width: 100%;
+  max-height: 54vh;
+  object-fit: contain;
+  display: block;
+}
+
+.epn-caption {
+  padding: 14px 20px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--sa-surface, #ffffff);
+}
+
+.epn-modal.is-text-only .epn-caption {
+  padding: 6px 22px 10px;
+  text-align: center;
+}
+
+.epn-headline {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.45;
+  color: var(--sa-price, #059669);
+  white-space: pre-line;
+}
+
+.epn-text {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.6;
+  color: var(--sa-price, #059669);
+  white-space: pre-line;
+}
+
+.epn-caption:hover .epn-headline,
+.epn-caption:hover .epn-text,
+.epn-content-link.is-clickable:hover .epn-headline,
+.epn-content-link.is-clickable:hover .epn-text {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.epn-footer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px 18px;
+  background: var(--sa-surface, #ffffff);
+}
+
+.epn-dismiss-btn {
+  width: auto;
+  min-width: 152px;
+  height: 42px;
+  padding: 0 26px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  box-shadow: 0 8px 20px rgba(22, 163, 74, 0.32);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: transform 0.14s ease, filter 0.16s ease, box-shadow 0.16s ease;
+}
+
+.epn-dismiss-btn:hover {
+  filter: brightness(1.05);
+  box-shadow: 0 10px 24px rgba(22, 163, 74, 0.42);
+}
+
+.epn-dismiss-btn:active {
+  transform: scale(0.97);
+}
+
+.epn-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 16px 10px;
+  border-top: 1px solid var(--sa-border, #e2e8f0);
+  background: var(--sa-surface, #ffffff);
+}
+
+.epn-pager-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--sa-border, #cbd5e1);
+  background: var(--sa-surface-2, #f8fafc);
+  color: var(--sa-heading, #334155);
+  font-size: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.epn-pager-btn:hover {
+  filter: brightness(0.96);
+}
+
+.epn-pager-dots {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sa-muted, #64748b);
+}
+
+@media (max-width: 600px) {
+  .epn-overlay {
+    padding: 14px;
+  }
+
+  .epn-modal {
+    max-width: 100%;
+    border-radius: 20px;
+  }
+
+  .epn-footer-actions {
+    padding: 10px 14px 14px;
+  }
+}
+
+/* ===== EMPTY PENDING ORDER MODAL ===== */
+.empty-pending-order-modal {
+  max-width: 420px;
+  width: 92vw;
+  border-radius: 20px;
+  padding: 24px 20px 20px;
+  background: var(--sa-surface, #ffffff);
+  color: var(--sa-heading, #0f172a);
+}
+
+.epo-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.epo-icon-badge {
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.14);
+  color: #d97706;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  margin-bottom: 12px;
+}
+
+.epo-title {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--sa-heading, #0f172a);
+}
+
+.epo-desc {
+  margin: 0 0 18px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--sa-muted, #64748b);
+}
+
+.epo-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.epo-btn {
+  width: 100%;
+  height: 42px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: transform 0.14s ease, opacity 0.14s ease;
+}
+
+.epo-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.epo-btn.is-restore {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+}
+
+.epo-btn.is-cancel {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.45);
+  color: #dc2626;
+}
+
+.epo-btn.is-pick {
+  background: var(--sa-chip-bg, #f1f5f9);
+  border-color: var(--sa-border, #cbd5e1);
+  color: var(--sa-heading, #334155);
 }
 </style>
 

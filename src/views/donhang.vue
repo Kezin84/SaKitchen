@@ -284,8 +284,14 @@
               </div>
 
               <div class="time-box" :class="getTimeClass(dh, getDonStatus(dh))">
+                <div v-if="dh.Ngay_tao_duong_lich" class="time-created">Tạo đơn: {{ dh.Ngay_tao_duong_lich }}</div>
                 <div class="time-main">Thời gian nhận: {{ dh.Thoi_gian_nhan_hang || 'Giao sớm' }}</div>
                 <div class="time-sub" v-if="getDonStatus(dh) !== 'Hoàn thành'">{{ formatTimeRemaining(dh.Thoi_gian_nhan_hang) }}</div>
+              </div>
+
+              <div v-if="dh.Khuyen_mai_dat_duoc && String(dh.Khuyen_mai_dat_duoc).trim()" class="promo-earned-box">
+                <i class="app-ico ri-gift-2-fill"></i>
+                <span>Ưu đãi: {{ dh.Khuyen_mai_dat_duoc }}</span>
               </div>
 
               <div v-if="dh.Ghi_chu && dh.Ghi_chu.trim()" class="note-box" :title="dh.Ghi_chu">
@@ -502,6 +508,11 @@
                   <span class="copy-label">{{ copiedKey === 'modal-addr' ? 'Copied' : 'Copy' }}</span>
                 </button>
               </div>
+            </div>
+
+            <div v-if="activeOrder?.Ngay_tao_duong_lich" class="m-row">
+              <div class="m-label">Thời gian tạo đơn</div>
+              <div class="m-value">{{ activeOrder.Ngay_tao_duong_lich }}</div>
             </div>
 
             <div class="m-row">
@@ -989,6 +1000,15 @@
                 {{ formatMoney(canEditOrder ? computedEditTotal : (activeOrder?.Tong_gia_ban ?? activeOrder?.Tong_cong)) }}
               </div>
             </div>
+            <div class="m-row" v-if="activeOrder?.Khuyen_mai_dat_duoc && String(activeOrder.Khuyen_mai_dat_duoc).trim()">
+              <div class="m-label">Ưu đãi đạt được</div>
+              <div class="m-value">
+                <div class="promo-earned-box">
+                  <i class="app-ico ri-gift-2-fill"></i>
+                  <span>{{ activeOrder.Khuyen_mai_dat_duoc }}</span>
+                </div>
+              </div>
+            </div>
             <div class="m-row" v-if="canEditOrder || activeOrder?.Ghi_chu">
               <div class="m-label">Ghi chú đơn</div>
               <div class="m-value">
@@ -1452,8 +1472,8 @@ function getRawItemsForOrder(maHoaDon) {
   const dh = donHangList.value.find((d) => String(d.Ma_hoa_don).trim() === key)
   const st = dh ? getDonStatus(dh) : ''
 
-  if (live?.exists && (live.itemsList.length > 0 || st === 'Chờ duyệt')) {
-    return live.itemsList
+  if (live?.exists && (live.submittedItemsList?.length > 0 || live.itemsList.length > 0 || st === 'Chờ duyệt')) {
+    return live.submittedItemsList?.length ? live.submittedItemsList : live.itemsList
   }
   return chiTietList.value.filter((i) => String(i.Ma_hoa_don).trim() === key)
 }
@@ -3737,6 +3757,13 @@ watch(
   font-family: 'JetBrains Mono', monospace;
   background: rgba(148, 163, 184, 0.08);
   border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.time-box .time-created {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #94a3b8;
+  margin-bottom: 2px;
 }
 
 .time-box .time-main {
@@ -6212,6 +6239,20 @@ watch(
     grid-column: 1 / -1;
     order: 3;
   }
+}
+
+.promo-earned-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  color: #059669;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.35;
 }
 </style>
 

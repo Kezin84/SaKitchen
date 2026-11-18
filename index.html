@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
 
   <meta name="viewport"
-    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 
   <!-- Google Fonts: Be Vietnam Pro -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -113,6 +113,8 @@
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
       text-rendering: optimizeLegibility;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
     }
 
     button,
@@ -148,8 +150,15 @@
       }
     }
 
-    /* Prevent iOS Safari auto-zoom on mobile only */
-    @media (max-width: 768px) {
+    /* Prevent mobile zoom (pinch, double-tap & iOS Safari auto-zoom on input focus) */
+    @media (max-width: 768px), (hover: none) and (pointer: coarse) {
+      html,
+      body,
+      #app,
+      * {
+        touch-action: pan-x pan-y;
+      }
+
       input,
       textarea,
       select {
@@ -190,6 +199,30 @@
         }
       }, 80);
     });
+  </script>
+  <!-- BLOCK MOBILE PINCH & GESTURE ZOOM (iOS Safari / WebView) -->
+  <script>
+    (function () {
+      var isMobileViewport = function () {
+        return window.innerWidth <= 768 ||
+          (window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches);
+      };
+      var preventPinch = function (e) {
+        if (!isMobileViewport()) return;
+        if (e.cancelable) e.preventDefault();
+      };
+      var preventMultiTouch = function (e) {
+        if (!isMobileViewport()) return;
+        if (e.touches && e.touches.length > 1 && e.cancelable) {
+          e.preventDefault();
+        }
+      };
+      document.addEventListener('gesturestart', preventPinch, { passive: false });
+      document.addEventListener('gesturechange', preventPinch, { passive: false });
+      document.addEventListener('gestureend', preventPinch, { passive: false });
+      document.addEventListener('touchstart', preventMultiTouch, { passive: false });
+      document.addEventListener('touchmove', preventMultiTouch, { passive: false });
+    })();
   </script>
 </body>
 

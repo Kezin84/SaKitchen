@@ -1610,7 +1610,7 @@ import { ref, computed, onMounted, watch ,nextTick,onUnmounted  } from 'vue'
 import L from 'leaflet'
 import { useRoute,useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getStorefrontSheets, IMGBB_KEY } from '@/config/api'
+import { getStorefrontSheets } from '@/config/api'
 import {
   localizeProduct,
   productMatchesKeyword,

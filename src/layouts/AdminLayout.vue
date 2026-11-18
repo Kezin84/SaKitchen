@@ -45,6 +45,7 @@ watch(
 // Provide function để child component có thể gọi refresh
 provide('refreshPendingCount', () => loadPendingOrders())
 provide('updatePendingCount', () => loadPendingOrders())
+provide('isMobileDockHidden', isMobileDockHidden)
 
 const menuOnlineLink = computed(() => {
   return { name: 'menu-online', params: { lang: 'vi' } }
@@ -71,6 +72,8 @@ let checking = false
 let hasInitWebOrderBell = false
 let newOrderAlertTimer = null
 let sharedAudioCtx = null
+let createdThemeColorMeta = false
+let prevThemeColorContent = null
 const knownWaitingWebOrderIds = new Set()
 const knownWebOrderUpdateTimestamps = new Map()
 
@@ -305,6 +308,20 @@ const checkExpiredSilently = async () => {
 }
 
 onMounted(() => {
+  if (typeof document !== 'undefined') {
+    document.documentElement.classList.add('admin-shell-active')
+    let themeMeta = document.querySelector('meta[name="theme-color"]')
+    if (themeMeta) {
+      prevThemeColorContent = themeMeta.getAttribute('content')
+    } else {
+      themeMeta = document.createElement('meta')
+      themeMeta.setAttribute('name', 'theme-color')
+      document.head.appendChild(themeMeta)
+      createdThemeColorMeta = true
+    }
+    themeMeta.setAttribute('content', '#0f172a')
+  }
+
   checkExpiredSilently()
   loadMenuOnlineNcc()
 
@@ -379,7 +396,12 @@ function onAdminMobileScroll(e) {
     lastScrollTopByTarget.set(target, curTop)
     return
   }
-  const prevTop = lastScrollTopByTarget.has(target) ? lastScrollTopByTarget.get(target) : curTop
+  if (!lastScrollTopByTarget.has(target)) {
+    lastScrollTopByTarget.set(target, curTop)
+    isMobileDockHidden.value = true
+    return
+  }
+  const prevTop = lastScrollTopByTarget.get(target)
   const delta = curTop - prevTop
   if (delta > 10) {
     isMobileDockHidden.value = true
@@ -430,6 +452,15 @@ onUnmounted(() => {
     detachZeroInputBehavior = null
   }
   if (typeof document !== 'undefined') {
+    document.documentElement.classList.remove('admin-shell-active')
+    const themeMeta = document.querySelector('meta[name="theme-color"]')
+    if (themeMeta) {
+      if (createdThemeColorMeta) {
+        themeMeta.remove()
+      } else if (prevThemeColorContent !== null) {
+        themeMeta.setAttribute('content', prevThemeColorContent)
+      }
+    }
     document.title = adminBaseTitle.value
   }
 })
@@ -507,6 +538,11 @@ onUnmounted(() => {
         <RouterLink :to="{ name: 'admin-bao-cao' }" class="menu-item">
           <i class="ri-bar-chart-2-fill"></i>
           <span>Báo cáo tổng hợp</span>
+        </RouterLink>
+
+        <RouterLink :to="{ name: 'admin-tinh-chiet-khau' }" class="menu-item">
+          <i class="ri-percent-line"></i>
+          <span>Tính chiết khấu</span>
         </RouterLink>
 
         <div class="menu-divider"></div>
@@ -734,6 +770,11 @@ onUnmounted(() => {
           <span>Báo cáo tổng hợp</span>
         </RouterLink>
 
+        <RouterLink :to="{ name: 'admin-tinh-chiet-khau' }" class="mobile-menu-item" @click="closeMobileSidebar">
+          <i class="ri-percent-line"></i>
+          <span>Tính chiết khấu</span>
+        </RouterLink>
+
         <div class="menu-divider"></div>
 
         <!-- NỘI DUNG WEBSITE -->
@@ -814,8 +855,10 @@ onUnmounted(() => {
 .admin-layout {
   display: flex;
   height: 100vh;
-  background: #f8fafc;
+  height: 100dvh;
+  background: #0f172a;
   position: relative;
+  overflow: hidden;
 }
 
 /* ================= DESKTOP SIDEBAR (LEFT) ================= */
@@ -834,7 +877,7 @@ onUnmounted(() => {
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
 }
 
 .crm-sidebar::before {
@@ -1148,10 +1191,12 @@ onUnmounted(() => {
 /* ================= MAIN CONTENT ================= */
 .crm-main {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   padding: 0;
   overflow: auto;
-  background: #f8fafc;
-  color: #0f172a;
+  background: #0f172a;
+  color: #e2e8f0;
   transition: margin-left 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -1172,14 +1217,22 @@ onUnmounted(() => {
 
   .admin-layout {
     flex-direction: column;
+    height: 100%;
+    height: 100dvh;
+    overflow: hidden;
+    background: #0f172a;
   }
 
   .crm-main {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
     padding: 0;
-    padding-bottom: calc(88px + env(safe-area-inset-bottom));
-    height: 100vh;
-    height: 100dvh;
+    background: #0f172a;
     overflow-y: auto;
+    overflow-x: clip;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* ================= MOBILE BOTTOM BAR (LIQUID GLASS DOCK) ================= */
@@ -1666,5 +1719,42 @@ onUnmounted(() => {
 .admin-bell-toast-leave-to {
   opacity: 0;
   transform: translateY(-10px) scale(0.96);
+}
+</style>
+
+<style>
+html.admin-shell-active,
+html.admin-shell-active body,
+html.admin-shell-active #app,
+html.admin-shell-active .app-root {
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #0f172a !important;
+  background-color: #0f172a !important;
+}
+
+@media (max-width: 768px) {
+  html.admin-shell-active .crm-main > :not(.admin-web-order-toast) {
+    min-height: 100% !important;
+    box-sizing: border-box;
+  }
+
+  html.admin-shell-active .crm-main > :is(
+    .admin-page,
+    .bao-cao-page,
+    .chi-phi-page,
+    .ck-page,
+    .page-container,
+    .container,
+    .page
+  ) {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
 }
 </style>

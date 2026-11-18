@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { getOneSheet, dispatchAction } from '@/config/api'
-import { uploadImageToImgBB } from '@/utils/imageUpload.js'
+import { uploadImageToCloudinary } from '@/utils/imageUpload.js'
 /* ================= CONFIG ================= */
 
 
@@ -23,11 +23,12 @@ function genLogoId() {
   return `LG-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}`
 }
 
-async function uploadImgBB(file) {
-  return uploadImageToImgBB(file, {
+async function uploadLogoImage(file) {
+  return uploadImageToCloudinary(file, {
     targetKB: 100,
     maxWidth: 1000,
     maxHeight: 1000,
+    folder: 'sakitchen/logo',
   })
 }
 
@@ -106,7 +107,7 @@ async function saveLogo() {
     let finalUrl = logo.value?.URL || ''
 
     if (file.value) {
-      finalUrl = await uploadImgBB(file.value)
+      finalUrl = await uploadLogoImage(file.value)
       if (!finalUrl) {
         throw new Error('Upload ảnh thất bại')
       }

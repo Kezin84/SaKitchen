@@ -135,7 +135,7 @@
       >
         <i class="ri-folders-line"></i>
         <span>Sắp xếp Danh mục</span>
-        <span class="tab-count">{{ categoryDraft.length }}</span>
+        <span class="tab-count">{{ categoryTreeDraft.length }}</span>
         <span v-if="hasCategoryChanges" class="tab-dirty-dot" title="Có thay đổi chưa lưu"></span>
       </button>
 
@@ -158,13 +158,13 @@
       <span>Đang tải dữ liệu...</span>
     </div>
 
-    <!-- ===== TAB 1: SẮP XẾP DANH MỤC ===== -->
+    <!-- ===== TAB 1: SẮP XẾP DANH MỤC (CHỈ HIỂN THỊ & SẮP XẾP) ===== -->
     <section v-else-if="activeTab === 'categories'" class="sort-panel">
       <div class="panel-toolbar">
         <div class="panel-hint">
           <i class="ri-information-line"></i>
           <span>
-            Mục <strong>Tất cả</strong> luôn cố định ở đầu. Kéo thả, nhập số `#`, hoặc chọn nhanh <strong>A → Z / Z → A</strong> để sắp xếp danh mục (bao gồm cả <strong>Sale</strong>), sau đó nhấn <strong>Lưu & Đồng bộ</strong>.
+            Mục <strong>Tất cả</strong> luôn cố định ở đầu. Việc tạo &amp; gom danh mục con vào <strong>Danh mục cha</strong> thực hiện ở trang <strong>Kho hàng</strong>; tại đây chỉ sắp xếp thứ tự Cha &amp; Con bên trong rồi nhấn <strong>Lưu &amp; Đồng bộ</strong>.
           </span>
         </div>
         <div class="panel-toolbar-actions">
@@ -200,88 +200,184 @@
         </div>
       </div>
 
-      <!-- Draggable Category List -->
-      <div v-if="!categoryDraft.length" class="empty-box">
+      <!-- Draggable Category Tree List -->
+      <div v-if="!categoryTreeDraft.length" class="empty-box">
         Chưa có danh mục nào trong Kho hàng.
       </div>
       <div v-else class="sortable-list">
         <div
-          v-for="(cat, idx) in categoryDraft"
-          :key="cat.key"
-          class="sort-row cat-row"
-          :class="{
-            'is-sale-row': cat.isSale,
-            'is-dragging': catDragIdx === idx,
-            'is-drag-over': catDragOverIdx === idx && catDragIdx !== idx,
-          }"
-          draggable="true"
-          @dragstart="onCatDragStart(idx, $event)"
-          @dragover.prevent="onCatDragOver(idx)"
-          @drop.prevent="onCatDrop(idx)"
-          @dragend="onCatDragEnd"
+          v-for="(node, idx) in categoryTreeDraft"
+          :key="node.key + (node.isParentGroup ? '-grp' : '-solo')"
+          class="cat-tree-block"
         >
-          <div class="drag-handle" title="Kéo để đổi vị trí">
-            <i class="ri-draggable"></i>
-          </div>
-
-          <div class="pos-input-wrap" title="Nhập số vị trí rồi nhấn Enter">
-            <span class="pos-hash">#</span>
-            <input
-              type="number"
-              min="1"
-              :max="categoryDraft.length"
-              :value="idx + 1"
-              class="pos-number-input"
-              @change="moveCategoryTo(idx, $event.target.value)"
-            />
-          </div>
-
-          <div class="cat-row-info">
-            <div class="cat-name-line">
-              <span class="cat-row-name">
-                <i v-if="cat.isSale" class="ri-fire-fill sale-fire-icon"></i>
-                {{ cat.label }}
-              </span>
-              <span v-if="cat.isSale" class="cat-sale-badge">
-                Tự động hiện khi có món giảm giá
-              </span>
+          <div
+            class="sort-row cat-row"
+            :class="{
+              'is-sale-row': node.isSale,
+              'is-parent-group-row': node.isParentGroup,
+              'is-dragging': catDragIdx === idx,
+              'is-drag-over': catDragOverIdx === idx && catDragIdx !== idx,
+            }"
+            draggable="true"
+            @dragstart="onCatDragStart(idx, $event)"
+            @dragover.prevent="onCatDragOver(idx)"
+            @drop.prevent="onCatDrop(idx)"
+            @dragend="onCatDragEnd"
+          >
+            <div class="drag-handle" title="Kéo để đổi vị trí">
+              <i class="ri-draggable"></i>
             </div>
-            <div class="cat-row-meta">
-              <span>{{ cat.count }} sản phẩm</span>
-              <span v-if="cat.translations" class="cat-i18n-preview">
-                • {{ cat.translations }}
-              </span>
+
+            <div class="pos-input-wrap" title="Nhập số vị trí rồi nhấn Enter">
+              <span class="pos-hash">#</span>
+              <input
+                type="number"
+                min="1"
+                :max="categoryTreeDraft.length"
+                :value="idx + 1"
+                class="pos-number-input"
+                @change="moveCategoryTo(idx, $event.target.value)"
+              />
+            </div>
+
+            <button
+              v-if="node.isParentGroup"
+              type="button"
+              class="cat-expand-btn"
+              :title="isParentExpanded(node.key) ? 'Thu gọn danh mục con' : 'Mở danh mục con'"
+              @click.stop="toggleParentExpanded(node.key)"
+            >
+              <i :class="isParentExpanded(node.key) ? 'ri-arrow-down-s-line' : 'ri-arrow-right-s-line'"></i>
+            </button>
+
+            <div class="cat-row-info">
+              <div class="cat-name-line">
+                <span class="cat-row-name">
+                  <i v-if="node.isSale" class="ri-fire-fill sale-fire-icon"></i>
+                  <i v-else-if="node.isParentGroup" class="ri-folder-3-fill parent-folder-icon"></i>
+                  {{ node.label }}
+                </span>
+                <span v-if="node.isParentGroup" class="cat-parent-badge">
+                  Danh mục cha • {{ node.children.length }} con
+                </span>
+                <span v-if="node.isSale" class="cat-sale-badge">
+                  Tự động hiện khi có món giảm giá
+                </span>
+              </div>
+              <div class="cat-row-meta">
+                <span>{{ node.count }} sản phẩm</span>
+                <span v-if="node.translations" class="cat-i18n-preview">
+                  • {{ node.translations }}
+                </span>
+              </div>
+            </div>
+
+            <div class="row-move-actions">
+              <button
+                type="button"
+                class="move-btn"
+                :disabled="idx === 0"
+                title="Đưa lên vị trí #1"
+                @click="moveCategoryTo(idx, 1)"
+              >
+                <i class="ri-arrow-up-double-line"></i>
+              </button>
+              <button
+                type="button"
+                class="move-btn"
+                :disabled="idx === 0"
+                title="Lên 1 bậc"
+                @click="moveCategoryBy(idx, -1)"
+              >
+                <i class="ri-arrow-up-s-line"></i>
+              </button>
+              <button
+                type="button"
+                class="move-btn"
+                :disabled="idx === categoryTreeDraft.length - 1"
+                title="Xuống 1 bậc"
+                @click="moveCategoryBy(idx, 1)"
+              >
+                <i class="ri-arrow-down-s-line"></i>
+              </button>
             </div>
           </div>
 
-          <div class="row-move-actions">
-            <button
-              type="button"
-              class="move-btn"
-              :disabled="idx === 0"
-              title="Đưa lên vị trí #1"
-              @click="moveCategoryTo(idx, 1)"
+          <!-- Nested Subcategories Inside Parent Group -->
+          <div
+            v-if="node.isParentGroup && isParentExpanded(node.key)"
+            class="subcat-nest-list"
+          >
+            <div v-if="!node.children.length" class="subcat-nest-empty">
+              Chưa có danh mục con nào. Hãy chọn <strong>"↳ Thuộc cha: {{ node.label }}"</strong> ở một danh mục bên dưới để gom vào đây.
+            </div>
+            <div
+              v-for="(sub, sIdx) in node.children"
+              :key="'sub-' + node.key + '-' + sub.key"
+              class="sort-row subcat-nest-row"
+              :class="{
+                'is-dragging': subDragState.parentKey === node.key && subDragState.idx === sIdx,
+                'is-drag-over':
+                  subDragState.parentKey === node.key &&
+                  subDragState.overIdx === sIdx &&
+                  subDragState.idx !== sIdx,
+              }"
+              draggable="true"
+              @dragstart.stop="onSubDragStart(node.key, sIdx, $event)"
+              @dragover.prevent.stop="onSubDragOver(node.key, sIdx)"
+              @drop.prevent.stop="onSubDrop(node.key, sIdx)"
+              @dragend.stop="onSubDragEnd"
             >
-              <i class="ri-arrow-up-double-line"></i>
-            </button>
-            <button
-              type="button"
-              class="move-btn"
-              :disabled="idx === 0"
-              title="Lên 1 bậc"
-              @click="moveCategoryBy(idx, -1)"
-            >
-              <i class="ri-arrow-up-s-line"></i>
-            </button>
-            <button
-              type="button"
-              class="move-btn"
-              :disabled="idx === categoryDraft.length - 1"
-              title="Xuống 1 bậc"
-              @click="moveCategoryBy(idx, 1)"
-            >
-              <i class="ri-arrow-down-s-line"></i>
-            </button>
+              <div class="drag-handle" title="Kéo để đổi vị trí trong nhóm cha">
+                <i class="ri-draggable"></i>
+              </div>
+
+              <div class="pos-input-wrap is-sub-pos" title="Thứ tự con trong nhóm cha">
+                <span class="pos-hash">#</span>
+                <input
+                  type="number"
+                  min="1"
+                  :max="node.children.length"
+                  :value="sIdx + 1"
+                  class="pos-number-input"
+                  @change="moveSubCategoryTo(node.key, sIdx, $event.target.value)"
+                />
+              </div>
+
+              <div class="cat-row-info">
+                <div class="cat-name-line">
+                  <span class="subcat-branch-ico">↳</span>
+                  <span class="cat-row-name">{{ sub.label }}</span>
+                </div>
+                <div class="cat-row-meta">
+                  <span>{{ sub.count }} sản phẩm</span>
+                  <span v-if="sub.translations" class="cat-i18n-preview">
+                    • {{ sub.translations }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="row-move-actions">
+                <button
+                  type="button"
+                  class="move-btn"
+                  :disabled="sIdx === 0"
+                  title="Lên 1 bậc"
+                  @click="moveSubCategoryBy(node.key, sIdx, -1)"
+                >
+                  <i class="ri-arrow-up-s-line"></i>
+                </button>
+                <button
+                  type="button"
+                  class="move-btn"
+                  :disabled="sIdx === node.children.length - 1"
+                  title="Xuống 1 bậc"
+                  @click="moveSubCategoryBy(node.key, sIdx, 1)"
+                >
+                  <i class="ri-arrow-down-s-line"></i>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -537,13 +633,19 @@ const savingAll = ref(false)
 const rawProducts = ref([])
 const savedProductSortMode = ref(DISPLAY_MODE_FLAT)
 const savedCategoryOrder = ref([])
-const savedCategoryBaselineKeys = ref([])
+const savedParentMap = ref({})
+const savedParentI18n = ref({})
+const savedCategorySnapshot = ref('')
 const savedBaseOrderCodes = ref([]) // canonical Thu_tu sequence of products
 const savedTopAtByCode = ref({}) // { [Ma_hang]: Top_at }
 
 // Editable draft state (not synced until user clicks Lưu)
 const productSortMode = ref(DISPLAY_MODE_FLAT)
-const categoryDraft = ref([])
+const categoryTreeDraft = ref([])
+const parentI18nDraft = ref({})
+const customParentKeysDraft = ref([])
+const expandedParentKeys = ref({})
+const subDragState = ref({ parentKey: '', idx: -1, overIdx: -1 })
 const baseOrderDraft = ref([]) // products ordered solely by Thu_tu (1..N)
 const topAtDraftByCode = ref({}) // { [Ma_hang]: Top_at }
 
@@ -593,50 +695,159 @@ function formatMoney(num) {
   return Number.isFinite(n) ? n.toLocaleString('en-US') : '0'
 }
 
-function buildCategoryEntries(products, customOrder = [], forcedDirection = null) {
-  const infoByVi = new Map()
+function harvestHierarchyData(products, cfgParentMap = {}, cfgParentI18n = {}) {
+  const subStats = new Map()
+  const harvestedParentMap = { ...cfgParentMap }
+  const harvestedParentI18n = {}
+
+  for (const [pKey, pLangs] of Object.entries(cfgParentI18n || {})) {
+    const cleanP = String(pKey || '').trim()
+    if (!cleanP) continue
+    harvestedParentI18n[cleanP] = { ...pLangs, vi: cleanP }
+  }
 
   for (const p of products || []) {
     const viCat = getCanonicalCat(p)
     if (!viCat || viCat === 'Tất cả' || viCat === 'Sale') continue
-    if (!infoByVi.has(viCat)) {
-      const i18n = normalizeProductI18n(p)
+    const i18n = normalizeProductI18n(p)
+
+    if (!subStats.has(viCat)) {
       const otherLangs = DATA_LANG_CODES.filter((c) => c !== 'vi')
         .map((code) => String(i18n[code]?.Danh_muc || '').trim())
         .filter((val) => val && val !== viCat)
-      infoByVi.set(viCat, {
+      subStats.set(viCat, {
         key: viCat,
         label: viCat,
-        isSale: false,
         count: 0,
         translations: [...new Set(otherLangs)].join(' / '),
       })
     }
-    infoByVi.get(viCat).count += 1
+    subStats.get(viCat).count += 1
+
+    const itemParentVi = String(i18n.vi?.Danh_muc_cha || p?.Danh_muc_cha || '').trim()
+    if (itemParentVi && itemParentVi !== 'Tất cả' && itemParentVi !== 'Sale' && itemParentVi !== viCat) {
+      if (!Object.prototype.hasOwnProperty.call(harvestedParentMap, viCat)) {
+        harvestedParentMap[viCat] = itemParentVi
+      }
+      if (!harvestedParentI18n[itemParentVi]) {
+        harvestedParentI18n[itemParentVi] = { vi: itemParentVi }
+      }
+      for (const code of DATA_LANG_CODES) {
+        if (code === 'vi') continue
+        const val = String(i18n[code]?.Danh_muc_cha || '').trim()
+        if (val && !harvestedParentI18n[itemParentVi][code]) {
+          harvestedParentI18n[itemParentVi][code] = val
+        }
+      }
+    }
   }
 
+  return { subStats, harvestedParentMap, harvestedParentI18n }
+}
+
+function buildCategoryTreeEntries(
+  products,
+  customOrder = [],
+  parentMapInput = {},
+  parentI18nInput = {},
+  extraParentKeys = [],
+  forcedDirection = null,
+) {
+  const { subStats } = harvestHierarchyData(products, parentMapInput, parentI18nInput)
+  const rankMap = new Map(customOrder.map((name, idx) => [name, idx]))
+  const hasCustom = rankMap.size > 0 && !forcedDirection
+
+  // Collect all active parent keys
+  const parentGroupsMap = new Map()
+  const ensureParentGroup = (pKey) => {
+    const clean = String(pKey || '').trim()
+    if (!clean || clean === 'Tất cả' || clean === 'Sale') return null
+    if (!parentGroupsMap.has(clean)) {
+      const i18nObj = parentI18nInput[clean] || { vi: clean }
+      const transPreview = DATA_LANG_CODES.filter((c) => c !== 'vi')
+        .map((c) => String(i18nObj[c] || '').trim())
+        .filter((v) => v && v !== clean)
+      parentGroupsMap.set(clean, {
+        key: clean,
+        label: clean,
+        isParentGroup: true,
+        isSale: false,
+        count: 0,
+        translations: [...new Set(transPreview)].join(' / '),
+        children: [],
+      })
+    }
+    return parentGroupsMap.get(clean)
+  }
+
+  for (const extraP of extraParentKeys || []) {
+    ensureParentGroup(extraP)
+  }
+  for (const [subKey, parentKey] of Object.entries(parentMapInput || {})) {
+    if (subStats.has(subKey) && parentKey && parentKey !== subKey) {
+      ensureParentGroup(parentKey)
+    }
+  }
+
+  const standaloneNodes = []
+  for (const [subKey, info] of subStats.entries()) {
+    const assignedParent = String(parentMapInput[subKey] || '').trim()
+    if (assignedParent && assignedParent !== subKey && parentGroupsMap.has(assignedParent)) {
+      const grp = parentGroupsMap.get(assignedParent)
+      grp.children.push({ ...info })
+      grp.count += info.count
+    } else {
+      standaloneNodes.push({
+        key: info.key,
+        label: info.label,
+        isParentGroup: false,
+        isSale: false,
+        count: info.count,
+        translations: info.translations,
+        children: [],
+      })
+    }
+  }
+
+  const sortChildNodes = (arr) => {
+    arr.sort((a, b) => {
+      if (forcedDirection === 'asc' || forcedDirection === 'desc') {
+        const cmp = a.label.localeCompare(b.label, 'vi', { sensitivity: 'base', numeric: true })
+        return forcedDirection === 'desc' ? -cmp : cmp
+      }
+      const rA = rankMap.has(a.key) ? rankMap.get(a.key) : Number.MAX_SAFE_INTEGER
+      const rB = rankMap.has(b.key) ? rankMap.get(b.key) : Number.MAX_SAFE_INTEGER
+      if (rA !== rB) return rA - rB
+      return a.label.localeCompare(b.label, 'vi', { sensitivity: 'base', numeric: true })
+    })
+  }
+
+  const topNodes = []
+  for (const grp of parentGroupsMap.values()) {
+    sortChildNodes(grp.children)
+    topNodes.push(grp)
+  }
+  topNodes.push(...standaloneNodes)
+
   const saleCount = (products || []).filter((p) => Number(p?.Gia_Giam || 0) > 0).length
-  infoByVi.set('Sale', {
+  topNodes.push({
     key: 'Sale',
     label: 'Sale',
+    isParentGroup: false,
     isSale: true,
     count: saleCount,
     translations: 'Danh mục khuyến mãi',
+    children: [],
   })
 
-  const entries = [...infoByVi.values()]
-
   if (forcedDirection === 'asc' || forcedDirection === 'desc') {
-    return entries.sort((a, b) => {
+    return topNodes.sort((a, b) => {
       const cmp = a.label.localeCompare(b.label, 'vi', { sensitivity: 'base', numeric: true })
       return forcedDirection === 'desc' ? -cmp : cmp
     })
   }
 
-  const rankMap = new Map(customOrder.map((name, idx) => [name, idx]))
-  const hasCustom = rankMap.size > 0
-
-  return entries.sort((a, b) => {
+  return topNodes.sort((a, b) => {
     const rA = rankMap.has(a.key) ? rankMap.get(a.key) : Number.MAX_SAFE_INTEGER
     const rB = rankMap.has(b.key) ? rankMap.get(b.key) : Number.MAX_SAFE_INTEGER
     if (!hasCustom) {
@@ -653,9 +864,57 @@ function buildCategoryEntries(products, customOrder = [], forcedDirection = null
   })
 }
 
+function extractCurrentParentMapFromTree(tree) {
+  const map = {}
+  for (const node of tree || []) {
+    if (!node?.isParentGroup) continue
+    for (const child of node.children || []) {
+      if (child?.key && child.key !== node.key) {
+        map[child.key] = node.key
+      }
+    }
+  }
+  return map
+}
+
+function flattenTreeOrderKeys(tree) {
+  const keys = []
+  for (const node of tree || []) {
+    if (!node?.key) continue
+    keys.push(node.key)
+    if (node.isParentGroup) {
+      for (const child of node.children || []) {
+        if (child?.key) keys.push(child.key)
+      }
+    }
+  }
+  return [...new Set(keys)]
+}
+
+function computeTreeSnapshot(tree, pI18n = {}) {
+  const order = flattenTreeOrderKeys(tree)
+  const pMap = extractCurrentParentMapFromTree(tree)
+  return JSON.stringify({ order, pMap, pI18n })
+}
+
 function hydrateDraftFromSaved() {
   productSortMode.value = savedProductSortMode.value
-  categoryDraft.value = buildCategoryEntries(rawProducts.value, savedCategoryOrder.value)
+  parentI18nDraft.value = JSON.parse(JSON.stringify(savedParentI18n.value || {}))
+  customParentKeysDraft.value = Object.keys(savedParentI18n.value || {}).filter((k) =>
+    Object.values(savedParentMap.value || {}).includes(k),
+  )
+  categoryTreeDraft.value = buildCategoryTreeEntries(
+    rawProducts.value,
+    savedCategoryOrder.value,
+    savedParentMap.value,
+    parentI18nDraft.value,
+    customParentKeysDraft.value,
+  )
+  const nextExpanded = {}
+  for (const node of categoryTreeDraft.value) {
+    if (node.isParentGroup) nextExpanded[node.key] = true
+  }
+  expandedParentKeys.value = nextExpanded
 
   const sortedByRank = sortProductsByRankOnly(rawProducts.value)
   baseOrderDraft.value = sortedByRank.map((p) => ({ ...p }))
@@ -672,10 +931,25 @@ async function loadAll() {
     const products = Array.isArray(hhRes?.data) ? hhRes.data : []
     const cfg = normalizeDisplayConfig(cfgRes?.data || [])
 
+    const { harvestedParentMap, harvestedParentI18n } = harvestHierarchyData(
+      products,
+      cfg.parentMap,
+      cfg.parentI18n,
+    )
+
     rawProducts.value = products
     savedProductSortMode.value = cfg.productSortMode
     savedCategoryOrder.value = [...cfg.categoryOrder]
-    savedCategoryBaselineKeys.value = buildCategoryEntries(products, cfg.categoryOrder).map((c) => c.key)
+    savedParentMap.value = { ...harvestedParentMap }
+    savedParentI18n.value = JSON.parse(JSON.stringify(harvestedParentI18n))
+
+    const initialTree = buildCategoryTreeEntries(
+      products,
+      cfg.categoryOrder,
+      savedParentMap.value,
+      savedParentI18n.value,
+    )
+    savedCategorySnapshot.value = computeTreeSnapshot(initialTree, savedParentI18n.value)
 
     const sortedByRank = sortProductsByRankOnly(products)
     savedBaseOrderCodes.value = sortedByRank.map((p) => p.Ma_hang)
@@ -709,11 +983,12 @@ watch([selectedCategoryFilter, productSearch], () => {
 /* ===== CHANGE DETECTION (ALL REQUIRE SAVE TO SYNC) ===== */
 const hasModeChanges = computed(() => productSortMode.value !== savedProductSortMode.value)
 
-const currentCategoryKeys = computed(() => categoryDraft.value.map((c) => c.key))
-const hasCategoryChanges = computed(() => {
-  if (savedCategoryBaselineKeys.value.length !== currentCategoryKeys.value.length) return true
-  return currentCategoryKeys.value.some((k, i) => k !== savedCategoryBaselineKeys.value[i])
-})
+const currentCategorySnapshot = computed(() =>
+  computeTreeSnapshot(categoryTreeDraft.value, parentI18nDraft.value),
+)
+const hasCategoryChanges = computed(
+  () => currentCategorySnapshot.value !== savedCategorySnapshot.value,
+)
 
 const hasProductChanges = computed(() => {
   if (savedBaseOrderCodes.value.length !== baseOrderDraft.value.length) return false
@@ -793,9 +1068,28 @@ function isTopRankOne(item) {
   return getTopRank(item) === 1
 }
 
-/* ===== CATEGORY ACTIONS (DRAFT) ===== */
+/* ===== CATEGORY TREE DISPLAY & REORDER ACTIONS (DRAFT) ===== */
+function isParentExpanded(parentKey) {
+  return expandedParentKeys.value[parentKey] !== false
+}
+
+function toggleParentExpanded(parentKey) {
+  expandedParentKeys.value = {
+    ...expandedParentKeys.value,
+    [parentKey]: !isParentExpanded(parentKey),
+  }
+}
+
 function sortCategoriesAlpha(direction = 'asc') {
-  categoryDraft.value = buildCategoryEntries(rawProducts.value, [], direction)
+  const curMap = extractCurrentParentMapFromTree(categoryTreeDraft.value)
+  categoryTreeDraft.value = buildCategoryTreeEntries(
+    rawProducts.value,
+    [],
+    curMap,
+    parentI18nDraft.value,
+    customParentKeysDraft.value,
+    direction,
+  )
   showToast(
     direction === 'desc'
       ? 'Đã xếp danh mục theo Z → A (nhấn Lưu & Đồng bộ để áp dụng)'
@@ -805,16 +1099,16 @@ function sortCategoriesAlpha(direction = 'asc') {
 }
 
 function moveCategoryTo(fromIdx, rawTargetPos) {
-  const total = categoryDraft.value.length
+  const total = categoryTreeDraft.value.length
   if (total < 2) return
   const parsed = Math.floor(Number(rawTargetPos))
   if (!Number.isFinite(parsed)) return
   const destIdx = Math.min(Math.max(parsed - 1, 0), total - 1)
   if (destIdx === fromIdx) return
-  const next = [...categoryDraft.value]
+  const next = [...categoryTreeDraft.value]
   const [moved] = next.splice(fromIdx, 1)
   next.splice(destIdx, 0, moved)
-  categoryDraft.value = next
+  categoryTreeDraft.value = next
 }
 
 function moveCategoryBy(idx, delta) {
@@ -831,6 +1125,7 @@ function onCatDragStart(idx, event) {
 }
 
 function onCatDragOver(idx) {
+  if (catDragIdx.value < 0) return
   catDragOverIdx.value = idx
 }
 
@@ -847,10 +1142,69 @@ function onCatDragEnd() {
   catDragOverIdx.value = -1
 }
 
+function moveSubCategoryTo(parentKey, fromIdx, rawTargetPos) {
+  const grpIdx = categoryTreeDraft.value.findIndex((n) => n.isParentGroup && n.key === parentKey)
+  if (grpIdx === -1) return
+  const children = categoryTreeDraft.value[grpIdx].children || []
+  if (children.length < 2) return
+  const parsed = Math.floor(Number(rawTargetPos))
+  if (!Number.isFinite(parsed)) return
+  const destIdx = Math.min(Math.max(parsed - 1, 0), children.length - 1)
+  if (destIdx === fromIdx) return
+
+  const nextChildren = [...children]
+  const [moved] = nextChildren.splice(fromIdx, 1)
+  nextChildren.splice(destIdx, 0, moved)
+
+  const nextTree = [...categoryTreeDraft.value]
+  nextTree[grpIdx] = { ...nextTree[grpIdx], children: nextChildren }
+  categoryTreeDraft.value = nextTree
+}
+
+function moveSubCategoryBy(parentKey, idx, delta) {
+  moveSubCategoryTo(parentKey, idx, idx + 1 + delta)
+}
+
+function onSubDragStart(parentKey, idx, event) {
+  subDragState.value = { parentKey, idx, overIdx: idx }
+  if (event?.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', `${parentKey}:${idx}`)
+  }
+}
+
+function onSubDragOver(parentKey, idx) {
+  if (subDragState.value.parentKey !== parentKey) return
+  subDragState.value.overIdx = idx
+}
+
+function onSubDrop(parentKey, dropIdx) {
+  const { parentKey: srcParent, idx: fromIdx } = subDragState.value
+  if (srcParent === parentKey && fromIdx >= 0 && dropIdx >= 0 && fromIdx !== dropIdx) {
+    moveSubCategoryTo(parentKey, fromIdx, dropIdx + 1)
+  }
+  onSubDragEnd()
+}
+
+function onSubDragEnd() {
+  subDragState.value = { parentKey: '', idx: -1, overIdx: -1 }
+}
+
 /* ===== PRODUCT REORDER & TOP (DRAFT ONLY) ===== */
-const filterCategoryOptions = computed(() =>
-  categoryDraft.value.filter((c) => !c.isSale),
-)
+const filterCategoryOptions = computed(() => {
+  const out = []
+  for (const node of categoryTreeDraft.value) {
+    if (node.isSale) continue
+    if (node.isParentGroup) {
+      for (const ch of node.children || []) {
+        out.push({ key: ch.key, label: `${node.label} › ${ch.label}` })
+      }
+    } else {
+      out.push({ key: node.key, label: node.label })
+    }
+  }
+  return out
+})
 
 const canReorderProducts = computed(() => !productSearch.value.trim())
 
@@ -1044,7 +1398,7 @@ async function saveAllChanges() {
     const tasks = []
 
     if (hasModeChanges.value || hasCategoryChanges.value) {
-      const nextKeys = categoryDraft.value.map((c) => c.key)
+      const nextKeys = flattenTreeOrderKeys(categoryTreeDraft.value)
       tasks.push(
         dispatchAction({
           action: 'saveDisplayConfig',
@@ -1055,7 +1409,7 @@ async function saveAllChanges() {
         }).then((res) => {
           if (!res?.success) throw new Error(res?.message || 'Lưu cấu hình hiển thị thất bại')
           savedCategoryOrder.value = [...nextKeys]
-          savedCategoryBaselineKeys.value = [...nextKeys]
+          savedCategorySnapshot.value = computeTreeSnapshot(categoryTreeDraft.value, parentI18nDraft.value)
           savedProductSortMode.value = productSortMode.value
         }),
       )
@@ -1598,6 +1952,191 @@ async function saveAllChanges() {
   opacity: 0.45;
 }
 
+/* Parent -> Subcategory Tree Styling */
+.btn-create-parent {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 13px;
+  border-radius: 10px;
+  border: 1px solid rgba(52, 211, 153, 0.65);
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: filter 0.16s ease;
+}
+.btn-create-parent:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.btn-create-parent:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.new-parent-bar {
+  margin-bottom: 14px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.npb-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.npb-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #6ee7b7;
+}
+.npb-close {
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 18px;
+  cursor: pointer;
+}
+.npb-inputs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+.npb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.npb-field label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+.npb-input {
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 9px;
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  color: #f8fafc;
+  font-size: 13px;
+  outline: none;
+}
+.npb-input:focus {
+  border-color: #10b981;
+}
+.npb-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.cat-tree-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sort-row.is-parent-group-row {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+.cat-expand-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.parent-folder-icon {
+  color: #34d399;
+  margin-right: 4px;
+}
+
+.cat-parent-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+}
+
+.cat-parent-assign {
+  flex-shrink: 0;
+}
+
+.parent-assign-select {
+  height: 34px;
+  max-width: 220px;
+  padding: 0 10px;
+  border-radius: 9px;
+  background: rgba(30, 41, 59, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  color: #e2e8f0;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.parent-quick-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.move-btn.is-dissolve:hover {
+  border-color: rgba(248, 113, 113, 0.6);
+  color: #f87171;
+}
+
+.subcat-nest-list {
+  margin-left: 28px;
+  padding-left: 14px;
+  border-left: 2px dashed rgba(52, 211, 153, 0.38);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.subcat-nest-empty {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px dashed rgba(148, 163, 184, 0.25);
+  color: #94a3b8;
+  font-size: 12.5px;
+}
+
+.subcat-nest-row {
+  background: rgba(15, 23, 42, 0.62);
+  border-color: rgba(148, 163, 184, 0.16);
+}
+
+.subcat-branch-ico {
+  color: #34d399;
+  font-weight: 900;
+  margin-right: 4px;
+}
+
 .sort-row.is-drag-over {
   border-color: #38bdf8;
   box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.28);
@@ -1940,7 +2479,7 @@ async function saveAllChanges() {
 
 @media (max-width: 768px) {
   .sort-page {
-    padding: 14px 12px 130px;
+    padding: 14px 12px calc(88px + env(safe-area-inset-bottom));
   }
   .mode-toggle-grid {
     grid-template-columns: 1fr;

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { getOneSheet, dispatchAction } from '@/config/api'
-import { uploadImageToImgBB } from '@/utils/imageUpload.js'
+import { uploadImageToCloudinary } from '@/utils/imageUpload.js'
 /* ======================
    CONFIG
 ====================== */
@@ -73,11 +73,12 @@ function genBannerId() {
   )
 }
 
-async function uploadImgBB(file) {
-  return uploadImageToImgBB(file, {
+async function uploadBannerImage(file) {
+  return uploadImageToCloudinary(file, {
     targetKB: 100,
     maxWidth: 1600,
     maxHeight: 1000,
+    folder: 'sakitchen/banner',
   })
 }
 
@@ -177,7 +178,7 @@ async function addBanner() {
 
   loading.value = true
   try {
-    const imgUrl = await uploadImgBB(file.value)
+    const imgUrl = await uploadBannerImage(file.value)
 
     await dispatchAction({
       action: 'addBanner',
@@ -230,7 +231,7 @@ async function saveEdit() {
   loading.value = true
   try {
     const imgUrl = editBannerFile.value
-      ? await uploadImgBB(editBannerFile.value)
+      ? await uploadBannerImage(editBannerFile.value)
       : editingBanner.value.URL
 
     await dispatchAction({

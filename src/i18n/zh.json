@@ -7,7 +7,11 @@
     "detail": "查看详情",
     "detailNote": "查看详情/备注",
     "add": "添加",
-    "note": "菜品备注（给商家）"
+    "note": "菜品备注（给商家）",
+    "notePlaceholder": "例如：少辣、不要葱、多加酱...",
+    "relatedItems": "同分类推荐",
+    "chooseVariant": "规格分类",
+    "noticeLabel": "公告"
   },
   "contact": {
     "sendOrder": "联系商家下单",
@@ -184,6 +188,7 @@
   },
   "mobile": {
     "category": "分类",
+    "menu": "菜单",
     "contact": "联系",
     "cart": "购物车",
     "progress": "进度",
@@ -242,6 +247,11 @@
     "completedNotice": "订单已完成，感谢您的支持！如需继续点餐请点击创建新订单。",
     "cancelledNotice": "商家已取消此订单。如有疑问请联系商家，或点击创建新订单。",
     "completedToast": "订单 #{code} 已完成！",
-    "cancelledToast": "商家已取消订单 #{code}。"
+    "cancelledToast": "商家已取消订单 #{code}。",
+    "shopMessageLabel": "商家通知",
+    "finalCompletedTitle": "订单 #{code} 已完成",
+    "finalCancelledTitle": "订单 #{code} 已取消",
+    "finalNewOrderBtn": "创建新订单",
+    "finalCloseBtn": "关闭"
   }
 }

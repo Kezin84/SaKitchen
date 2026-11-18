@@ -219,14 +219,21 @@
                 Chi tiết sản phẩm
               </div>
               <div class="panel-body panel-grid">
-                <div class="field span-6">
-                  <label>Danh mục ({{ getLangShort(activeFormLang) }})</label>
+                <div class="field span-4">
+                  <label>Danh mục cha ({{ getLangShort(activeFormLang) }})</label>
                   <input
-                    v-model="form.i18n[activeFormLang].Danh_muc"
-                    :placeholder="activeFormLang === 'vi' ? 'VD: Cơm, Bún - Phở - Mì, Đồ uống...' : (form.i18n.vi.Danh_muc ? `Dịch từ: ${form.i18n.vi.Danh_muc}` : 'Danh mục...')"
+                    v-model="form.i18n[activeFormLang].Danh_muc_cha"
+                    :placeholder="activeFormLang === 'vi' ? 'VD: Đồ ăn, Đồ uống, Ăn vặt...' : (form.i18n.vi.Danh_muc_cha ? `Dịch từ: ${form.i18n.vi.Danh_muc_cha}` : 'Danh mục cha...')"
                   />
                 </div>
-                <div class="field span-6">
+                <div class="field span-4">
+                  <label>Danh mục con ({{ getLangShort(activeFormLang) }})</label>
+                  <input
+                    v-model="form.i18n[activeFormLang].Danh_muc"
+                    :placeholder="activeFormLang === 'vi' ? 'VD: Cơm, Bún - Phở - Mì, Trà sữa...' : (form.i18n.vi.Danh_muc ? `Dịch từ: ${form.i18n.vi.Danh_muc}` : 'Danh mục con...')"
+                  />
+                </div>
+                <div class="field span-4">
                   <label>ĐVT ({{ getLangShort(activeFormLang) }})</label>
                   <input
                     v-model="form.i18n[activeFormLang].Dvt"
@@ -435,7 +442,8 @@
     <th>Mã hàng</th>
     <th>Tên hàng</th>
     <th>Mô tả</th>
-    <th>Danh mục</th>
+    <th>Danh mục cha</th>
+    <th>Danh mục con</th>
     <th>ĐVT</th>
     <th>Size</th>
     <th>Giá gốc</th>
@@ -478,6 +486,7 @@
 
                   <td class="ellipsis">{{ h.Mo_ta }}</td>
 
+                  <td>{{ h.Danh_muc_cha }}</td>
                   <td>{{ h.Danh_muc }}</td>
                   <td>{{ h.Dvt }}</td>
                   <td>{{ h.Size }}</td>
@@ -545,7 +554,8 @@
       <button class="btn chip" @click="applyBulk('img_5')"><i class="ri-add-circle-fill"></i> Ảnh phụ 5</button>
       <button class="btn chip" @click="applyBulk('img_6')"><i class="ri-add-circle-fill"></i> Ảnh phụ 6</button>
 
-      <button class="btn chip" @click="applyBulk('Danh_muc')"><i class="ri-add-circle-fill"></i> Danh mục (VI)</button>
+      <button class="btn chip" @click="applyBulk('Danh_muc_cha')"><i class="ri-add-circle-fill"></i> Danh mục cha (VI)</button>
+      <button class="btn chip" @click="applyBulk('Danh_muc')"><i class="ri-add-circle-fill"></i> Danh mục con (VI)</button>
       <button class="btn chip" @click="applyBulk('Dvt')"><i class="ri-add-circle-fill"></i> ĐVT (VI)</button>
       <button class="btn chip" @click="applyBulk('Size')"><i class="ri-add-circle-fill"></i> Size</button>
 
@@ -659,7 +669,8 @@
               <div class="kv"><span class="k">Tên hàng:</span><span class="v">{{ detailItem?.Ten_hang }}</span></div>
               <div class="kv"><span class="k">Mã hàng:</span><span class="v mono">{{ detailItem?.Ma_hang }}</span></div>
 
-              <div class="kv"><span class="k">Danh mục:</span><span class="v">{{ detailItem?.Danh_muc }}</span></div>
+              <div class="kv"><span class="k">Danh mục cha:</span><span class="v">{{ detailItem?.Danh_muc_cha || '—' }}</span></div>
+              <div class="kv"><span class="k">Danh mục con:</span><span class="v">{{ detailItem?.Danh_muc }}</span></div>
               <div class="kv"><span class="k">ĐVT:</span><span class="v">{{ detailItem?.Dvt }}</span></div>
               <div class="kv"><span class="k">Size:</span><span class="v">{{ detailItem?.Size }}</span></div>
 
@@ -814,11 +825,19 @@
               />
             </div>
 
-            <div class="field span-4">
-              <label>Danh mục ({{ getLangShort(activeEditLang) }})</label>
+            <div class="field span-6">
+              <label>Danh mục cha ({{ getLangShort(activeEditLang) }})</label>
+              <input
+                v-model="editForm.i18n[activeEditLang].Danh_muc_cha"
+                :placeholder="activeEditLang === 'vi' ? 'Danh mục cha...' : (editForm.i18n.vi.Danh_muc_cha ? `Dịch từ: ${editForm.i18n.vi.Danh_muc_cha}` : 'Danh mục cha...')"
+              />
+            </div>
+
+            <div class="field span-6">
+              <label>Danh mục con ({{ getLangShort(activeEditLang) }})</label>
               <input
                 v-model="editForm.i18n[activeEditLang].Danh_muc"
-                :placeholder="activeEditLang === 'vi' ? 'Danh mục...' : (editForm.i18n.vi.Danh_muc ? `Dịch từ: ${editForm.i18n.vi.Danh_muc}` : 'Danh mục...')"
+                :placeholder="activeEditLang === 'vi' ? 'Danh mục con...' : (editForm.i18n.vi.Danh_muc ? `Dịch từ: ${editForm.i18n.vi.Danh_muc}` : 'Danh mục con...')"
               />
             </div>
 
@@ -941,6 +960,79 @@
         </div>
       </div>
     </div>
+    <div v-if="duplicateModal.open" class="modal-mask" @click.self="cancelDuplicateModal">
+      <div class="notify-box dup-modal-box">
+        <div class="notify-title">⚠️ Đang có sản phẩm trùng trong kho</div>
+
+        <template v-if="duplicateModal.mode === 'single'">
+          <div class="dup-compare-grid">
+            <div class="dup-card is-old">
+              <div class="dup-card-lbl">
+                {{ duplicateModal.matchSource === 'pending' ? 'Đã có trong danh sách chờ' : 'Sản phẩm đang có trong DB' }}
+              </div>
+              <div class="dup-card-name">{{ duplicateModal.existingItem?.Ten_hang }}</div>
+              <div class="dup-card-meta">
+                <span>Mã: <strong>#{{ duplicateModal.existingItem?.Ma_hang }}</strong></span>
+                <span>Giá bán: <strong>{{ fmtMoney(duplicateModal.existingItem?.Gia_ban, duplicateModal.existingItem?.Don_vi_tien_te) }}</strong></span>
+                <span>Giá gốc: <strong>{{ fmtMoney(duplicateModal.existingItem?.Gia_goc, duplicateModal.existingItem?.Don_vi_tien_te) }}</strong></span>
+              </div>
+            </div>
+            <div class="dup-card is-new">
+              <div class="dup-card-lbl">Sản phẩm bạn vừa nhập</div>
+              <div class="dup-card-name">{{ duplicateModal.pendingSynced?.Ten_hang }}</div>
+              <div class="dup-card-meta">
+                <span>Nếu thêm mới → Mã: <strong>#{{ duplicateModal.suggestedNewCode }}</strong></span>
+                <span>Giá bán: <strong>{{ fmtMoney(duplicateModal.pendingSynced?.Gia_ban, duplicateModal.pendingSynced?.Don_vi_tien_te) }}</strong></span>
+                <span>Giá gốc: <strong>{{ fmtMoney(duplicateModal.pendingSynced?.Gia_goc, duplicateModal.pendingSynced?.Don_vi_tien_te) }}</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="dup-actions">
+            <button class="btn warning" type="button" @click="resolveSingleDuplicate('update')">
+              <i class="app-ico ri-refresh-line"></i>
+              Cập nhật vào #{{ duplicateModal.existingItem?.Ma_hang }}
+            </button>
+            <button class="btn success" type="button" @click="resolveSingleDuplicate('create_new')">
+              <i class="app-ico ri-add-circle-line"></i>
+              Bỏ qua &amp; Thêm mới (#{{ duplicateModal.suggestedNewCode }})
+            </button>
+            <button class="btn ghost" type="button" @click="cancelDuplicateModal">Hủy</button>
+          </div>
+        </template>
+
+        <template v-else>
+          <div class="notify-msg">
+            Phát hiện <strong>{{ duplicateModal.excelConflicts.length }}</strong> dòng trong file Excel chưa điền cột
+            <code>Ma_hang</code> nhưng <strong>trùng tên</strong> với sản phẩm đã có:
+          </div>
+          <div class="dup-excel-list">
+            <div
+              v-for="(c, idx) in duplicateModal.excelConflicts"
+              :key="`dup-xl-${idx}`"
+              class="dup-excel-item"
+            >
+              <strong>{{ c.row.Ten_hang }}</strong>
+              <span>Trùng: #{{ c.duplicate.matched?.Ma_hang }}</span>
+            </div>
+          </div>
+          <div class="dup-actions">
+            <button class="btn warning" type="button" @click="resolveExcelDuplicates('update')">
+              <i class="app-ico ri-refresh-line"></i>
+              Cập nhật vào sản phẩm trùng
+            </button>
+            <button class="btn success" type="button" @click="resolveExcelDuplicates('create_new')">
+              <i class="app-ico ri-add-circle-line"></i>
+              Bỏ qua &amp; Thêm mới (tự thêm _1)
+            </button>
+            <button class="btn ghost" type="button" @click="cancelDuplicateModal">
+              Bỏ các dòng trùng này
+            </button>
+          </div>
+        </template>
+      </div>
+    </div>
+
     <div v-if="notify.open" class="modal-mask" @click.self="closeNotify">
       <div class="notify-box" :class="notify.type">
         <div class="notify-title">{{ notify.title }}</div>
@@ -956,15 +1048,25 @@
 
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue'
-import * as XLSX from 'xlsx'
+import * as XLSXRaw from 'xlsx-js-style'
 import { onBeforeRouteLeave } from 'vue-router'
 import { getOneSheet, dispatchAction } from '@/config/api'
-import { uploadImageToImgBB } from '@/utils/imageUpload.js'
+import { uploadImageToCloudinary } from '@/utils/imageUpload.js'
 import {
   normalizeNccDiscountType,
   normalizeNccDiscountValue,
   formatNccDiscountLabel,
 } from '@/utils/nccDiscount'
+import {
+  genBaseProductCode,
+  buildUniqueProductCode,
+  findDuplicateProductMatch,
+} from '@/utils/productCode'
+import {
+  createSampleTemplateProductRows,
+  exportProductsWorkbook,
+  normalizeImportedExcelRow,
+} from '@/utils/productExcel'
 import {
   SUPPORTED_DATA_LANGS,
   createEmptyProductI18n,
@@ -975,11 +1077,14 @@ import {
   productMatchesKeyword,
 } from '@/utils/i18nData'
 
+const XLSX = XLSXRaw?.utils ? XLSXRaw : XLSXRaw?.default || XLSXRaw
+
 /* ================= CONFIG ================= */
 const PRODUCT_IMAGE_COMPRESS_OPTS = {
   targetKB: 100,
   maxWidth: 1200,
   maxHeight: 1200,
+  folder: 'sakitchen/san-pham',
 }
 
 /* ================= STATE ================= */
@@ -1072,6 +1177,7 @@ const emptyForm = () => ({
   Ten_hang: '',
   Main_img: '',
   Mo_ta: '',
+  Danh_muc_cha: '',
   Danh_muc: '',
   Size: '',
   Dvt: '',
@@ -1124,6 +1230,7 @@ function selectProduct(p) {
     Ten_hang: i18n.vi.Ten_hang || p.Ten_hang || '',
     Main_img: p.Main_img || '',
     Mo_ta: i18n.vi.Mo_ta || p.Mo_ta || '',
+    Danh_muc_cha: i18n.vi.Danh_muc_cha || p.Danh_muc_cha || '',
     Danh_muc: i18n.vi.Danh_muc || p.Danh_muc || '',
     Size: p.Size || '',
     Dvt: i18n.vi.Dvt || p.Dvt || '',
@@ -1176,19 +1283,144 @@ function clearSearch() {
 
 /* ================= AUTO SYNC I18N & GEN MÃ HÀNG ================= */
 function genMaHangFE(tenHang) {
-  const clean = String(tenHang || '').trim()
-  if (!clean) return ''
-  const ascii = clean
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/Đ/g, 'D')
-  const code = ascii
-    .split(/\s+/)
-    .map((w) => w.replace(/[^a-zA-Z0-9]/g, '')[0]?.toUpperCase())
-    .filter(Boolean)
-    .join('')
-  return code || 'SP'
+  return genBaseProductCode(tenHang)
+}
+
+function getAllOccupiedMaHangCodes(excludePendingIdx = -1) {
+  const codes = new Set()
+  for (const p of productList.value || []) {
+    const code = String(p?.Ma_hang || '').trim()
+    if (code) codes.add(code)
+  }
+  ;(list.value || []).forEach((p, idx) => {
+    if (idx === excludePendingIdx) return
+    const code = String(p?.Ma_hang || '').trim()
+    if (code) codes.add(code)
+  })
+  return codes
+}
+
+const duplicateModal = ref({
+  open: false,
+  mode: 'single', // 'single' | 'excel'
+  existingItem: null,
+  matchSource: 'db',
+  suggestedNewCode: '',
+  pendingSynced: null,
+  keepCurrency: 'P',
+  excelConflicts: [],
+})
+
+function cancelDuplicateModal() {
+  duplicateModal.value.open = false
+  duplicateModal.value.pendingSynced = null
+  duplicateModal.value.excelConflicts = []
+}
+
+function resetManualEntryForm(keepCurrency = 'P') {
+  isExistingProductSelected.value = false
+  form.value = {
+    ...emptyForm(),
+    Don_vi_tien_te: keepCurrency,
+  }
+  activeFormLang.value = 'vi'
+}
+
+function resolveSingleDuplicate(action) {
+  const modal = duplicateModal.value
+  const synced = modal.pendingSynced
+  const existing = modal.existingItem
+  if (!synced) {
+    cancelDuplicateModal()
+    return
+  }
+
+  if (action === 'update' && existing) {
+    const targetCode = String(existing.Ma_hang || '').trim()
+    const mergedRow = syncProductWithI18n({
+      ...existing,
+      ...synced,
+      Ma_hang: targetCode,
+    })
+    if (modal.matchSource === 'pending') {
+      const idx = list.value.findIndex((p) => String(p?.Ma_hang || '').trim() === targetCode)
+      if (idx > -1) {
+        list.value[idx] = {
+          ...mergedRow,
+          Don_vi_tien_te: modal.keepCurrency,
+          _fromExisting: Boolean(list.value[idx]._fromExisting || existing._fromExisting),
+        }
+      } else {
+        list.value.push({ ...mergedRow, Don_vi_tien_te: modal.keepCurrency, _fromExisting: true })
+      }
+    } else {
+      list.value.push({ ...mergedRow, Don_vi_tien_te: modal.keepCurrency, _fromExisting: true })
+    }
+  } else {
+    const used = getAllOccupiedMaHangCodes()
+    const existingCode = String(existing?.Ma_hang || '').trim()
+    const freshCode = buildUniqueProductCode(existingCode || synced.Ten_hang, used, {
+      treatInputAsBase: Boolean(existingCode),
+    })
+    list.value.push({
+      ...synced,
+      Ma_hang: freshCode,
+      Don_vi_tien_te: modal.keepCurrency,
+      _fromExisting: false,
+      _forceCreateNew: true,
+    })
+  }
+
+  cancelDuplicateModal()
+  resetManualEntryForm(modal.keepCurrency)
+}
+
+function resolveExcelDuplicates(action) {
+  const conflicts = duplicateModal.value.excelConflicts || []
+  const used = getAllOccupiedMaHangCodes()
+  let resolvedCount = 0
+
+  for (const entry of conflicts) {
+    const existing = entry.duplicate?.matched
+    const existingCode = String(existing?.Ma_hang || '').trim()
+
+    if (action === 'update' && existingCode) {
+      const merged = syncProductWithI18n({
+        ...existing,
+        ...entry.row,
+        Ma_hang: existingCode,
+      })
+      if (entry.duplicate.matchSource === 'pending') {
+        const idx = list.value.findIndex((p) => String(p?.Ma_hang || '').trim() === existingCode)
+        if (idx > -1) {
+          list.value[idx] = { ...merged, _fromExisting: Boolean(list.value[idx]._fromExisting) }
+        } else {
+          list.value.push({ ...merged, _fromExisting: true })
+        }
+      } else {
+        list.value.push({ ...merged, _fromExisting: true })
+      }
+      used.add(existingCode)
+      resolvedCount++
+    } else if (action === 'create_new') {
+      const freshCode = buildUniqueProductCode(existingCode || entry.row.Ten_hang, used, {
+        treatInputAsBase: Boolean(existingCode),
+      })
+      used.add(freshCode)
+      list.value.push({
+        ...entry.row,
+        Ma_hang: freshCode,
+        _fromExisting: false,
+        _forceCreateNew: true,
+      })
+      resolvedCount++
+    }
+  }
+
+  cancelDuplicateModal()
+  if (resolvedCount > 0) {
+    openNotify('📥 Import', `Đã xử lý thêm ${resolvedCount} dòng trùng vào danh sách`, 'success')
+  }
 }
 
 watch(
@@ -1208,6 +1440,7 @@ watch(
       String(i18nVal.ko?.Ten_hang || '').trim()
 
     form.value.Ten_hang = primaryName
+    form.value.Danh_muc_cha = String(i18nVal.vi?.Danh_muc_cha || '').trim()
     form.value.Danh_muc = String(i18nVal.vi?.Danh_muc || '').trim()
     form.value.Dvt = String(i18nVal.vi?.Dvt || '').trim()
     form.value.Mo_ta = String(i18nVal.vi?.Mo_ta || '').trim()
@@ -1238,24 +1471,42 @@ function themHang() {
     return
   }
 
-  if (!synced.Ma_hang) {
-    synced.Ma_hang = genMaHangFE(synced.Ten_hang)
-  }
-
   const keepCurrency = form.value.Don_vi_tien_te || 'P'
-
-  list.value.push({
-    ...synced,
-    Don_vi_tien_te: keepCurrency,
-    _fromExisting: Boolean(form.value._fromExisting),
+  const duplicate = findDuplicateProductMatch({
+    tenHang: synced.Ten_hang,
+    maHang: form.value._fromExisting ? synced.Ma_hang : '',
+    catalog: productList.value,
+    pending: list.value,
   })
 
-  isExistingProductSelected.value = false
-  form.value = {
-    ...emptyForm(),
-    Don_vi_tien_te: keepCurrency,
+  if (duplicate?.matched) {
+    const matchedCode = String(duplicate.matched.Ma_hang || '').trim()
+    const used = getAllOccupiedMaHangCodes()
+    duplicateModal.value = {
+      open: true,
+      mode: 'single',
+      existingItem: duplicate.matched,
+      matchSource: duplicate.matchSource,
+      suggestedNewCode: buildUniqueProductCode(matchedCode || synced.Ten_hang, used, {
+        treatInputAsBase: Boolean(matchedCode),
+      }),
+      pendingSynced: synced,
+      keepCurrency,
+      excelConflicts: [],
+    }
+    return
   }
-  activeFormLang.value = 'vi'
+
+  const uniqueCode = buildUniqueProductCode(synced.Ten_hang, getAllOccupiedMaHangCodes())
+  list.value.push({
+    ...synced,
+    Ma_hang: uniqueCode,
+    Don_vi_tien_te: keepCurrency,
+    _fromExisting: false,
+    _forceCreateNew: true,
+  })
+
+  resetManualEntryForm(keepCurrency)
 }
 
 function removeItem(i) {
@@ -1300,7 +1551,7 @@ async function handleSubImageUpload(e, fieldName) {
 
   uploadingSubImg.value[fieldName] = true
   try {
-    form.value[fieldName] = await uploadImageToImgBB(file, PRODUCT_IMAGE_COMPRESS_OPTS)
+    form.value[fieldName] = await uploadImageToCloudinary(file, PRODUCT_IMAGE_COMPRESS_OPTS)
   } catch (err) {
     console.error(err)
     openNotify('❌ Lỗi', `Upload ${fieldName} thất bại`, 'error')
@@ -1314,16 +1565,20 @@ async function handleSubImageUpload(e, fieldName) {
 function buildPayload() {
   return list.value.map((raw) => {
     const i = syncProductWithI18n(raw)
+    const hasGiaGiam =
+      raw.Gia_Giam !== undefined && raw.Gia_Giam !== null && String(raw.Gia_Giam).trim() !== ''
     return {
-      Ma_hang: i.Ma_hang || genMaHangFE(i.Ten_hang),
+      Ma_hang: i.Ma_hang || buildUniqueProductCode(i.Ten_hang, []),
       Ten_hang: i.Ten_hang,
       Main_img: i.Main_img || '',
       Mo_ta: i.Mo_ta || '',
+      Danh_muc_cha: i.Danh_muc_cha || '',
       Danh_muc: i.Danh_muc || '',
       Size: i.Size || '',
       Dvt: i.Dvt || '',
       Gia_goc: Number(i.Gia_goc || 0),
       Gia_ban: Number(i.Gia_ban || 0),
+      ...(hasGiaGiam ? { Gia_Giam: Number(raw.Gia_Giam) } : {}),
       Ncc_loai_giam: normalizeNccDiscountType(i.Ncc_loai_giam),
       Ncc_gia_tri_giam: normalizeNccDiscountValue(i.Ncc_gia_tri_giam),
       Trang_thai: i.Trang_thai || 'Còn hàng',
@@ -1335,6 +1590,7 @@ function buildPayload() {
       img_5: i.img_5 || '',
       img_6: i.img_6 || '',
       i18n: i.i18n,
+      ...(raw._forceCreateNew ? { _forceCreateNew: true } : {}),
     }
   })
 }
@@ -1403,42 +1659,11 @@ watch(
 
 /* ================= EXCEL TEMPLATE & IMPORT ================= */
 function downloadExcelTemplate() {
-  const sampleRows = [
-    {
-      Ma_hang: '',
-      Ten_hang: 'Cơm sườn nướng mật ong',
-      Danh_muc: 'Cơm',
-      Dvt: 'Phần',
-      Size: '',
-      Gia_goc: 0,
-      Gia_ban: 270,
-      Don_vi_tien_te: 'P',
-      Trang_thai: 'Còn hàng',
-      Main_img: '',
-      Mo_ta: 'Sườn nướng thơm mềm ăn kèm cơm nóng',
-      Ten_hang_en: 'Honey Grilled Pork Chop Rice',
-      Danh_muc_en: 'Rice',
-      Dvt_en: 'Portion',
-      Mo_ta_en: 'Tender honey-glazed pork chop with steamed rice',
-      Ten_hang_zh: '蜜汁烤猪排饭',
-      Danh_muc_zh: '米饭',
-      Dvt_zh: '份',
-      Mo_ta_zh: '',
-      Ten_hang_fil: 'Kanin na may Inihaw na Pork Chop sa Pulot',
-      Danh_muc_fil: 'Kanin (Rice Meals)',
-      Dvt_fil: 'Order',
-      Mo_ta_fil: '',
-      Ten_hang_ko: '허니 그릴 폭찹 덮밥',
-      Danh_muc_ko: '덮밥 · 밥류',
-      Dvt_ko: '인분',
-      Mo_ta_ko: '',
-    },
-  ]
-
-  const ws = XLSX.utils.json_to_sheet(sampleRows)
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, 'Hang_Hoa')
-  XLSX.writeFile(wb, 'TEMPLATE-SA-KITCHEN-5LANG.xlsx')
+  exportProductsWorkbook({
+    rawRows: createSampleTemplateProductRows(),
+    filename: 'TEMPLATE-SA-KITCHEN-5LANG.xlsx',
+    sheetName: 'Hang_Hoa',
+  })
 }
 
 function importExcel(e) {
@@ -1452,34 +1677,104 @@ function importExcel(e) {
     const sheet = workbook.Sheets[workbook.SheetNames[0]]
     const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
 
-    let addedCount = 0
-    rows.forEach((r) => {
-      const synced = syncProductWithI18n({
-        ...r,
-        Gia_goc: parseMoneyInput(String(r.Gia_goc || '')),
-        Gia_ban: parseMoneyInput(String(r.Gia_ban || '')),
-        Trang_thai: r.Trang_thai || 'Còn hàng',
-        Don_vi_tien_te: r.Don_vi_tien_te || 'P',
-        img_1: r.img_1 || '',
-        img_2: r.img_2 || '',
-        img_3: r.img_3 || '',
-        img_4: r.img_4 || '',
-        img_5: r.img_5 || '',
-        img_6: r.img_6 || '',
+    const usedCodes = new Set(getAllOccupiedMaHangCodes())
+    const readyRows = []
+    const excelConflicts = []
+    const nccConflictRows = []
+
+    rows.forEach((rawRow, rawIdx) => {
+      const normalized = normalizeImportedExcelRow(rawRow)
+      if (!normalized.Ten_hang) return
+
+      if (normalized._nccConflict) {
+        nccConflictRows.push(`Dòng ${rawIdx + 2}: ${normalized.Ten_hang}`)
+        return
+      }
+
+      const hasExplicitMa = normalized._hasExplicitMaHang
+      const synced = syncProductWithI18n(normalized)
+
+      if (hasExplicitMa) {
+        const explicitMa = String(normalized.Ma_hang).trim()
+        synced.Ma_hang = explicitMa
+        synced._fromExisting = productList.value.some(
+          (p) => String(p?.Ma_hang || '').trim() === explicitMa,
+        )
+        if (normalized.Gia_Giam !== '' && normalized.Gia_Giam !== undefined) {
+          synced.Gia_Giam = normalized.Gia_Giam
+        }
+        usedCodes.add(explicitMa)
+        readyRows.push(synced)
+        return
+      }
+
+      const duplicate = findDuplicateProductMatch({
+        tenHang: synced.Ten_hang,
+        catalog: productList.value,
+        pending: [...list.value, ...readyRows],
       })
 
-      if (synced.Ten_hang) {
-        const explicitMa = String(r.Ma_hang || '').trim()
-        synced.Ma_hang = explicitMa || genMaHangFE(synced.Ten_hang)
-        synced._fromExisting = Boolean(
-          explicitMa && productList.value.some((p) => p.Ma_hang === explicitMa)
-        )
-        list.value.push(synced)
-        addedCount++
+      if (duplicate?.matched) {
+        excelConflicts.push({
+          row: {
+            ...synced,
+            ...(normalized.Gia_Giam !== '' && normalized.Gia_Giam !== undefined
+              ? { Gia_Giam: normalized.Gia_Giam }
+              : {}),
+          },
+          duplicate,
+        })
+        return
       }
+
+      const newCode = buildUniqueProductCode(synced.Ten_hang, usedCodes)
+      usedCodes.add(newCode)
+      synced.Ma_hang = newCode
+      synced._fromExisting = false
+      synced._forceCreateNew = true
+      if (normalized.Gia_Giam !== '' && normalized.Gia_Giam !== undefined) {
+        synced.Gia_Giam = normalized.Gia_Giam
+      }
+      readyRows.push(synced)
     })
 
-    openNotify('📥 Import', `Đã import ${addedCount} dòng hợp lệ`, 'success')
+    readyRows.forEach((item) => list.value.push(item))
+
+    if (nccConflictRows.length > 0 && excelConflicts.length === 0) {
+      const sampleList = nccConflictRows.slice(0, 5).join(', ')
+      const extraMore = nccConflictRows.length > 5 ? ` (+${nccConflictRows.length - 5} dòng)` : ''
+      openNotify(
+        '⚠️ Kiểm tra cột CK NCC',
+        `Đã nhập ${readyRows.length} dòng hợp lệ. Bỏ qua ${nccConflictRows.length} dòng bị điền cả 2 cột ncc_%_ck & ncc_tien_giam (${sampleList}${extraMore}) — chỉ điền 1 trong 2 cột rồi import lại.`,
+        'error',
+      )
+      return
+    }
+
+    if (excelConflicts.length > 0) {
+      duplicateModal.value = {
+        open: true,
+        mode: 'excel',
+        existingItem: null,
+        matchSource: 'db',
+        suggestedNewCode: '',
+        pendingSynced: null,
+        keepCurrency: 'P',
+        excelConflicts,
+      }
+      if (readyRows.length > 0 || nccConflictRows.length > 0) {
+        const nccNote = nccConflictRows.length
+          ? ` (Bỏ qua ${nccConflictRows.length} dòng bị điền cả 2 cột CK NCC)`
+          : ''
+        openNotify(
+          '📥 Import',
+          `Đã nhập ${readyRows.length} dòng hợp lệ. Còn ${excelConflicts.length} dòng trùng tên đang chờ xác nhận.${nccNote}`,
+          'info',
+        )
+      }
+    } else {
+      openNotify('📥 Import', `Đã import ${readyRows.length} dòng hợp lệ`, 'success')
+    }
   }
 
   reader.readAsArrayBuffer(file)
@@ -1503,7 +1798,7 @@ function applyBulk(field) {
 
     if (field.includes('Gia')) {
       row[field] = Number(value || 0)
-    } else if (['Ten_hang', 'Danh_muc', 'Dvt', 'Mo_ta'].includes(field)) {
+    } else if (['Ten_hang', 'Danh_muc_cha', 'Danh_muc', 'Dvt', 'Mo_ta'].includes(field)) {
       row[field] = value
       row.i18n.vi[field] = value
     } else {
@@ -1511,7 +1806,8 @@ function applyBulk(field) {
     }
 
     if (row.Ten_hang && !row._fromExisting) {
-      row.Ma_hang = genMaHangFE(row.Ten_hang)
+      row.Ma_hang = buildUniqueProductCode(row.Ten_hang, getAllOccupiedMaHangCodes(index))
+      row._forceCreateNew = true
     }
   })
 
@@ -1530,7 +1826,7 @@ async function handleMainImageUpload(e) {
 
   uploadingImg.value = true
   try {
-    form.value.Main_img = await uploadImageToImgBB(file, PRODUCT_IMAGE_COMPRESS_OPTS)
+    form.value.Main_img = await uploadImageToCloudinary(file, PRODUCT_IMAGE_COMPRESS_OPTS)
   } catch (err) {
     console.error(err)
     openNotify('❌ Lỗi', 'Upload ảnh thất bại', 'error')
@@ -1554,7 +1850,7 @@ async function handleBulkImageUpload(e) {
 
   try {
     const results = await Promise.allSettled(
-      files.map((file) => uploadImageToImgBB(file, PRODUCT_IMAGE_COMPRESS_OPTS))
+      files.map((file) => uploadImageToCloudinary(file, PRODUCT_IMAGE_COMPRESS_OPTS))
     )
     bulkImageUrls.value = results
       .filter((r) => r.status === 'fulfilled' && r.value)
@@ -1605,7 +1901,11 @@ function saveEdit() {
   if (editIndex.value === null) return
   const synced = syncProductWithI18n(editForm.value)
   if (!synced.Ma_hang && synced.Ten_hang) {
-    synced.Ma_hang = genMaHangFE(synced.Ten_hang)
+    synced.Ma_hang = buildUniqueProductCode(
+      synced.Ten_hang,
+      getAllOccupiedMaHangCodes(editIndex.value),
+    )
+    synced._forceCreateNew = true
   }
 
   list.value[editIndex.value] = {
@@ -1624,7 +1924,7 @@ async function handleEditImageUpload(e) {
 
   uploadingEditImg.value = true
   try {
-    editForm.value.Main_img = await uploadImageToImgBB(file, PRODUCT_IMAGE_COMPRESS_OPTS)
+    editForm.value.Main_img = await uploadImageToCloudinary(file, PRODUCT_IMAGE_COMPRESS_OPTS)
     openNotify('✅ Upload', 'Đã đổi ảnh thành công', 'success')
   } catch (err) {
     console.error(err)
@@ -1641,7 +1941,7 @@ async function handleEditSubImageUpload(e, fieldName) {
 
   uploadingEditSubImg.value[fieldName] = true
   try {
-    editForm.value[fieldName] = await uploadImageToImgBB(file, PRODUCT_IMAGE_COMPRESS_OPTS)
+    editForm.value[fieldName] = await uploadImageToCloudinary(file, PRODUCT_IMAGE_COMPRESS_OPTS)
   } catch (err) {
     console.error(err)
     openNotify('❌ Lỗi', `Upload ${fieldName} thất bại`, 'error')
@@ -1719,6 +2019,7 @@ onUnmounted(() => {
 
 /* ================== LAYOUT ================== */
 .crm-layout {
+  height: 100%;
   height: 100dvh;
   width: 100%;
   background: rgb(15, 23, 42);
@@ -1784,6 +2085,18 @@ h2 {
     grid-template-columns: 1fr;
     overflow: auto;
     padding-right: 2px;
+  }
+}
+
+@media (max-width: 768px) {
+  .crm-layout {
+    height: 100%;
+  }
+
+  .content-grid {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
   }
 }
 
@@ -3209,5 +3522,92 @@ h2 {
   font-weight: 500;
   color: #93c5fd;
   text-transform: none;
+}
+
+.dup-modal-box {
+  max-width: 540px;
+  width: 94%;
+}
+
+.dup-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 10px 0 14px;
+  text-align: left;
+}
+
+@media (max-width: 560px) {
+  .dup-compare-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dup-card {
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dup-card.is-old {
+  border-color: rgba(245, 158, 11, 0.45);
+}
+
+.dup-card.is-new {
+  border-color: rgba(34, 197, 94, 0.45);
+}
+
+.dup-card-lbl {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.dup-card-name {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.dup-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.dup-excel-list {
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 10px 0 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.dup-excel-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  font-size: 12.5px;
+}
+
+.dup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 </style>

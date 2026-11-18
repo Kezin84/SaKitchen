@@ -7,7 +7,11 @@
     "detail": "Tingnan ang detalye",
     "detailNote": "Tingnan ang detalye/tala",
     "add": "IDAGDAG",
-    "note": "Tala ng ulam (para sa shop)"
+    "note": "Tala ng ulam (para sa shop)",
+    "notePlaceholder": "Hal: bawasan ang anghang, walang sibuyas...",
+    "relatedItems": "Mga katulad na pagkain",
+    "chooseVariant": "Mga opsyon",
+    "noticeLabel": "PAUNAWA"
   },
   "contact": {
     "sendOrder": "Makipag-ugnayan para mag-order",
@@ -184,6 +188,7 @@
   },
   "mobile": {
     "category": "Kategorya",
+    "menu": "Menu",
     "contact": "Makipag-ugnayan",
     "cart": "Cart",
     "progress": "Status",
@@ -242,6 +247,11 @@
     "completedNotice": "Kumpleto na ang order. Salamat! Pindutin ang Bagong Order kung oorder ulit.",
     "cancelledNotice": "Kinansela ng shop ang order na ito. Makipag-ugnayan sa shop o gumawa ng bagong order.",
     "completedToast": "Kumpleto na ang order #{code}!",
-    "cancelledToast": "Kinansela ng shop ang order #{code}."
+    "cancelledToast": "Kinansela ng shop ang order #{code}.",
+    "shopMessageLabel": "Mensahe mula sa shop",
+    "finalCompletedTitle": "Kumpleto na ang order #{code}",
+    "finalCancelledTitle": "Kinansela ang order #{code}",
+    "finalNewOrderBtn": "Gumawa ng bagong order",
+    "finalCloseBtn": "Isara"
   }
 }

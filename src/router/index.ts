@@ -15,6 +15,7 @@ import Login from '@/views/Login.vue'
 import NhapHoaDon from '@/views/nhaphoadon.vue'
 import DonHang from '@/views/donhang.vue'
 import BaoCao from '@/views/baocao.vue'
+import TinhChietKhau from '@/views/TinhChietKhau.vue'
 import ChiPhiPhatSinh from '@/views/chiPhiPhatSinh.vue'
 
 import KhachHang from '@/views/khachHang.vue'
@@ -22,6 +23,27 @@ import KhachHang from '@/views/khachHang.vue'
 import LandingPage from '@/views/LandingPage.vue'
 
 const SUPPORTED_LANGS = ['vi', 'en', 'zh-CN', 'fil', 'ko']
+
+function menuLangGuard(to: {
+  name?: string | symbol | null
+  params: Record<string, string | string[]>
+  query: Record<string, unknown>
+}) {
+  const lang = String(to.params.lang || '')
+  if (!SUPPORTED_LANGS.includes(lang)) {
+    return { name: 'menu-online', params: { lang: 'vi' }, replace: true }
+  }
+  // Tương thích ngược: nếu khách mở link cũ có ?ncc=SA thì tự làm sạch URL
+  if ('ncc' in to.query) {
+    const { ncc: _ncc, ...cleanQuery } = to.query
+    return {
+      name: typeof to.name === 'string' ? to.name : 'menu-online',
+      params: to.params,
+      query: cleanQuery as Record<string, string>,
+      replace: true,
+    }
+  }
+}
 
 const router = createRouter({
   history: createWebHistory(),
@@ -60,6 +82,11 @@ const router = createRouter({
           name: 'admin-bao-cao',
           component: BaoCao,
         },
+        {
+          path: 'tinh-chiet-khau',
+          name: 'admin-tinh-chiet-khau',
+          component: TinhChietKhau,
+        },
         { path: 'banner', name: 'admin-banner', component: Banner },
         { path: 'sap-xep-hien-thi', name: 'admin-sap-xep-hien-thi', component: SapXepHienThi },
         { path: 'thong-bao', name: 'admin-thong-bao', component: Thongbao },
@@ -84,20 +111,16 @@ const router = createRouter({
     },
 
     {
-      path: '/:lang',
+      path: '/:lang/:productSlug?/:productId?',
       name: 'menu-online',
       component: MenuOnline,
-      beforeEnter: (to) => {
-        const lang = String(to.params.lang || '')
-        if (!SUPPORTED_LANGS.includes(lang)) {
-          return { name: 'menu-online', params: { lang: 'vi' }, replace: true }
-        }
-        // Tương thích ngược: nếu khách mở link cũ có ?ncc=SA thì tự làm sạch URL về /:lang
-        if ('ncc' in to.query) {
-          const { ncc: _ncc, ...cleanQuery } = to.query
-          return { name: 'menu-online', params: { lang }, query: cleanQuery, replace: true }
-        }
-      },
+      beforeEnter: menuLangGuard,
+    },
+    {
+      path: '/:lang/:parentCategory/:subCategory/:productSlug',
+      name: 'menu-online-legacy',
+      component: MenuOnline,
+      beforeEnter: menuLangGuard,
     },
 
     { path: '/:pathMatch(.*)*', redirect: '/vi' },
@@ -107,7 +130,10 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const user = JSON.parse(localStorage.getItem('user') || 'null')
   const isLoginPage = to.name === 'login'
-  const isPublicMenu = to.name === 'menu-online' || to.name === 'menu-mobile'
+  const isPublicMenu =
+    to.name === 'menu-online' ||
+    to.name === 'menu-online-legacy' ||
+    to.name === 'menu-mobile'
 
   if (to.meta.requiresAuth && !user) {
     return next({ name: 'login' })

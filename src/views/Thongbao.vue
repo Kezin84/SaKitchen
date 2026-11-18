@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { getOneSheet, dispatchAction } from '@/config/api'
-import { uploadImageToImgBB } from '@/utils/imageUpload.js'
+import { uploadImageToCloudinary } from '@/utils/imageUpload.js'
 import {
   SUPPORTED_DATA_LANGS,
   createEmptyNoticeI18n,
@@ -103,10 +103,11 @@ function clearEditPopupImg() {
 }
 
 async function uploadPopupImage(file) {
-  return uploadImageToImgBB(file, {
+  return uploadImageToCloudinary(file, {
     targetKB: 180,
     maxWidth: 1200,
     maxHeight: 1600,
+    folder: 'sakitchen/thong-bao',
   })
 }
 

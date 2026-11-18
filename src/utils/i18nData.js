@@ -45,11 +45,11 @@ function str(v) {
  * ========================================================= */
 export function createEmptyProductI18n() {
   return {
-    vi: { Ten_hang: '', Danh_muc: '', Dvt: '', Mo_ta: '' },
-    en: { Ten_hang: '', Danh_muc: '', Dvt: '', Mo_ta: '' },
-    'zh-CN': { Ten_hang: '', Danh_muc: '', Dvt: '', Mo_ta: '' },
-    fil: { Ten_hang: '', Danh_muc: '', Dvt: '', Mo_ta: '' },
-    ko: { Ten_hang: '', Danh_muc: '', Dvt: '', Mo_ta: '' },
+    vi: { Ten_hang: '', Danh_muc_cha: '', Danh_muc: '', Dvt: '', Mo_ta: '' },
+    en: { Ten_hang: '', Danh_muc_cha: '', Danh_muc: '', Dvt: '', Mo_ta: '' },
+    'zh-CN': { Ten_hang: '', Danh_muc_cha: '', Danh_muc: '', Dvt: '', Mo_ta: '' },
+    fil: { Ten_hang: '', Danh_muc_cha: '', Danh_muc: '', Dvt: '', Mo_ta: '' },
+    ko: { Ten_hang: '', Danh_muc_cha: '', Danh_muc: '', Dvt: '', Mo_ta: '' },
   }
 }
 
@@ -80,6 +80,7 @@ export function normalizeProductI18n(item = {}) {
 
     base[code] = {
       Ten_hang: str(langObj.Ten_hang) || pickFlat('Ten_hang'),
+      Danh_muc_cha: str(langObj.Danh_muc_cha) || pickFlat('Danh_muc_cha'),
       Danh_muc: str(langObj.Danh_muc) || pickFlat('Danh_muc'),
       Dvt: str(langObj.Dvt) || pickFlat('Dvt'),
       Mo_ta: str(langObj.Mo_ta) || pickFlat('Mo_ta'),
@@ -88,6 +89,9 @@ export function normalizeProductI18n(item = {}) {
 
   // Fallback root fields into 'vi' when i18n.vi is empty
   if (!base.vi.Ten_hang && str(item.Ten_hang)) base.vi.Ten_hang = str(item.Ten_hang)
+  if (!base.vi.Danh_muc_cha && str(item.Danh_muc_cha)) {
+    base.vi.Danh_muc_cha = str(item.Danh_muc_cha)
+  }
   if (!base.vi.Danh_muc && str(item.Danh_muc)) base.vi.Danh_muc = str(item.Danh_muc)
   if (!base.vi.Dvt && str(item.Dvt)) base.vi.Dvt = str(item.Dvt)
   if (!base.vi.Mo_ta && str(item.Mo_ta)) base.vi.Mo_ta = str(item.Mo_ta)
@@ -112,15 +116,28 @@ export function syncProductWithI18n(item = {}) {
   delete copy.Ma_nha_cung_cap
   delete copy.Ten_nha_cung_cap
   delete copy.So_luong_kho
+  delete copy._tenVi
+  delete copy._danhMucVi
+  delete copy._danhMucChaVi
+  delete copy._hasExplicitMaHang
+  delete copy._forceCreateNew
+  delete copy._fromExisting
+  delete copy._nccConflict
+  for (const key of Object.keys(copy)) {
+    if (/^ncc_(?:%|phan_tram)_ck$|^ncc_tien_giam$/i.test(key)) {
+      delete copy[key]
+    }
+  }
 
   // Clean up any temporary flat Excel suffixes
-  for (const field of ['Ten_hang', 'Danh_muc', 'Dvt', 'Mo_ta']) {
+  for (const field of ['Ten_hang', 'Danh_muc_cha', 'Danh_muc', 'Dvt', 'Mo_ta']) {
     for (const sfx of ['vi', 'en', 'zh-CN', 'zh', 'cn', 'fil', 'ph', 'tl', 'ko', 'kr']) {
       delete copy[`${field}_${sfx}`]
     }
   }
 
   copy.Ten_hang = i18n.vi.Ten_hang || str(item.Ten_hang)
+  copy.Danh_muc_cha = i18n.vi.Danh_muc_cha || str(item.Danh_muc_cha)
   copy.Danh_muc = i18n.vi.Danh_muc || str(item.Danh_muc)
   copy.Dvt = i18n.vi.Dvt || str(item.Dvt)
   copy.Mo_ta = i18n.vi.Mo_ta || str(item.Mo_ta)
@@ -150,10 +167,12 @@ export function localizeProduct(item, lang = 'vi') {
   return {
     ...normalizedItem,
     Ten_hang: resolveProductField(normalizedItem, 'Ten_hang', lang),
+    Danh_muc_cha: resolveProductField(normalizedItem, 'Danh_muc_cha', lang),
     Danh_muc: resolveProductField(normalizedItem, 'Danh_muc', lang),
     Dvt: resolveProductField(normalizedItem, 'Dvt', lang),
     Mo_ta: resolveProductField(normalizedItem, 'Mo_ta', lang),
     _tenVi: i18n.vi.Ten_hang || str(item.Ten_hang),
+    _danhMucChaVi: i18n.vi.Danh_muc_cha || str(item.Danh_muc_cha),
     _danhMucVi: i18n.vi.Danh_muc || str(item.Danh_muc),
   }
 }
@@ -168,6 +187,7 @@ export function productMatchesKeyword(item, rawKeyword) {
   if (!kw) return true
   if (str(item?.Ma_hang).toLowerCase().includes(kw)) return true
   if (str(item?.Ten_hang).toLowerCase().includes(kw)) return true
+  if (str(item?.Danh_muc_cha).toLowerCase().includes(kw)) return true
   if (str(item?.Danh_muc).toLowerCase().includes(kw)) return true
 
   const i18n = item?.i18n
@@ -176,10 +196,148 @@ export function productMatchesKeyword(item, rawKeyword) {
       const entry = i18n[code]
       if (!entry) continue
       if (str(entry.Ten_hang).toLowerCase().includes(kw)) return true
+      if (str(entry.Danh_muc_cha).toLowerCase().includes(kw)) return true
       if (str(entry.Danh_muc).toLowerCase().includes(kw)) return true
     }
   }
   return false
+}
+
+const DEFAULT_SLUG_BY_LANG = {
+  vi: { parent: 'danh-muc', sub: 'mon' },
+  en: { parent: 'category', sub: 'item' },
+  'zh-CN': { parent: '分类', sub: '菜品' },
+  fil: { parent: 'kategorya', sub: 'pagkain' },
+  ko: { parent: '카테고리', sub: '메뉴' },
+}
+
+export function toUrlSlug(rawText, fallback = '') {
+  const text = str(rawText)
+  if (!text) return fallback
+  const slug = text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/g, '')
+  return slug || fallback
+}
+
+function safeDecodeParam(val) {
+  const raw = str(val)
+  if (!raw) return ''
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return raw
+  }
+}
+
+export function getProductUrlParams(item, lang = 'vi') {
+  const activeLang = DATA_LANG_CODES.includes(lang) ? lang : 'vi'
+  const normalized = item?.i18n ? item : { ...item, i18n: normalizeProductI18n(item) }
+
+  const rawName =
+    resolveProductField(normalized, 'Ten_hang', activeLang) ||
+    str(item?.Ten_hang) ||
+    str(item?.Ma_hang)
+  const productId = str(item?.Ma_hang) || toUrlSlug(rawName, 'sp')
+  const productSlug = toUrlSlug(rawName, toUrlSlug(productId, 'san-pham'))
+
+  return {
+    productSlug,
+    productId,
+  }
+}
+
+export function getProductUrlSlugs(item, lang = 'vi') {
+  const activeLang = DATA_LANG_CODES.includes(lang) ? lang : 'vi'
+  const defaults = DEFAULT_SLUG_BY_LANG[activeLang] || DEFAULT_SLUG_BY_LANG.vi
+  const normalized = item?.i18n ? item : { ...item, i18n: normalizeProductI18n(item) }
+  const { productSlug, productId } = getProductUrlParams(normalized, activeLang)
+
+  const rawParent =
+    resolveProductField(normalized, 'Danh_muc_cha', activeLang) ||
+    str(item?.Danh_muc_cha)
+  const rawSub =
+    resolveProductField(normalized, 'Danh_muc', activeLang) ||
+    str(item?.Danh_muc)
+
+  return {
+    parentSlug: toUrlSlug(rawParent || rawSub, defaults.parent),
+    subSlug: toUrlSlug(rawSub || rawParent, defaults.sub),
+    productSlug,
+    productId,
+  }
+}
+
+export function findProductByUrlParams(items = [], params = {}, lang = 'vi') {
+  const rawId = safeDecodeParam(params.productId)
+  const rawSlugParam = safeDecodeParam(params.productSlug)
+
+  // 1. Exact ID match first (guaranteed unique even when product names repeat)
+  if (rawId) {
+    const exact = (items || []).find((item) => str(item?.Ma_hang) === rawId)
+    if (exact) return exact
+    const ci = (items || []).find(
+      (item) => str(item?.Ma_hang).toLowerCase() === rawId.toLowerCase(),
+    )
+    if (ci) return ci
+  }
+
+  // 2. Fallback: match by Ma_hang in single-param URL or by productSlug across languages
+  const targetProductSlug = toUrlSlug(rawSlugParam || rawId, '')
+  if (!targetProductSlug && !rawSlugParam) return null
+
+  if (rawSlugParam) {
+    const directByCode = (items || []).find(
+      (item) => str(item?.Ma_hang).toLowerCase() === rawSlugParam.toLowerCase(),
+    )
+    if (directByCode) return directByCode
+  }
+
+  const targetSubSlug = toUrlSlug(safeDecodeParam(params.subSlug), '')
+  const targetParentSlug = toUrlSlug(safeDecodeParam(params.parentSlug), '')
+  const langPriority = [
+    lang,
+    ...DATA_LANG_CODES.filter((c) => c !== lang),
+  ].filter((c) => DATA_LANG_CODES.includes(c))
+
+  const candidates = []
+
+  for (const item of items || []) {
+    if (!item) continue
+    const normalized = item.i18n ? item : { ...item, i18n: normalizeProductI18n(item) }
+    const codeSlug = toUrlSlug(item.Ma_hang, '')
+
+    let matchedName = codeSlug && codeSlug === targetProductSlug
+    let matchedSub = false
+    let matchedParent = false
+
+    for (const l of langPriority) {
+      const slugs = getProductUrlSlugs(normalized, l)
+      if (slugs.productSlug === targetProductSlug) {
+        matchedName = true
+        if (targetSubSlug && slugs.subSlug === targetSubSlug) matchedSub = true
+        if (targetParentSlug && slugs.parentSlug === targetParentSlug) matchedParent = true
+      }
+    }
+
+    if (matchedName) {
+      const score = (matchedParent ? 2 : 0) + (matchedSub ? 1 : 0)
+      candidates.push({ item, score })
+    }
+  }
+
+  if (!candidates.length) return null
+  candidates.sort((a, b) => b.score - a.score)
+  return candidates[0].item
+}
+
+export function findProductByUrlSlugs(items = [], params = {}, lang = 'vi') {
+  return findProductByUrlParams(items, params, lang)
 }
 
 /* =========================================================

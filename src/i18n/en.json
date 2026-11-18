@@ -7,7 +7,11 @@
     "detail": "View detail",
     "detailNote": "View detail/note",
     "add": "ADD",
-    "note": "Dish note (for shop)"
+    "note": "Dish note (for shop)",
+    "notePlaceholder": "Ex: less spicy, no onion, extra sauce...",
+    "relatedItems": "More in this category",
+    "chooseVariant": "Options",
+    "noticeLabel": "NOTICE"
   },
   "contact": {
     "sendOrder": "Contact to send order",
@@ -184,6 +188,7 @@
   },
   "mobile": {
     "category": "Category",
+    "menu": "Menu",
     "contact": "Contact",
     "cart": "Cart",
     "progress": "Progress",
@@ -242,6 +247,11 @@
     "completedNotice": "Order completed. Thank you! Tap Start New Order to order again.",
     "cancelledNotice": "The shop cancelled this order. Contact the shop for support or start a new order.",
     "completedToast": "Order #{code} has been completed!",
-    "cancelledToast": "Order #{code} was cancelled by the shop."
+    "cancelledToast": "Order #{code} was cancelled by the shop.",
+    "shopMessageLabel": "Message from shop",
+    "finalCompletedTitle": "Order #{code} completed",
+    "finalCancelledTitle": "Order #{code} cancelled",
+    "finalNewOrderBtn": "Start new order",
+    "finalCloseBtn": "Close"
   }
 }

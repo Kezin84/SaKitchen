@@ -1,6 +1,6 @@
-import { IMGBB_KEY } from '@/config/api'
+import { CLOUDINARY_CLOUD_NAME, CLOUDINARY_SIGN_ENDPOINT } from '@/config/api'
 
-const IMGBB_UPLOAD_URL = 'https://api.imgbb.com/1/upload'
+const DEFAULT_CLOUDINARY_FOLDER = 'sakitchen'
 const DEFAULT_TARGET_KB = 100
 const DEFAULT_MAX_WIDTH = 1200
 const DEFAULT_MAX_HEIGHT = 1200
@@ -161,25 +161,56 @@ export async function compressImageToJpg(file, options = {}) {
 }
 
 /**
- * Compress an image to ~100KB JPG and upload it to ImgBB, returning the hosted URL.
+ * Request a short-lived signed upload payload from our serverless endpoint.
+ * @param {string} folder
+ * @returns {Promise<{cloudName: string, apiKey: string, timestamp: number, signature: string, folder: string}>}
+ */
+async function requestCloudinarySignature(folder) {
+  const res = await fetch(CLOUDINARY_SIGN_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ folder }),
+  })
+  const json = await res.json().catch(() => ({}))
+
+  if (!res.ok || !json?.success || !json?.signature || !json?.apiKey) {
+    throw new Error(json?.message || 'Không thể tạo chữ ký upload Cloudinary')
+  }
+
+  return json
+}
+
+/**
+ * Compress an image to ~100KB JPG and upload it to Cloudinary, returning the hosted HTTPS URL.
  * @param {File|Blob} file
  * @param {Object} [options]
+ * @param {string} [options.folder='sakitchen']
  * @returns {Promise<string>}
  */
-export async function uploadImageToImgBB(file, options = {}) {
+export async function uploadImageToCloudinary(file, options = {}) {
   const compressedFile = await compressImageToJpg(file, options)
-  const formData = new FormData()
-  formData.append('image', compressedFile, compressedFile.name)
+  const folder = options.folder || DEFAULT_CLOUDINARY_FOLDER
+  const sign = await requestCloudinarySignature(folder)
+  const cloudName = sign.cloudName || CLOUDINARY_CLOUD_NAME
 
-  const res = await fetch(`${IMGBB_UPLOAD_URL}?key=${IMGBB_KEY}`, {
+  const formData = new FormData()
+  formData.append('file', compressedFile, compressedFile.name)
+  formData.append('api_key', sign.apiKey)
+  formData.append('timestamp', String(sign.timestamp))
+  formData.append('signature', sign.signature)
+  if (sign.folder) {
+    formData.append('folder', sign.folder)
+  }
+
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
     method: 'POST',
     body: formData,
   })
-  const json = await res.json()
+  const json = await res.json().catch(() => ({}))
 
-  if (!res.ok || !json?.success || !json?.data?.url) {
-    throw new Error(json?.error?.message || 'Upload imgbb failed')
+  if (!res.ok || !(json?.secure_url || json?.url)) {
+    throw new Error(json?.error?.message || 'Upload Cloudinary thất bại')
   }
 
-  return json.data.url
+  return json.secure_url || json.url
 }

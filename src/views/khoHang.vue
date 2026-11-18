@@ -124,6 +124,13 @@
 
       <transition name="slide-down">
         <div v-if="showExportMenu" class="dropdown-menu right-align">
+          <button class="menu-item" @click="selectExport('excel_all')">
+            <i class="ri-file-excel-2-fill text-success"></i> Xuất Excel (Toàn bộ kho · 5 ngôn ngữ)
+          </button>
+          <button class="menu-item" @click="selectExport('excel_current')">
+            <i class="ri-file-excel-2-line text-success"></i>
+            Xuất Excel ({{ selected.length ? `Đã chọn ${selected.length} món` : `Đang lọc (${ordered.length})` }})
+          </button>
           <button class="menu-item" @click="selectExport('text')">
             <i class="ri-file-text-line"></i> Tên : Giá
           </button>
@@ -182,8 +189,32 @@
   </div>
 </transition>
 
-<!-- Xóa bộ lọc để riêng (không tính vào 6 nút) -->
-<div class="clear-filter-row">
+<!-- Tạo danh mục cha, Link phân loại SP & Xóa bộ lọc -->
+<div class="clear-filter-row parent-action-row">
+  <button
+    type="button"
+    class="btn-manage-parents"
+    @click="openParentCategoryModal"
+  >
+    <span class="btn-icon"><i class="ri-folder-add-line"></i></span>
+    <span class="btn-text">Tạo danh mục cha</span>
+    <span v-if="existingParentEntries.length" class="filter-badge">
+      {{ existingParentEntries.length }}
+    </span>
+  </button>
+
+  <button
+    type="button"
+    class="btn-manage-product-groups"
+    @click="openProductGroupModal"
+  >
+    <span class="btn-icon"><i class="ri-links-line"></i></span>
+    <span class="btn-text">Link phân loại SP</span>
+    <span v-if="productGroupsList.length" class="filter-badge">
+      {{ productGroupsList.length }}
+    </span>
+  </button>
+
   <button
     v-if="hasActiveFilters"
     class="btn-clear-filters"
@@ -229,7 +260,8 @@
               <th style="width: 120px" class="text-center">Mã hàng</th>
               <th style="width: 200px" class="text-center">Tên sản phẩm</th>
               <th style="width: 160px" class="text-center">Mô tả</th>
-              <th style="width: 120px" class="text-center">Danh mục</th>
+              <th style="width: 120px" class="text-center">Danh mục cha</th>
+              <th style="width: 120px" class="text-center">Danh mục con</th>
               <th style="width: 80px" class="text-center">Size</th>
               <th style="width: 70px" class="text-center">ĐVT</th>
               <th style="width: 100px" class="text-center">Giá gốc</th>
@@ -297,6 +329,7 @@
               <td class="text-center text-mono">{{ item.Ma_hang }}</td>
               <td class="text-center product-name-cell" @click.stop="openEdit(item, { focusField: 'Ten_hang' })">{{ item.Ten_hang }}</td>
               <td class="text-center text-muted text-truncate" @click.stop="openEdit(item, { focusField: 'Mo_ta' })">{{ item.Mo_ta }}</td>
+              <td class="text-center" @click.stop="openEdit(item, { focusField: 'Danh_muc_cha' })">{{ item.Danh_muc_cha || '—' }}</td>
               <td class="text-center" @click.stop="openEdit(item, { focusField: 'Danh_muc' })">{{ item.Danh_muc }}</td>
               <td class="text-center" @click.stop="openEdit(item, { focusField: 'Size' })">{{ item.Size }}</td>
               <td class="text-center" @click.stop="openEdit(item, { focusField: 'Dvt' })">{{ item.Dvt }}</td>
@@ -779,13 +812,56 @@
                       <i class="ri-arrow-up-double-line"></i> Đẩy lên #1
                     </button>
                   </div>
+                  <div v-if="edit.Ma_hang" class="edit-link-trigger-card">
+                    <div class="elt-left">
+                      <div class="elt-title-row">
+                        <i class="ri-links-line"></i>
+                        <span>Link với hàng hóa khác</span>
+                        <span class="ils-badge" :class="{ active: editLinkDraft.items.length >= 2 }">
+                          {{
+                            editLinkDraft.items.length >= 2
+                              ? `Đã link ${editLinkDraft.items.length} món`
+                              : 'Chưa link'
+                          }}
+                        </span>
+                      </div>
+                      <div v-if="editLinkDraft.items.length >= 2" class="elt-preview-chips">
+                        <span
+                          v-for="selIt in editLinkDraft.items"
+                          :key="'elt-chip-' + selIt.maHang"
+                          class="elt-chip"
+                          :class="{ 'is-current': selIt.maHang === edit.Ma_hang }"
+                        >
+                          {{ selIt.shortLabel || (selIt.maHang === edit.Ma_hang ? (edit.Ten_hang || selIt.maHang) : getProductNameByCode(selIt.maHang)) }}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      class="btn-link-group-inline"
+                      @click="openEditLinkPickerModal"
+                    >
+                      <i class="ri-links-line"></i>
+                      <span>{{ editLinkDraft.items.length >= 2 ? 'Sửa link' : 'Chọn hàng link' }}</span>
+                    </button>
+                  </div>
                 </div>
                   <div class="form-group">
-                    <label class="form-label">Danh mục ({{ getLangShort(activeEditLang) }})</label>
+                    <label class="form-label">Danh mục cha ({{ getLangShort(activeEditLang) }})</label>
+                    <input
+                      data-field="Danh_muc_cha"
+                      v-model="edit.i18n[activeEditLang].Danh_muc_cha"
+                      :placeholder="activeEditLang === 'vi' ? 'Danh mục cha...' : (edit.i18n.vi.Danh_muc_cha ? `Dịch từ: ${edit.i18n.vi.Danh_muc_cha}` : 'Danh mục cha...')"
+                      class="form-control"
+                      @input="onEditI18nChange"
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Danh mục con ({{ getLangShort(activeEditLang) }})</label>
                     <input
                       data-field="Danh_muc"
                       v-model="edit.i18n[activeEditLang].Danh_muc"
-                      :placeholder="activeEditLang === 'vi' ? 'Danh mục...' : (edit.i18n.vi.Danh_muc ? `Dịch từ: ${edit.i18n.vi.Danh_muc}` : 'Danh mục...')"
+                      :placeholder="activeEditLang === 'vi' ? 'Danh mục con...' : (edit.i18n.vi.Danh_muc ? `Dịch từ: ${edit.i18n.vi.Danh_muc}` : 'Danh mục con...')"
                       class="form-control"
                       @input="onEditI18nChange"
                     />
@@ -1098,17 +1174,29 @@
                         @input="onEditI18nChange"
                       />
                     </div>
-                    <div class="modal-section-grid modal-section-grid-3">
+                    <div class="modal-section-grid modal-section-grid-2" style="margin-bottom: 12px;">
                       <div class="form-group">
-                        <label class="form-label">Danh mục ({{ getLangShort(activeEditLang) }})</label>
+                        <label class="form-label">Danh mục cha ({{ getLangShort(activeEditLang) }})</label>
                         <input
-                          data-field="Danh_muc"
-                          v-model="edit.i18n[activeEditLang].Danh_muc"
-                          :placeholder="activeEditLang === 'vi' ? 'Danh mục...' : (edit.i18n.vi.Danh_muc ? `Dịch từ: ${edit.i18n.vi.Danh_muc}` : 'Danh mục...')"
+                          data-field="Danh_muc_cha"
+                          v-model="edit.i18n[activeEditLang].Danh_muc_cha"
+                          :placeholder="activeEditLang === 'vi' ? 'Danh mục cha...' : (edit.i18n.vi.Danh_muc_cha ? `Dịch từ: ${edit.i18n.vi.Danh_muc_cha}` : 'Danh mục cha...')"
                           class="form-control"
                           @input="onEditI18nChange"
                         />
                       </div>
+                      <div class="form-group">
+                        <label class="form-label">Danh mục con ({{ getLangShort(activeEditLang) }})</label>
+                        <input
+                          data-field="Danh_muc"
+                          v-model="edit.i18n[activeEditLang].Danh_muc"
+                          :placeholder="activeEditLang === 'vi' ? 'Danh mục con...' : (edit.i18n.vi.Danh_muc ? `Dịch từ: ${edit.i18n.vi.Danh_muc}` : 'Danh mục con...')"
+                          class="form-control"
+                          @input="onEditI18nChange"
+                        />
+                      </div>
+                    </div>
+                    <div class="modal-section-grid modal-section-grid-2">
                       <div class="form-group">
                         <label class="form-label">Size</label>
                         <input data-field="Size" v-model="edit.Size" class="form-control" @input="markAsEdited" />
@@ -1213,34 +1301,72 @@
 </div>
                 </div>
                 <div class="modal-section-card modal-section-card--wide">
-                  <div class="modal-section-title">Mô tả sản phẩm ({{ getLangShort(activeEditLang) }})</div>
-                  <div class="form-group">
-                    <textarea
-                      data-field="Mo_ta"
-                      v-model="edit.i18n[activeEditLang].Mo_ta"
-                      :placeholder="activeEditLang === 'vi' ? 'Mô tả sản phẩm...' : (edit.i18n.vi.Mo_ta ? `Dịch từ: ${edit.i18n.vi.Mo_ta}` : 'Mô tả...')"
-                      class="form-control form-textarea"
-                      rows="3"
-                      @input="onEditI18nChange"
-                    ></textarea>
-                  </div>
-                  <label class="hide-toggle-row">
-                    <input type="checkbox" v-model="edit.Is_hidden" @change="markAsEdited" />
-                    <span>Ẩn sản phẩm khỏi Menu Online</span>
-                  </label>
-                  <div class="top-modal-row">
-                    <label class="hide-toggle-row top-toggle-row">
-                      <input type="checkbox" v-model="editIsTop" />
-                      <span>Ghim lên Top Menu Online</span>
-                    </label>
-                    <button
-                      v-if="getProductTopAt(edit) > 0 && !isTopRankOne(edit)"
-                      type="button"
-                      class="btn-bump-top-inline"
-                      @click="bumpEditToTop"
-                    >
-                      <i class="ri-arrow-up-double-line"></i> Đẩy lên #1
-                    </button>
+                  <div class="modal-section-title">Mô tả &amp; Cài đặt hiển thị ({{ getLangShort(activeEditLang) }})</div>
+                  <div class="modal-desc-settings-split">
+                    <div class="form-group modal-desc-pane">
+                      <label class="form-label">Mô tả sản phẩm</label>
+                      <textarea
+                        data-field="Mo_ta"
+                        v-model="edit.i18n[activeEditLang].Mo_ta"
+                        :placeholder="activeEditLang === 'vi' ? 'Mô tả sản phẩm...' : (edit.i18n.vi.Mo_ta ? `Dịch từ: ${edit.i18n.vi.Mo_ta}` : 'Mô tả...')"
+                        class="form-control form-textarea modal-desc-textarea"
+                        rows="4"
+                        @input="onEditI18nChange"
+                      ></textarea>
+                    </div>
+                    <div class="modal-settings-pane">
+                      <label class="hide-toggle-row">
+                        <input type="checkbox" v-model="edit.Is_hidden" @change="markAsEdited" />
+                        <span>Ẩn sản phẩm khỏi Menu Online</span>
+                      </label>
+                      <div class="top-modal-row">
+                        <label class="hide-toggle-row top-toggle-row">
+                          <input type="checkbox" v-model="editIsTop" />
+                          <span>Ghim lên Top Menu Online</span>
+                        </label>
+                        <button
+                          v-if="getProductTopAt(edit) > 0 && !isTopRankOne(edit)"
+                          type="button"
+                          class="btn-bump-top-inline"
+                          @click="bumpEditToTop"
+                        >
+                          <i class="ri-arrow-up-double-line"></i> Đẩy lên #1
+                        </button>
+                      </div>
+                      <div v-if="edit.Ma_hang" class="edit-link-trigger-card">
+                        <div class="elt-left">
+                          <div class="elt-title-row">
+                            <i class="ri-links-line"></i>
+                            <span>Link với hàng hóa khác</span>
+                            <span class="ils-badge" :class="{ active: editLinkDraft.items.length >= 2 }">
+                              {{
+                                editLinkDraft.items.length >= 2
+                                  ? `Đã link ${editLinkDraft.items.length} món`
+                                  : 'Chưa link'
+                              }}
+                            </span>
+                          </div>
+                          <div v-if="editLinkDraft.items.length >= 2" class="elt-preview-chips">
+                            <span
+                              v-for="selIt in editLinkDraft.items"
+                              :key="'elt-chip-' + selIt.maHang"
+                              class="elt-chip"
+                              :class="{ 'is-current': selIt.maHang === edit.Ma_hang }"
+                            >
+                              {{ selIt.shortLabel || (selIt.maHang === edit.Ma_hang ? (edit.Ten_hang || selIt.maHang) : getProductNameByCode(selIt.maHang)) }}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          class="btn-link-group-inline"
+                          @click="openEditLinkPickerModal"
+                        >
+                          <i class="ri-links-line"></i>
+                          <span>{{ editLinkDraft.items.length >= 2 ? 'Sửa link' : 'Chọn hàng link' }}</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1350,6 +1476,10 @@
           <button type="button" class="bfb-btn bfb-btn-clear" @click="clearSelection">
             Bỏ chọn
           </button>
+          <button type="button" class="bfb-btn bfb-btn-delete" @click="bulkDeleteFromModal">
+            <i class="ri-delete-bin-6-line"></i>
+            <span>Xóa đã chọn</span>
+          </button>
           <button type="button" class="bfb-btn bfb-btn-edit" @click="openBulkEditModal">
             <i class="ri-edit-box-line"></i>
             <span>Sửa hàng loạt</span>
@@ -1392,16 +1522,30 @@
             </div>
 
             <div class="bulk-fields-grid">
-              <!-- Danh mục -->
+              <!-- Danh mục cha -->
+              <div class="bulk-field-card" :class="{ active: bulkForm.enableDanhMucCha }">
+                <label class="bulk-field-toggle">
+                  <input type="checkbox" v-model="bulkForm.enableDanhMucCha" />
+                  <span>Danh mục cha ({{ getLangShort(selectedLanguage) }})</span>
+                </label>
+                <input
+                  v-model="bulkForm.Danh_muc_cha"
+                  :disabled="!bulkForm.enableDanhMucCha"
+                  placeholder="Nhập tên danh mục cha mới..."
+                  class="form-control"
+                />
+              </div>
+
+              <!-- Danh mục con -->
               <div class="bulk-field-card" :class="{ active: bulkForm.enableDanhMuc }">
                 <label class="bulk-field-toggle">
                   <input type="checkbox" v-model="bulkForm.enableDanhMuc" />
-                  <span>Danh mục ({{ getLangShort(selectedLanguage) }})</span>
+                  <span>Danh mục con ({{ getLangShort(selectedLanguage) }})</span>
                 </label>
                 <input
                   v-model="bulkForm.Danh_muc"
                   :disabled="!bulkForm.enableDanhMuc"
-                  placeholder="Nhập tên danh mục mới..."
+                  placeholder="Nhập tên danh mục con mới..."
                   class="form-control"
                 />
               </div>
@@ -1685,26 +1829,712 @@
       </div>
     </transition>
 
+    <!-- ===== MODAL TẠO & GOM DANH MỤC CHA ===== -->
+    <transition name="fade">
+      <div
+        v-if="showParentCategoryModal"
+        class="bulk-modal-overlay"
+        @click.self="closeParentCategoryModal"
+      >
+        <div class="bulk-modal-card parent-cat-modal-card" @click.stop>
+          <div class="bulk-modal-header">
+            <div>
+              <h3 class="bulk-modal-title">
+                <i class="ri-folder-add-fill"></i>
+                Tạo &amp; Gom Danh Mục Cha
+              </h3>
+              <p class="bulk-modal-subtitle">
+                Tạo danh mục cha và tick chọn các danh mục con để đưa vào (tự động đồng bộ kho hàng &amp; Menu Online).
+              </p>
+            </div>
+            <button
+              type="button"
+              class="bulk-close-btn"
+              :disabled="parentModalSaving"
+              @click="closeParentCategoryModal"
+            >
+              <i class="ri-close-line"></i>
+            </button>
+          </div>
+
+          <div class="bulk-modal-body pcm-body">
+            <!-- Existing Parent Tabs + New Button -->
+            <div class="pcm-section">
+              <div class="pcm-section-label">Chọn danh mục cha để sửa hoặc tạo mới:</div>
+              <div class="pcm-parent-pills">
+                <button
+                  type="button"
+                  class="pcm-parent-pill is-new"
+                  :class="{ active: parentModalState.isCreatingNew }"
+                  @click="selectNewParentInModal"
+                >
+                  <i class="ri-add-circle-line"></i>
+                  <span>+ Tạo cha mới</span>
+                </button>
+                <button
+                  v-for="p in existingParentEntries"
+                  :key="'pcm-p-' + p.name"
+                  type="button"
+                  class="pcm-parent-pill"
+                  :class="{ active: !parentModalState.isCreatingNew && parentModalState.editingParentKey === p.name }"
+                  @click="selectExistingParentInModal(p.name)"
+                >
+                  <i class="ri-folder-3-fill"></i>
+                  <span>{{ p.name }}</span>
+                  <span class="pcm-pill-count">{{ p.childCount }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Parent Name & Multi-lang Inputs -->
+            <div class="pcm-section pcm-name-card">
+              <div class="pcm-name-grid">
+                <div class="pcm-field">
+                  <label>Tên Danh mục cha (Tiếng Việt)*</label>
+                  <input
+                    v-model="parentModalState.i18n.vi"
+                    type="text"
+                    class="form-control"
+                    :disabled="!parentModalState.isCreatingNew"
+                    placeholder="VD: Đồ uống, Món chính, Tráng miệng..."
+                  />
+                </div>
+                <div class="pcm-field">
+                  <label>English (tùy chọn)</label>
+                  <input
+                    v-model="parentModalState.i18n.en"
+                    type="text"
+                    class="form-control"
+                    placeholder="Drinks..."
+                  />
+                </div>
+                <div class="pcm-field">
+                  <label>中文 (tùy chọn)</label>
+                  <input
+                    v-model="parentModalState.i18n['zh-CN']"
+                    type="text"
+                    class="form-control"
+                    placeholder="饮品..."
+                  />
+                </div>
+                <div class="pcm-field">
+                  <label>한국어 (tùy chọn)</label>
+                  <input
+                    v-model="parentModalState.i18n.ko"
+                    type="text"
+                    class="form-control"
+                    placeholder="음료..."
+                  />
+                </div>
+                <div class="pcm-field">
+                  <label>Filipino (tùy chọn)</label>
+                  <input
+                    v-model="parentModalState.i18n.fil"
+                    type="text"
+                    class="form-control"
+                    placeholder="Inumin..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- Subcategory Checklist Picker -->
+            <div class="pcm-section">
+              <div class="pcm-sub-toolbar">
+                <div class="pcm-sub-title">
+                  Chọn danh mục con đưa vào ({{ parentModalState.selectedSubs.length }}/{{ allKhoSubCategories.length }}):
+                </div>
+                <div class="pcm-sub-actions">
+                  <button type="button" class="pcm-mini-btn" @click="selectAllFilteredSubs(true)">
+                    Chọn tất cả
+                  </button>
+                  <button type="button" class="pcm-mini-btn" @click="selectAllFilteredSubs(false)">
+                    Bỏ chọn
+                  </button>
+                </div>
+              </div>
+
+              <input
+                v-model="parentModalState.subSearch"
+                type="text"
+                class="form-control pcm-sub-search"
+                placeholder="Tìm nhanh danh mục con..."
+              />
+
+              <div v-if="!filteredModalSubCategories.length" class="pcm-empty">
+                Không tìm thấy danh mục con phù hợp trong Kho hàng.
+              </div>
+              <div v-else class="pcm-sub-grid">
+                <label
+                  v-for="sub in filteredModalSubCategories"
+                  :key="'pcm-sub-' + sub.name"
+                  class="pcm-sub-item"
+                  :class="{
+                    checked: parentModalState.selectedSubs.includes(sub.name),
+                    'other-parent':
+                      sub.currentParent &&
+                      sub.currentParent !== activeModalParentName &&
+                      !parentModalState.selectedSubs.includes(sub.name),
+                  }"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="parentModalState.selectedSubs.includes(sub.name)"
+                    @change="toggleSubInParentModal(sub.name)"
+                  />
+                  <div class="pcm-sub-info">
+                    <div class="pcm-sub-name">{{ sub.name }}</div>
+                    <div class="pcm-sub-meta">
+                      <span>{{ sub.count }} SP</span>
+                      <span
+                        v-if="sub.currentParent && sub.currentParent !== activeModalParentName"
+                        class="pcm-other-badge"
+                      >
+                        • Đang thuộc: {{ sub.currentParent }}
+                      </span>
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="bulk-modal-footer">
+            <button
+              v-if="!parentModalState.isCreatingNew && parentModalState.editingParentKey"
+              type="button"
+              class="btn-modal btn-danger"
+              :disabled="parentModalSaving"
+              @click="dissolveParentFromModal"
+            >
+              <i class="ri-folder-reduce-line"></i>
+              <span>Xóa nhóm cha</span>
+            </button>
+            <div v-else></div>
+
+            <div class="bulk-footer-right">
+              <button
+                type="button"
+                class="btn-modal btn-secondary"
+                :disabled="parentModalSaving"
+                @click="closeParentCategoryModal"
+              >
+                Đóng
+              </button>
+              <button
+                type="button"
+                class="btn-modal btn-primary"
+                :disabled="parentModalSaving"
+                @click="saveParentCategoryModal"
+              >
+                <span v-if="parentModalSaving" class="btn-spinner"></span>
+                <span>{{ parentModalSaving ? 'Đang lưu...' : 'Lưu Danh mục cha' }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- ===== MODAL LINK PHÂN LOẠI SẢN PHẨM (100% FULLSCREEN) ===== -->
+    <transition name="fade">
+      <div
+        v-if="showProductGroupModal"
+        class="bulk-modal-overlay fullscreen-link-overlay"
+        @click.self="closeProductGroupModal"
+      >
+        <div class="bulk-modal-card fullscreen-link-card" @click.stop>
+          <div class="bulk-modal-header flc-header">
+            <div class="flc-header-inner">
+              <div>
+                <h3 class="bulk-modal-title pgm-title">
+                  <i class="ri-links-line"></i>
+                  Link Phân Loại Sản Phẩm
+                </h3>
+                <p class="bulk-modal-subtitle">
+                  Gom các món riêng lẻ (VD: Món nhỏ, Món lớn...) lại để khách bấm chọn chuyển đổi ngay trong modal chi tiết.
+                </p>
+              </div>
+              <button
+                type="button"
+                class="bulk-close-btn"
+                :disabled="productGroupSaving"
+                @click="closeProductGroupModal"
+              >
+                <i class="ri-close-line"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="flc-top-tabs-bar">
+            <div class="flc-container flc-top-tabs-inner">
+              <span class="pcm-section-label">Nhóm phân loại:</span>
+              <div class="pcm-parent-pills">
+                <button
+                  type="button"
+                  class="pcm-parent-pill is-new"
+                  :class="{ active: productGroupState.isCreatingNew }"
+                  @click="selectNewProductGroupInModal"
+                >
+                  <i class="ri-add-circle-line"></i>
+                  <span>+ Tạo nhóm mới</span>
+                </button>
+                <button
+                  v-for="(grp, gIdx) in productGroupsList"
+                  :key="'pgm-grp-' + grp.id"
+                  type="button"
+                  class="pcm-parent-pill"
+                  :class="{ active: !productGroupState.isCreatingNew && productGroupState.editingGroupId === grp.id }"
+                  @click="selectExistingProductGroupInModal(grp.id)"
+                >
+                  <i class="ri-links-line"></i>
+                  <span>{{ grp.name || `Nhóm #${gIdx + 1}` }}</span>
+                  <span class="pcm-pill-count">{{ grp.items.length }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flc-workspace-body">
+            <div class="flc-container link-workspace-grid">
+              <!-- CỘT TRÁI: THÔNG TIN NHÓM & CÁC MÓN ĐÃ CHỌN -->
+              <div class="link-pane is-left">
+                <div class="link-pane-head">
+                  <span class="link-pane-title">
+                    <i class="ri-list-ordered"></i>
+                    <span>Sản phẩm trong nhóm ({{ productGroupState.items.length }})</span>
+                  </span>
+                  <span class="link-pane-hint">Tối thiểu 2 món</span>
+                </div>
+
+                <div class="pcm-field flc-group-name-field">
+                  <label>Tên nhóm (dùng để quản lý, tùy chọn)</label>
+                  <input
+                    v-model="productGroupState.name"
+                    type="text"
+                    class="form-control"
+                    placeholder="VD: Trà sữa truyền thống, Bánh tráng..."
+                  />
+                </div>
+
+                <div v-if="!productGroupState.items.length" class="link-pane-empty">
+                  <i class="ri-checkbox-multiple-blank-line"></i>
+                  <span>Chưa chọn sản phẩm nào. Tick chọn ít nhất 2 sản phẩm ở cột bên phải.</span>
+                </div>
+                <div v-else class="link-selected-scroll">
+                  <div
+                    v-for="(selIt, sIdx) in productGroupState.items"
+                    :key="'pgm-sel-' + selIt.maHang"
+                    class="pgm-selected-row flc-selected-card"
+                  >
+                    <div class="pgm-move-col">
+                      <button
+                        type="button"
+                        class="pgm-move-btn"
+                        :disabled="sIdx === 0"
+                        title="Lên"
+                        @click="moveProductGroupItem(sIdx, -1)"
+                      >
+                        <i class="ri-arrow-up-s-line"></i>
+                      </button>
+                      <button
+                        type="button"
+                        class="pgm-move-btn"
+                        :disabled="sIdx === productGroupState.items.length - 1"
+                        title="Xuống"
+                        @click="moveProductGroupItem(sIdx, 1)"
+                      >
+                        <i class="ri-arrow-down-s-line"></i>
+                      </button>
+                    </div>
+                    <img
+                      v-if="getProductImageByCode(selIt.maHang)"
+                      :src="getProductImageByCode(selIt.maHang)"
+                      class="link-item-thumb"
+                      alt=""
+                    />
+                    <div v-else class="link-item-thumb is-empty">
+                      <i class="ri-image-line"></i>
+                    </div>
+                    <div class="pgm-sel-info">
+                      <div class="pgm-sel-name">
+                        {{ getProductNameByCode(selIt.maHang) }}
+                      </div>
+                      <div class="pgm-sel-meta">
+                        <span>{{ selIt.maHang }}</span>
+                        <span v-if="getProductPriceByCode(selIt.maHang)">
+                          • {{ getProductPriceByCode(selIt.maHang) }}
+                        </span>
+                      </div>
+                      <input
+                        v-model="selIt.shortLabel"
+                        type="text"
+                        class="form-control flc-short-input"
+                        placeholder="Tên nút ngắn (bỏ trống = tên món)"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      class="pgm-remove-btn"
+                      title="Gỡ khỏi nhóm"
+                      @click="removeProductFromGroupDraft(selIt.maHang)"
+                    >
+                      <i class="ri-close-line"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- CỘT PHẢI: KHO HÀNG ĐỂ TÌM & TICK CHỌN -->
+              <div class="link-pane is-right">
+                <div class="link-pane-head">
+                  <span class="link-pane-title">
+                    <i class="ri-archive-line"></i>
+                    <span>Kho hàng hóa ({{ filteredKhoProductsForGroup.length }})</span>
+                  </span>
+                  <div class="link-filter-tools">
+                    <select v-model="productGroupState.categoryFilter" class="form-control flc-cat-select">
+                      <option value="">Tất cả danh mục</option>
+                      <option v-for="cat in categories" :key="'pgm-cat-' + cat.name" :value="cat.name">
+                        {{ cat.name }} ({{ cat.count }})
+                      </option>
+                    </select>
+                  </div>
+                </div>
+
+                <input
+                  v-model="productGroupState.search"
+                  type="text"
+                  class="form-control flc-search-input"
+                  placeholder="Tìm theo tên món, mã hàng, danh mục..."
+                />
+
+                <div v-if="!filteredKhoProductsForGroup.length" class="link-pane-empty">
+                  <i class="ri-search-line"></i>
+                  <span>Không tìm thấy sản phẩm phù hợp.</span>
+                </div>
+                <div v-else class="link-picker-scroll">
+                  <div class="link-picker-cards">
+                    <label
+                      v-for="prod in filteredKhoProductsForGroup"
+                      :key="'pgm-pick-' + prod.Ma_hang"
+                      class="pcm-sub-item flc-pick-card"
+                      :class="{
+                        checked: isProductInGroupDraft(prod.Ma_hang),
+                        'other-parent':
+                          otherGroupNameOfProduct(prod.Ma_hang) && !isProductInGroupDraft(prod.Ma_hang),
+                      }"
+                    >
+                      <input
+                        type="checkbox"
+                        :checked="isProductInGroupDraft(prod.Ma_hang)"
+                        @change="toggleProductInGroupDraft(prod.Ma_hang)"
+                      />
+                      <img
+                        v-if="prod.Main_img"
+                        :src="prod.Main_img"
+                        class="link-item-thumb"
+                        alt=""
+                      />
+                      <div v-else class="link-item-thumb is-empty">
+                        <i class="ri-image-line"></i>
+                      </div>
+                      <div class="pcm-sub-info">
+                        <div class="pcm-sub-name">{{ prod.Ten_hang }}</div>
+                        <div class="pcm-sub-meta">
+                          <span>{{ prod.Ma_hang }}</span>
+                          <span v-if="prod.Danh_muc"> • {{ prod.Danh_muc }}</span>
+                          <span v-if="getProductPriceByCode(prod.Ma_hang)" class="flc-pick-price">
+                            • {{ getProductPriceByCode(prod.Ma_hang) }}
+                          </span>
+                          <span
+                            v-if="otherGroupNameOfProduct(prod.Ma_hang) && !isProductInGroupDraft(prod.Ma_hang)"
+                            class="pcm-other-badge"
+                          >
+                            • Nhóm: {{ otherGroupNameOfProduct(prod.Ma_hang) }}
+                          </span>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bulk-modal-footer flc-footer">
+            <div class="flc-footer-inner">
+              <button
+                v-if="!productGroupState.isCreatingNew && productGroupState.editingGroupId"
+                type="button"
+                class="btn-modal btn-danger"
+                :disabled="productGroupSaving"
+                @click="deleteProductGroupModal"
+              >
+                <i class="ri-delete-bin-line"></i>
+                <span>Xóa nhóm</span>
+              </button>
+              <div v-else></div>
+
+              <div class="bulk-footer-right">
+                <button
+                  type="button"
+                  class="btn-modal btn-secondary"
+                  :disabled="productGroupSaving"
+                  @click="closeProductGroupModal"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="button"
+                  class="btn-modal btn-primary"
+                  :disabled="productGroupSaving || productGroupState.items.length < 2"
+                  @click="saveProductGroupModal"
+                >
+                  <span v-if="productGroupSaving" class="btn-spinner"></span>
+                  <span>{{ productGroupSaving ? 'Đang lưu...' : 'Lưu nhóm phân loại' }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- ===== MODAL CHỌN HÀNG HÓA LINK CÙNG (MỞ TỪ MODAL SỬA SẢN PHẨM - 100% FULLSCREEN) ===== -->
+    <transition name="fade">
+      <div
+        v-if="showEditLinkPickerModal"
+        class="bulk-modal-overlay fullscreen-link-overlay"
+        @click.self="closeEditLinkPickerModal"
+      >
+        <div class="bulk-modal-card fullscreen-link-card" @click.stop>
+          <div class="bulk-modal-header flc-header">
+            <div class="flc-header-inner">
+              <div>
+                <h3 class="bulk-modal-title pgm-title">
+                  <i class="ri-links-line"></i>
+                  Link hàng hóa với "{{ edit.Ten_hang || edit.Ma_hang }}"
+                </h3>
+                <p class="bulk-modal-subtitle">
+                  Chọn các hàng hóa khác ở cột bên phải để liên kết thành phân loại chọn nhanh trong modal Order.
+                </p>
+              </div>
+              <button
+                type="button"
+                class="bulk-close-btn"
+                :disabled="editLinkSaving"
+                @click="closeEditLinkPickerModal"
+              >
+                <i class="ri-close-line"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="flc-workspace-body">
+            <div class="flc-container link-workspace-grid">
+              <!-- CỘT TRÁI: CÁC MÓN ĐANG LINK -->
+              <div class="link-pane is-left">
+                <div class="link-pane-head">
+                  <span class="link-pane-title">
+                    <i class="ri-list-ordered"></i>
+                    <span>Các món đang link ({{ editLinkDraft.items.length }})</span>
+                  </span>
+                  <span class="link-pane-hint">
+                    {{ editLinkDraft.items.length >= 2 ? 'Đã đủ tối thiểu 2 món' : 'Chọn thêm ít nhất 1 món nữa' }}
+                  </span>
+                </div>
+
+                <div class="link-selected-scroll">
+                  <div
+                    v-for="(selIt, sIdx) in editLinkDraft.items"
+                    :key="'modal-ils-' + selIt.maHang"
+                    class="ils-selected-row flc-selected-card"
+                    :class="{ 'is-current': selIt.maHang === edit.Ma_hang }"
+                  >
+                    <div class="pgm-move-col">
+                      <button
+                        type="button"
+                        class="pgm-move-btn"
+                        :disabled="sIdx === 0"
+                        title="Lên"
+                        @click="moveEditLinkItem(sIdx, -1)"
+                      >
+                        <i class="ri-arrow-up-s-line"></i>
+                      </button>
+                      <button
+                        type="button"
+                        class="pgm-move-btn"
+                        :disabled="sIdx === editLinkDraft.items.length - 1"
+                        title="Xuống"
+                        @click="moveEditLinkItem(sIdx, 1)"
+                      >
+                        <i class="ri-arrow-down-s-line"></i>
+                      </button>
+                    </div>
+                    <img
+                      v-if="selIt.maHang === edit.Ma_hang ? edit.Main_img : getProductImageByCode(selIt.maHang)"
+                      :src="selIt.maHang === edit.Ma_hang ? edit.Main_img : getProductImageByCode(selIt.maHang)"
+                      class="link-item-thumb"
+                      alt=""
+                    />
+                    <div v-else class="link-item-thumb is-empty">
+                      <i class="ri-image-line"></i>
+                    </div>
+                    <div class="ils-sel-info">
+                      <div class="ils-sel-name">
+                        {{ selIt.maHang === edit.Ma_hang ? (edit.Ten_hang || selIt.maHang) : getProductNameByCode(selIt.maHang) }}
+                        <span v-if="selIt.maHang === edit.Ma_hang" class="ils-cur-tag">Đang sửa</span>
+                      </div>
+                      <div class="ils-sel-meta">
+                        {{ selIt.maHang }}
+                        <span v-if="getProductPriceByCode(selIt.maHang)"> • {{ getProductPriceByCode(selIt.maHang) }}</span>
+                      </div>
+                      <input
+                        v-model="selIt.shortLabel"
+                        type="text"
+                        class="form-control flc-short-input"
+                        placeholder="Tên nút ngắn (bỏ trống = tên món)"
+                        @input="onEditLinkChanged"
+                      />
+                    </div>
+                    <button
+                      v-if="selIt.maHang !== edit.Ma_hang"
+                      type="button"
+                      class="pgm-remove-btn"
+                      title="Bỏ link món này"
+                      @click="removeOtherProductFromEditLink(selIt.maHang)"
+                    >
+                      <i class="ri-close-line"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- CỘT PHẢI: CHỌN HÀNG HÓA KHÁC TRONG KHO -->
+              <div class="link-pane is-right">
+                <div class="link-pane-head">
+                  <span class="link-pane-title">
+                    <i class="ri-archive-line"></i>
+                    <span>Hàng hóa khác trong kho ({{ filteredOtherProductsForEditLink.length }})</span>
+                  </span>
+                  <div class="link-filter-tools">
+                    <select v-model="editLinkDraft.categoryFilter" class="form-control flc-cat-select">
+                      <option value="">Tất cả danh mục</option>
+                      <option v-for="cat in categories" :key="'ils-cat-' + cat.name" :value="cat.name">
+                        {{ cat.name }} ({{ cat.count }})
+                      </option>
+                    </select>
+                  </div>
+                </div>
+
+                <input
+                  v-model="editLinkDraft.search"
+                  type="text"
+                  class="form-control flc-search-input"
+                  placeholder="Tìm tên món, mã hàng, danh mục..."
+                />
+
+                <div v-if="!filteredOtherProductsForEditLink.length" class="link-pane-empty">
+                  <i class="ri-search-line"></i>
+                  <span>Không có sản phẩm phù hợp để link.</span>
+                </div>
+                <div v-else class="link-picker-scroll">
+                  <div class="link-picker-cards">
+                    <label
+                      v-for="prod in filteredOtherProductsForEditLink"
+                      :key="'modal-ils-pick-' + prod.Ma_hang"
+                      class="ils-pick-item flc-pick-card"
+                      :class="{ checked: isProductInEditLink(prod.Ma_hang) }"
+                    >
+                      <input
+                        type="checkbox"
+                        :checked="isProductInEditLink(prod.Ma_hang)"
+                        @change="toggleOtherProductInEditLink(prod.Ma_hang)"
+                      />
+                      <img
+                        v-if="prod.Main_img"
+                        :src="prod.Main_img"
+                        class="link-item-thumb"
+                        alt=""
+                      />
+                      <div v-else class="link-item-thumb is-empty">
+                        <i class="ri-image-line"></i>
+                      </div>
+                      <div class="ils-pick-info">
+                        <div class="ils-pick-name">{{ prod.Ten_hang }}</div>
+                        <div class="ils-pick-meta">
+                          <span>{{ prod.Ma_hang }}</span>
+                          <span v-if="prod.Danh_muc"> • {{ prod.Danh_muc }}</span>
+                          <span v-if="getProductPriceByCode(prod.Ma_hang)" class="flc-pick-price">
+                            • {{ getProductPriceByCode(prod.Ma_hang) }}
+                          </span>
+                          <span
+                            v-if="getOtherProductGroupLabel(prod.Ma_hang) && !isProductInEditLink(prod.Ma_hang)"
+                            class="pcm-other-badge"
+                          >
+                            • Nhóm: {{ getOtherProductGroupLabel(prod.Ma_hang) }}
+                          </span>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bulk-modal-footer flc-footer">
+            <div class="flc-footer-inner">
+              <div></div>
+              <div class="bulk-footer-right">
+                <button
+                  type="button"
+                  class="btn-modal btn-secondary"
+                  :disabled="editLinkSaving"
+                  @click="closeEditLinkPickerModal"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="button"
+                  class="btn-modal btn-primary"
+                  :disabled="editLinkSaving"
+                  @click="saveEditLinkPickerModal"
+                >
+                  <span v-if="editLinkSaving" class="btn-spinner"></span>
+                  <span>{{ editLinkSaving ? 'Đang lưu...' : 'Lưu link' }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
+
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, nextTick, onUnmounted, watch } from 'vue'
 import { getOneSheet, dispatchAction } from '@/config/api'
-import { uploadImageToImgBB } from '@/utils/imageUpload.js'
+import { uploadImageToCloudinary } from '@/utils/imageUpload.js'
 import {
   SUPPORTED_DATA_LANGS,
+  DATA_LANG_CODES,
   normalizeProductI18n,
   syncProductWithI18n,
   localizeProduct,
   getProductTranslatedLangs,
   productMatchesKeyword,
 } from '@/utils/i18nData'
+import { normalizeDisplayConfig } from '@/utils/displayOrder'
 import {
   normalizeNccDiscountType,
   normalizeNccDiscountValue,
   formatNccDiscountLabel,
 } from '@/utils/nccDiscount'
+import { exportProductsWorkbook } from '@/utils/productExcel'
 
 const supplementaryImageKeys = ['img_1', 'img_2', 'img_3', 'img_4', 'img_5', 'img_6']
 const modalSupplementaryUploading = ref(supplementaryImageKeys.map(() => false))
@@ -1732,10 +2562,738 @@ const statusSelect = ref(null)
 const statusSelectModal = ref(null)
 const isDiscountMode = ref(false)
 
+/* ===== PARENT CATEGORY MANAGER MODAL STATE ===== */
+const displayConfigState = ref({
+  categoryOrder: [],
+  parentMap: {},
+  parentI18n: {},
+  productGroups: [],
+  productSortMode: 'flat',
+})
+const showParentCategoryModal = ref(false)
+const parentModalSaving = ref(false)
+const parentModalState = ref({
+  isCreatingNew: true,
+  editingParentKey: '',
+  i18n: { vi: '', en: '', 'zh-CN': '', fil: '', ko: '' },
+  selectedSubs: [],
+  subSearch: '',
+})
+
+const effectiveParentHierarchy = computed(() => {
+  const pMap = { ...displayConfigState.value.parentMap }
+  const pI18n = JSON.parse(JSON.stringify(displayConfigState.value.parentI18n || {}))
+  const subStats = new Map()
+
+  for (const item of list.value || []) {
+    const i18n = normalizeProductI18n(item)
+    const subVi = String(i18n.vi?.Danh_muc || item?.Danh_muc || '').trim()
+    if (!subVi || subVi === 'Tất cả' || subVi === 'Sale') continue
+    if (!subStats.has(subVi)) {
+      subStats.set(subVi, { name: subVi, count: 0 })
+    }
+    subStats.get(subVi).count += 1
+
+    const itemParentVi = String(i18n.vi?.Danh_muc_cha || item?.Danh_muc_cha || '').trim()
+    if (itemParentVi && itemParentVi !== 'Tất cả' && itemParentVi !== 'Sale' && itemParentVi !== subVi) {
+      if (!Object.prototype.hasOwnProperty.call(pMap, subVi)) {
+        pMap[subVi] = itemParentVi
+      }
+      if (!pI18n[itemParentVi]) pI18n[itemParentVi] = { vi: itemParentVi }
+      for (const code of DATA_LANG_CODES) {
+        if (code === 'vi') continue
+        const val = String(i18n[code]?.Danh_muc_cha || '').trim()
+        if (val && !pI18n[itemParentVi][code]) {
+          pI18n[itemParentVi][code] = val
+        }
+      }
+    }
+  }
+
+  return { pMap, pI18n, subStats }
+})
+
+const allKhoSubCategories = computed(() => {
+  const { pMap, subStats } = effectiveParentHierarchy.value
+  return [...subStats.values()]
+    .map((s) => ({
+      name: s.name,
+      count: s.count,
+      currentParent: String(pMap[s.name] || '').trim(),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'vi', { sensitivity: 'base', numeric: true }))
+})
+
+const existingParentEntries = computed(() => {
+  const { pMap, pI18n } = effectiveParentHierarchy.value
+  const counts = new Map()
+  for (const pName of Object.keys(pI18n)) {
+    if (pName && pName !== 'Tất cả' && pName !== 'Sale') {
+      counts.set(pName, 0)
+    }
+  }
+  for (const [subName, pName] of Object.entries(pMap)) {
+    if (!pName || pName === subName) continue
+    counts.set(pName, (counts.get(pName) || 0) + 1)
+  }
+  return [...counts.entries()]
+    .map(([name, childCount]) => ({ name, childCount }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'vi', { sensitivity: 'base', numeric: true }))
+})
+
+const activeModalParentName = computed(() =>
+  parentModalState.value.isCreatingNew
+    ? String(parentModalState.value.i18n.vi || '').trim()
+    : String(parentModalState.value.editingParentKey || '').trim(),
+)
+
+const filteredModalSubCategories = computed(() => {
+  const kw = String(parentModalState.value.subSearch || '').trim().toLowerCase()
+  const activeName = activeModalParentName.value
+  return allKhoSubCategories.value.filter((sub) => {
+    if (activeName && sub.name === activeName) return false
+    if (!kw) return true
+    return (
+      sub.name.toLowerCase().includes(kw) ||
+      sub.currentParent.toLowerCase().includes(kw)
+    )
+  })
+})
+
+function openParentCategoryModal() {
+  const firstParent = existingParentEntries.value[0]?.name || ''
+  if (firstParent) {
+    selectExistingParentInModal(firstParent)
+  } else {
+    selectNewParentInModal()
+  }
+  showParentCategoryModal.value = true
+}
+
+function closeParentCategoryModal() {
+  if (parentModalSaving.value) return
+  showParentCategoryModal.value = false
+}
+
+function selectNewParentInModal() {
+  parentModalState.value = {
+    isCreatingNew: true,
+    editingParentKey: '',
+    i18n: { vi: '', en: '', 'zh-CN': '', fil: '', ko: '' },
+    selectedSubs: [],
+    subSearch: '',
+  }
+}
+
+function selectExistingParentInModal(parentName) {
+  const { pMap, pI18n } = effectiveParentHierarchy.value
+  const langObj = pI18n[parentName] || { vi: parentName }
+  const currentSubs = Object.entries(pMap)
+    .filter(([, p]) => p === parentName)
+    .map(([sub]) => sub)
+
+  parentModalState.value = {
+    isCreatingNew: false,
+    editingParentKey: parentName,
+    i18n: {
+      vi: parentName,
+      en: String(langObj.en || ''),
+      'zh-CN': String(langObj['zh-CN'] || ''),
+      fil: String(langObj.fil || ''),
+      ko: String(langObj.ko || ''),
+    },
+    selectedSubs: currentSubs,
+    subSearch: '',
+  }
+}
+
+function toggleSubInParentModal(subName) {
+  const arr = parentModalState.value.selectedSubs
+  const idx = arr.indexOf(subName)
+  if (idx >= 0) {
+    arr.splice(idx, 1)
+  } else {
+    arr.push(subName)
+  }
+}
+
+function selectAllFilteredSubs(checked) {
+  const visibleNames = filteredModalSubCategories.value.map((s) => s.name)
+  if (checked) {
+    const merged = new Set([...parentModalState.value.selectedSubs, ...visibleNames])
+    parentModalState.value.selectedSubs = [...merged]
+  } else {
+    const visibleSet = new Set(visibleNames)
+    parentModalState.value.selectedSubs = parentModalState.value.selectedSubs.filter(
+      (name) => !visibleSet.has(name),
+    )
+  }
+}
+
+async function saveParentCategoryModal() {
+  const targetParentVi = activeModalParentName.value
+  if (!targetParentVi) {
+    showAlert('Vui lòng nhập tên Danh mục cha (Tiếng Việt)', 'error')
+    return
+  }
+  if (targetParentVi === 'Tất cả' || targetParentVi === 'Sale') {
+    showAlert('Tên danh mục cha không được trùng "Tất cả" hoặc "Sale"', 'error')
+    return
+  }
+
+  parentModalSaving.value = true
+  try {
+    const { pMap, pI18n } = effectiveParentHierarchy.value
+    const nextMap = { ...pMap }
+    // Remove previous links to this parent first
+    for (const [subName, pName] of Object.entries(nextMap)) {
+      if (pName === targetParentVi) {
+        delete nextMap[subName]
+      }
+    }
+    // Assign newly selected subcategories
+    for (const subName of parentModalState.value.selectedSubs) {
+      if (subName && subName !== targetParentVi) {
+        nextMap[subName] = targetParentVi
+      }
+    }
+
+    const nextI18n = {
+      ...pI18n,
+      [targetParentVi]: {
+        vi: targetParentVi,
+        en: String(parentModalState.value.i18n.en || '').trim(),
+        'zh-CN': String(parentModalState.value.i18n['zh-CN'] || '').trim(),
+        fil: String(parentModalState.value.i18n.fil || '').trim(),
+        ko: String(parentModalState.value.i18n.ko || '').trim(),
+      },
+    }
+
+    const res = await dispatchAction({
+      action: 'saveDisplayConfig',
+      data: {
+        parentMap: nextMap,
+        parentI18n: nextI18n,
+      },
+    })
+    if (!res?.success) {
+      throw new Error(res?.message || 'Lưu danh mục cha thất bại')
+    }
+
+    await loadData()
+    selectExistingParentInModal(targetParentVi)
+    showAlert(`Đã lưu Danh mục cha "${targetParentVi}" và đồng bộ kho hàng!`, 'success')
+  } catch (err) {
+    console.error('saveParentCategoryModal error:', err)
+    showAlert(err?.message || 'Không lưu được danh mục cha', 'error')
+  } finally {
+    parentModalSaving.value = false
+  }
+}
+
+async function dissolveParentFromModal() {
+  const targetParentVi = parentModalState.value.editingParentKey
+  if (!targetParentVi) return
+  if (
+    !window.confirm(
+      `Xóa nhóm danh mục cha "${targetParentVi}"? Các danh mục con bên trong sẽ trở thành danh mục độc lập.`,
+    )
+  ) {
+    return
+  }
+
+  parentModalSaving.value = true
+  try {
+    const { pMap, pI18n } = effectiveParentHierarchy.value
+    const nextMap = { ...pMap }
+    for (const [subName, pName] of Object.entries(nextMap)) {
+      if (pName === targetParentVi) {
+        delete nextMap[subName]
+      }
+    }
+    const nextI18n = { ...pI18n }
+    delete nextI18n[targetParentVi]
+
+    const res = await dispatchAction({
+      action: 'saveDisplayConfig',
+      data: {
+        parentMap: nextMap,
+        parentI18n: nextI18n,
+      },
+    })
+    if (!res?.success) {
+      throw new Error(res?.message || 'Xóa nhóm cha thất bại')
+    }
+
+    await loadData()
+    const nextFirst = existingParentEntries.value[0]?.name || ''
+    if (nextFirst) {
+      selectExistingParentInModal(nextFirst)
+    } else {
+      selectNewParentInModal()
+    }
+    showAlert(`Đã giải tán danh mục cha "${targetParentVi}"`, 'success')
+  } catch (err) {
+    console.error('dissolveParentFromModal error:', err)
+    showAlert(err?.message || 'Không xóa được danh mục cha', 'error')
+  } finally {
+    parentModalSaving.value = false
+  }
+}
+
+/* ===== PRODUCT LINK GROUPS (VARIANTS) MANAGER STATE ===== */
+const showProductGroupModal = ref(false)
+const productGroupSaving = ref(false)
+const productGroupState = ref({
+  isCreatingNew: true,
+  editingGroupId: '',
+  name: '',
+  items: [], // [{ maHang, shortLabel }]
+  search: '',
+  categoryFilter: '',
+})
+
+const productGroupsList = computed(() =>
+  Array.isArray(displayConfigState.value.productGroups) ? displayConfigState.value.productGroups : [],
+)
+
+const filteredKhoProductsForGroup = computed(() => {
+  const kw = String(productGroupState.value.search || '').trim().toLowerCase()
+  const catFilter = String(productGroupState.value.categoryFilter || '').trim()
+  const items = list.value || []
+  const filtered = items.filter((it) => {
+    if (catFilter && String(it?.Danh_muc || '').trim() !== catFilter) return false
+    if (!kw) return true
+    const name = String(it?.Ten_hang || '').toLowerCase()
+    const code = String(it?.Ma_hang || '').toLowerCase()
+    const cat = String(it?.Danh_muc || '').toLowerCase()
+    return name.includes(kw) || code.includes(kw) || cat.includes(kw) || productMatchesKeyword(it, kw)
+  })
+  return filtered.slice(0, 120)
+})
+
+function getProductByCode(maHang) {
+  const code = String(maHang || '').trim()
+  return (list.value || []).find((p) => String(p?.Ma_hang || '').trim() === code) || null
+}
+
+function getProductNameByCode(maHang) {
+  const p = getProductByCode(maHang)
+  return p?.Ten_hang || maHang
+}
+
+function getProductImageByCode(maHang) {
+  const p = getProductByCode(maHang)
+  return String(p?.Main_img || '').trim()
+}
+
+function getProductPriceByCode(maHang) {
+  const p = getProductByCode(maHang)
+  if (!p) return ''
+  const giam = Number(p.Gia_Giam || 0)
+  const ban = Number(p.Gia_ban || 0)
+  const active = giam > 0 ? giam : ban
+  return `${active.toLocaleString('en-US')} ${p.Don_vi_tien_te || 'P'}`
+}
+
+function isProductInGroupDraft(maHang) {
+  const code = String(maHang || '').trim()
+  return productGroupState.value.items.some((it) => it.maHang === code)
+}
+
+function otherGroupNameOfProduct(maHang) {
+  const code = String(maHang || '').trim()
+  const found = productGroupsList.value.find(
+    (g) =>
+      g.id !== productGroupState.value.editingGroupId &&
+      Array.isArray(g.items) &&
+      g.items.some((it) => it.maHang === code),
+  )
+  if (!found) return ''
+  return found.name || found.id
+}
+
+function openProductGroupModal() {
+  const first = productGroupsList.value[0]
+  if (first) {
+    selectExistingProductGroupInModal(first.id)
+  } else {
+    selectNewProductGroupInModal()
+  }
+  showProductGroupModal.value = true
+}
+
+function getProductGroupForCode(maHang) {
+  const code = String(maHang || '').trim()
+  if (!code) return null
+  return (
+    productGroupsList.value.find(
+      (g) => Array.isArray(g.items) && g.items.some((it) => it.maHang === code),
+    ) || null
+  )
+}
+
+/* ===== INLINE PRODUCT LINKING INSIDE PRODUCT EDIT MODAL ===== */
+const showEditLinkPickerModal = ref(false)
+const editLinkSaving = ref(false)
+const editLinkDraft = ref({
+  groupId: '',
+  groupName: '',
+  items: [], // [{ maHang, shortLabel }]
+  search: '',
+  categoryFilter: '',
+  baselineSnapshot: '[]',
+})
+
+function openEditLinkPickerModal() {
+  editLinkDraft.value.search = ''
+  editLinkDraft.value.categoryFilter = ''
+  showEditLinkPickerModal.value = true
+}
+
+function closeEditLinkPickerModal() {
+  if (editLinkSaving.value) return
+  hydrateEditLinkDraft(edit.value)
+  showEditLinkPickerModal.value = false
+}
+
+async function saveEditLinkPickerModal() {
+  if (editLinkSaving.value) return
+  editLinkSaving.value = true
+  try {
+    const nextGroups = buildNextProductGroupsFromEditLink()
+    const res = await dispatchAction({
+      action: 'saveDisplayConfig',
+      data: { productGroups: nextGroups },
+    })
+    if (!res?.success) {
+      throw new Error(res?.message || 'Lưu link phân loại thất bại')
+    }
+    displayConfigState.value = {
+      ...displayConfigState.value,
+      productGroups: nextGroups,
+    }
+    hydrateEditLinkDraft(edit.value)
+    showEditLinkPickerModal.value = false
+    showAlert('Đã lưu liên kết phân loại sản phẩm!', 'success')
+  } catch (err) {
+    console.error('saveEditLinkPickerModal error:', err)
+    showAlert(err?.message || 'Không lưu được liên kết sản phẩm', 'error')
+  } finally {
+    editLinkSaving.value = false
+  }
+}
+
+function serializeEditLinkItems(itemsArr) {
+  return JSON.stringify(
+    (itemsArr || []).map((it) => ({
+      maHang: String(it?.maHang || '').trim(),
+      shortLabel: String(it?.shortLabel || '').trim(),
+    })),
+  )
+}
+
+function hydrateEditLinkDraft(rawItem) {
+  const code = String(rawItem?.Ma_hang || '').trim()
+  const existingGroup = getProductGroupForCode(code)
+  const items = existingGroup
+    ? (existingGroup.items || []).map((it) => ({
+        maHang: String(it.maHang || '').trim(),
+        shortLabel: String(it.shortLabel || '').trim(),
+      }))
+    : code
+      ? [{ maHang: code, shortLabel: '' }]
+      : []
+
+  editLinkDraft.value = {
+    groupId: existingGroup?.id || '',
+    groupName:
+      existingGroup?.name || String(rawItem?.i18n?.vi?.Ten_hang || rawItem?.Ten_hang || '').trim(),
+    items,
+    search: '',
+    categoryFilter: '',
+    baselineSnapshot: serializeEditLinkItems(items),
+  }
+}
+
+function hasEditLinkChanges() {
+  return serializeEditLinkItems(editLinkDraft.value.items) !== editLinkDraft.value.baselineSnapshot
+}
+
+function onEditLinkChanged() {
+  // Handled directly inside showEditLinkPickerModal via saveEditLinkPickerModal
+}
+
+const filteredOtherProductsForEditLink = computed(() => {
+  const currentCode = String(edit.value?.Ma_hang || '').trim()
+  const kw = String(editLinkDraft.value.search || '').trim().toLowerCase()
+  const catFilter = String(editLinkDraft.value.categoryFilter || '').trim()
+  const others = (list.value || []).filter((it) => {
+    const code = String(it?.Ma_hang || '').trim()
+    if (!code || code === currentCode) return false
+    if (catFilter && String(it?.Danh_muc || '').trim() !== catFilter) return false
+    if (!kw) return true
+    const name = String(it?.Ten_hang || '').toLowerCase()
+    const cat = String(it?.Danh_muc || '').toLowerCase()
+    return (
+      name.includes(kw) ||
+      code.toLowerCase().includes(kw) ||
+      cat.includes(kw) ||
+      productMatchesKeyword(it, kw)
+    )
+  })
+  // Put already-linked items first for convenience, then others (limit 120 for snappy scroll)
+  const linkedSet = new Set(editLinkDraft.value.items.map((i) => i.maHang))
+  const selected = others.filter((o) => linkedSet.has(o.Ma_hang))
+  const unselected = others.filter((o) => !linkedSet.has(o.Ma_hang))
+  return [...selected, ...unselected].slice(0, 120)
+})
+
+function isProductInEditLink(maHang) {
+  const code = String(maHang || '').trim()
+  return editLinkDraft.value.items.some((it) => it.maHang === code)
+}
+
+function getOtherProductGroupLabel(maHang) {
+  const code = String(maHang || '').trim()
+  const found = productGroupsList.value.find(
+    (g) =>
+      g.id !== editLinkDraft.value.groupId &&
+      Array.isArray(g.items) &&
+      g.items.some((it) => it.maHang === code),
+  )
+  return found ? found.name || found.id : ''
+}
+
+function toggleOtherProductInEditLink(maHang) {
+  const code = String(maHang || '').trim()
+  if (!code) return
+  const idx = editLinkDraft.value.items.findIndex((it) => it.maHang === code)
+  if (idx >= 0) {
+    editLinkDraft.value.items.splice(idx, 1)
+  } else {
+    editLinkDraft.value.items.push({ maHang: code, shortLabel: '' })
+  }
+  markAsEdited()
+}
+
+function removeOtherProductFromEditLink(maHang) {
+  const code = String(maHang || '').trim()
+  if (!code || code === String(edit.value?.Ma_hang || '').trim()) return
+  editLinkDraft.value.items = editLinkDraft.value.items.filter((it) => it.maHang !== code)
+  markAsEdited()
+}
+
+function moveEditLinkItem(idx, delta) {
+  const arr = editLinkDraft.value.items
+  const dest = idx + delta
+  if (dest < 0 || dest >= arr.length) return
+  const next = [...arr]
+  const [moved] = next.splice(idx, 1)
+  next.splice(dest, 0, moved)
+  editLinkDraft.value.items = next
+  markAsEdited()
+}
+
+function buildNextProductGroupsFromEditLink() {
+  const cleanItems = editLinkDraft.value.items
+    .map((it) => ({
+      maHang: String(it.maHang || '').trim(),
+      shortLabel: String(it.shortLabel || '').trim(),
+    }))
+    .filter((it) => it.maHang)
+
+  const currentCode = String(edit.value?.Ma_hang || '').trim()
+  const targetGroupId = editLinkDraft.value.groupId || (currentCode ? `pg_${Date.now()}` : '')
+
+  if (cleanItems.length < 2) {
+    // Unlink current product from its old group (and keep remaining >= 2 items if any)
+    return productGroupsList.value
+      .map((g) => ({
+        ...g,
+        items: (g.items || []).filter((it) => it.maHang !== currentCode),
+      }))
+      .filter((g) => g.items.length >= 2)
+  }
+
+  const chosenSet = new Set(cleanItems.map((i) => i.maHang))
+  const nextGroups = productGroupsList.value
+    .filter((g) => g.id !== targetGroupId)
+    .map((g) => ({
+      ...g,
+      items: (g.items || []).filter((it) => !chosenSet.has(it.maHang)),
+    }))
+    .filter((g) => g.items.length >= 2)
+
+  nextGroups.push({
+    id: targetGroupId,
+    name:
+      String(editLinkDraft.value.groupName || '').trim() ||
+      String(edit.value?.i18n?.vi?.Ten_hang || edit.value?.Ten_hang || '').trim(),
+    items: cleanItems,
+  })
+  return nextGroups
+}
+
+function closeProductGroupModal() {
+  if (productGroupSaving.value) return
+  showProductGroupModal.value = false
+}
+
+function selectNewProductGroupInModal() {
+  productGroupState.value = {
+    isCreatingNew: true,
+    editingGroupId: '',
+    name: '',
+    items: [],
+    search: '',
+    categoryFilter: '',
+  }
+}
+
+function selectExistingProductGroupInModal(groupId) {
+  const grp = productGroupsList.value.find((g) => g.id === groupId)
+  if (!grp) {
+    selectNewProductGroupInModal()
+    return
+  }
+  productGroupState.value = {
+    isCreatingNew: false,
+    editingGroupId: grp.id,
+    name: grp.name || '',
+    items: (grp.items || []).map((it) => ({
+      maHang: String(it.maHang || '').trim(),
+      shortLabel: String(it.shortLabel || '').trim(),
+    })),
+    search: '',
+    categoryFilter: '',
+  }
+}
+
+function toggleProductInGroupDraft(maHang) {
+  const code = String(maHang || '').trim()
+  if (!code) return
+  const idx = productGroupState.value.items.findIndex((it) => it.maHang === code)
+  if (idx >= 0) {
+    productGroupState.value.items.splice(idx, 1)
+  } else {
+    productGroupState.value.items.push({ maHang: code, shortLabel: '' })
+  }
+}
+
+function removeProductFromGroupDraft(maHang) {
+  const code = String(maHang || '').trim()
+  productGroupState.value.items = productGroupState.value.items.filter((it) => it.maHang !== code)
+}
+
+function moveProductGroupItem(idx, delta) {
+  const arr = productGroupState.value.items
+  const dest = idx + delta
+  if (dest < 0 || dest >= arr.length) return
+  const next = [...arr]
+  const [moved] = next.splice(idx, 1)
+  next.splice(dest, 0, moved)
+  productGroupState.value.items = next
+}
+
+async function saveProductGroupModal() {
+  if (productGroupState.value.items.length < 2) {
+    showAlert('Vui lòng chọn ít nhất 2 sản phẩm để link thành nhóm', 'error')
+    return
+  }
+
+  productGroupSaving.value = true
+  try {
+    const cleanItems = productGroupState.value.items.map((it) => ({
+      maHang: String(it.maHang || '').trim(),
+      shortLabel: String(it.shortLabel || '').trim(),
+    }))
+    const selectedCodes = new Set(cleanItems.map((i) => i.maHang))
+    const resolvedName =
+      String(productGroupState.value.name || '').trim() ||
+      getProductNameByCode(cleanItems[0].maHang)
+
+    const targetId = productGroupState.value.isCreatingNew
+      ? `pg_${Date.now()}`
+      : productGroupState.value.editingGroupId
+
+    // Remove chosen codes from any other group so each product belongs cleanly to 1 group
+    const nextGroups = productGroupsList.value
+      .filter((g) => g.id !== targetId)
+      .map((g) => ({
+        ...g,
+        items: (g.items || []).filter((it) => !selectedCodes.has(it.maHang)),
+      }))
+      .filter((g) => g.items.length >= 2)
+
+    nextGroups.push({
+      id: targetId,
+      name: resolvedName,
+      items: cleanItems,
+    })
+
+    const res = await dispatchAction({
+      action: 'saveDisplayConfig',
+      data: { productGroups: nextGroups },
+    })
+    if (!res?.success) {
+      throw new Error(res?.message || 'Lưu nhóm phân loại thất bại')
+    }
+
+    displayConfigState.value = {
+      ...displayConfigState.value,
+      productGroups: nextGroups,
+    }
+    selectExistingProductGroupInModal(targetId)
+    showAlert(`Đã lưu nhóm phân loại "${resolvedName}"!`, 'success')
+  } catch (err) {
+    console.error('saveProductGroupModal error:', err)
+    showAlert(err?.message || 'Không lưu được nhóm phân loại', 'error')
+  } finally {
+    productGroupSaving.value = false
+  }
+}
+
+async function deleteProductGroupModal() {
+  const targetId = productGroupState.value.editingGroupId
+  if (!targetId) return
+  if (!window.confirm('Xóa liên kết nhóm phân loại này?')) return
+
+  productGroupSaving.value = true
+  try {
+    const nextGroups = productGroupsList.value.filter((g) => g.id !== targetId)
+    const res = await dispatchAction({
+      action: 'saveDisplayConfig',
+      data: { productGroups: nextGroups },
+    })
+    if (!res?.success) {
+      throw new Error(res?.message || 'Xóa nhóm thất bại')
+    }
+    displayConfigState.value = {
+      ...displayConfigState.value,
+      productGroups: nextGroups,
+    }
+    const nextFirst = nextGroups[0]
+    if (nextFirst) {
+      selectExistingProductGroupInModal(nextFirst.id)
+    } else {
+      selectNewProductGroupInModal()
+    }
+    showAlert('Đã xóa nhóm phân loại sản phẩm', 'success')
+  } catch (err) {
+    console.error('deleteProductGroupModal error:', err)
+    showAlert(err?.message || 'Không xóa được nhóm phân loại', 'error')
+  } finally {
+    productGroupSaving.value = false
+  }
+}
+
 /* ===== BULK EDIT MODAL STATE ===== */
 const showBulkEditModal = ref(false)
 const bulkSaving = ref(false)
 const createDefaultBulkForm = () => ({
+  enableDanhMucCha: false,
+  Danh_muc_cha: '',
   enableDanhMuc: false,
   Danh_muc: '',
   enableSize: false,
@@ -1773,7 +3331,8 @@ const selectedProducts = computed(() => {
 const hasAnyBulkFieldEnabled = computed(() => {
   const f = bulkForm.value
   return Boolean(
-    f.enableDanhMuc ||
+    f.enableDanhMucCha ||
+      f.enableDanhMuc ||
       f.enableSize ||
       f.enableDvt ||
       f.enableDonViTienTe ||
@@ -1828,8 +3387,12 @@ const tableLoading = ref(true)
 async function loadData() {
   tableLoading.value = true // ✅ dùng tableLoading
   try {
-    const json = await getOneSheet('hang_hoa')
+    const [json, cfgJson] = await Promise.all([
+      getOneSheet('hang_hoa'),
+      getOneSheet('display_config'),
+    ])
     list.value = json.data || []
+    displayConfigState.value = normalizeDisplayConfig(cfgJson?.data || [])
   } catch (error) {
     console.error('Load data error:', error)
     showAlert('Không thể tải dữ liệu', 'error')
@@ -2055,6 +3618,7 @@ function onEditI18nChange() {
       String(edit.value.i18n.vi?.Ten_hang || '').trim() ||
       String(edit.value.i18n.en?.Ten_hang || '').trim() ||
       String(edit.value.Ten_hang || '').trim()
+    edit.value.Danh_muc_cha = String(edit.value.i18n.vi?.Danh_muc_cha || '').trim()
     edit.value.Danh_muc = String(edit.value.i18n.vi?.Danh_muc || '').trim()
     edit.value.Dvt = String(edit.value.i18n.vi?.Dvt || '').trim()
     edit.value.Mo_ta = String(edit.value.i18n.vi?.Mo_ta || '').trim()
@@ -2081,6 +3645,8 @@ function selectStatus(key) {
 
 function selectExport(type) {
   showExportMenu.value = false
+  if (type === 'excel_all') exportKhoExcel('all')
+  if (type === 'excel_current') exportKhoExcel('current')
   if (type === 'text') exportText()
   if (type === 'full') exportFull()
   if (type === 'name') exportTen()
@@ -2126,10 +3692,11 @@ async function handleImageUpload(targetKey = 'Main_img', event) {
   }
 
   try {
-    const uploadedUrl = await uploadImageToImgBB(file, {
+    const uploadedUrl = await uploadImageToCloudinary(file, {
       targetKB: 100,
       maxWidth: 1200,
       maxHeight: 1200,
+      folder: 'sakitchen/san-pham',
     })
 
     const key = targetKey || 'Main_img'
@@ -2487,6 +4054,47 @@ function toggleSelectAll(e) {
   }
 }
 
+function exportKhoExcel(scope = 'all') {
+  const rawByCode = new Map(
+    (list.value || []).map((item) => [String(item?.Ma_hang || '').trim(), item]),
+  )
+
+  let targetProducts = []
+  if (scope === 'current') {
+    if (selected.value.length > 0) {
+      const selSet = new Set(selected.value.map((c) => String(c || '').trim()))
+      targetProducts = (list.value || []).filter((item) =>
+        selSet.has(String(item?.Ma_hang || '').trim()),
+      )
+    } else {
+      targetProducts = (ordered.value || []).map(
+        (item) => rawByCode.get(String(item?.Ma_hang || '').trim()) || item,
+      )
+    }
+  } else {
+    targetProducts = list.value || []
+  }
+
+  if (!targetProducts.length) {
+    showAlert('Không có sản phẩm nào để xuất Excel', 'error')
+    return
+  }
+
+  const now = new Date()
+  const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(
+    now.getDate(),
+  ).padStart(2, '0')}`
+  const suffix = scope === 'current' ? (selected.value.length > 0 ? '-DA-CHON' : '-DANG-LOC') : ''
+  const filename = `KHO-HANG-SA-KITCHEN-5LANG${suffix}-${stamp}.xlsx`
+
+  exportProductsWorkbook({
+    products: targetProducts,
+    filename,
+    sheetName: 'Hang_Hoa',
+  })
+  showAlert(`Đã xuất ${targetProducts.length} sản phẩm ra ${filename}`, 'success')
+}
+
 function exportText() {
   if (!selected.value.length) {
     showAlert('Vui lòng chọn sản phẩm để xuất', 'error')
@@ -2568,6 +4176,7 @@ function prepareEditState(item) {
   const cloned = {
     ...rawItem,
     Ten_hang: i18n.vi.Ten_hang || rawItem.Ten_hang || '',
+    Danh_muc_cha: i18n.vi.Danh_muc_cha || rawItem.Danh_muc_cha || '',
     Danh_muc: i18n.vi.Danh_muc || rawItem.Danh_muc || '',
     Dvt: i18n.vi.Dvt || rawItem.Dvt || '',
     Mo_ta: i18n.vi.Mo_ta || rawItem.Mo_ta || '',
@@ -2585,6 +4194,7 @@ function prepareEditState(item) {
   hasUnsavedChanges.value = false
   edit.value = cloned
   originalEdit.value = JSON.parse(JSON.stringify(cloned))
+  hydrateEditLinkDraft(cloned)
 }
 
 function openEdit(item, options = {}) {
@@ -2833,13 +4443,37 @@ async function saveEdit() {
   saving.value = true
   try {
     const payload = syncProductWithI18n(edit.value)
-    const res = await dispatchAction({
-      action: 'updateHangHoa',
-      data: payload,
-    })
-    if (!res.success) {
-      throw new Error(res.message || 'Cập nhật thất bại')
+    const linkChanged = hasEditLinkChanges()
+    const tasks = [
+      dispatchAction({
+        action: 'updateHangHoa',
+        data: payload,
+      }).then((res) => {
+        if (!res.success) {
+          throw new Error(res.message || 'Cập nhật thất bại')
+        }
+      }),
+    ]
+
+    if (linkChanged) {
+      const nextGroups = buildNextProductGroupsFromEditLink()
+      tasks.push(
+        dispatchAction({
+          action: 'saveDisplayConfig',
+          data: { productGroups: nextGroups },
+        }).then((res) => {
+          if (!res?.success) {
+            throw new Error(res?.message || 'Lưu link phân loại thất bại')
+          }
+          displayConfigState.value = {
+            ...displayConfigState.value,
+            productGroups: nextGroups,
+          }
+        }),
+      )
     }
+
+    await Promise.all(tasks)
 
     showAlert('Cập nhật thành công', 'success')
     resetEditTracking()
@@ -2958,6 +4592,7 @@ async function saveBulkEdit() {
   const patch = {
     lang: selectedLanguage.value || 'vi',
   }
+  if (f.enableDanhMucCha) patch.Danh_muc_cha = String(f.Danh_muc_cha || '').trim()
   if (f.enableDanhMuc) patch.Danh_muc = String(f.Danh_muc || '').trim()
   if (f.enableSize) patch.Size = String(f.Size || '').trim()
   if (f.enableDvt) patch.Dvt = String(f.Dvt || '').trim()
@@ -4495,9 +6130,12 @@ function onMoneyInput(e, key) {
   }
 }
 .modal-body-grid {
+  width: 100%;
+  max-width: 1560px;
+  margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
-  gap: 28px;
+  grid-template-columns: minmax(340px, 400px) minmax(0, 1fr);
+  gap: 24px;
   align-items: flex-start;
 }
 
@@ -4515,8 +6153,48 @@ function onMoneyInput(e, key) {
 
 .modal-details-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+
+.modal-desc-settings-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.modal-desc-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.modal-desc-textarea {
+  flex: 1;
+  min-height: 118px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  resize: vertical;
+}
+
+.modal-settings-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+@media (max-width: 1120px) {
+  .modal-body-grid {
+    grid-template-columns: minmax(290px, 340px) minmax(0, 1fr);
+    gap: 18px;
+  }
+  .modal-details-grid,
+  .modal-desc-settings-split {
+    grid-template-columns: 1fr;
+  }
 }
 
 .modal-section-card {
@@ -4856,30 +6534,31 @@ function onMoneyInput(e, key) {
   box-shadow: 0 8px 16px rgba(239, 68, 68, 0.3);
 }
 
-/* ===== DESKTOP MODAL ===== */
+/* ===== DESKTOP MODAL (100% FULLSCREEN) ===== */
 .modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(8px);
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: stretch;
   z-index: 1000;
-  padding: 24px;
+  padding: 0;
 }
 
 .modal-container {
   width: 100%;
-  max-width: 900px;
-  max-height: 90vh;
+  max-width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
   background: rgb(15, 23, 42);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 16px;
+  border: none;
+  border-radius: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: none;
   font-family: 'Inter', 'Segoe UI', 'Helvetica Neue', system-ui, -apple-system, sans-serif;
 }
 
@@ -5387,6 +7066,822 @@ function onMoneyInput(e, key) {
 .clear-filter-row {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-manage-parents {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(52, 211, 153, 0.65);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.28));
+  color: #86efac;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.btn-manage-parents:hover {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+}
+
+.btn-manage-product-groups {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(56, 189, 248, 0.65);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(37, 99, 235, 0.28));
+  color: #7dd3fc;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.btn-manage-product-groups:hover {
+  background: linear-gradient(135deg, #0ea5e9, #2563eb);
+  color: #ffffff;
+}
+
+.pgm-title {
+  color: #7dd3fc;
+}
+
+.pgm-selected-wrap {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pgm-selected-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.pgm-selected-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+}
+
+.pgm-move-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pgm-move-btn {
+  width: 22px;
+  height: 18px;
+  padding: 0;
+  border-radius: 5px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(30, 41, 59, 0.8);
+  color: #cbd5e1;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.pgm-move-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pgm-sel-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.pgm-sel-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f8fafc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pgm-sel-meta {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.pgm-short-input {
+  width: 195px;
+  max-width: 44%;
+  height: 32px;
+  font-size: 12.5px;
+  padding: 0 9px;
+}
+
+.pgm-remove-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: none;
+  background: rgba(239, 68, 68, 0.14);
+  color: #f87171;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pgm-remove-btn:hover {
+  background: rgba(239, 68, 68, 0.28);
+}
+
+.edit-link-trigger-card {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 11px;
+  background: rgba(14, 165, 233, 0.09);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.elt-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.elt-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #7dd3fc;
+  flex-wrap: wrap;
+}
+
+.elt-preview-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.elt-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  color: #e2e8f0;
+}
+
+.elt-chip.is-current {
+  border-color: rgba(52, 211, 153, 0.55);
+  color: #6ee7b7;
+}
+
+.btn-link-group-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 9px;
+  border: 1px solid rgba(56, 189, 248, 0.6);
+  background: linear-gradient(135deg, #0ea5e9, #2563eb);
+  color: #ffffff;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: filter 0.15s ease;
+}
+
+.btn-link-group-inline:hover {
+  filter: brightness(1.08);
+}
+
+/* ===== 100% FULLSCREEN PRODUCT LINK MODALS (2-COLUMN BALANCED WORKSPACE) ===== */
+.bulk-modal-overlay.fullscreen-link-overlay {
+  padding: 0;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.bulk-modal-card.fullscreen-link-card {
+  width: 100%;
+  max-width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.flc-header {
+  padding: 16px 24px;
+  flex-shrink: 0;
+}
+
+.flc-header-inner,
+.flc-container,
+.flc-footer-inner {
+  width: 100%;
+  max-width: 1560px;
+  margin: 0 auto;
+}
+
+.flc-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.flc-top-tabs-bar {
+  padding: 12px 24px;
+  background: rgba(15, 23, 42, 0.72);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  flex-shrink: 0;
+}
+
+.flc-top-tabs-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.flc-workspace-body {
+  flex: 1;
+  min-height: 0;
+  padding: 20px 24px;
+  overflow: hidden;
+  display: flex;
+}
+
+.link-workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(380px, 0.92fr) minmax(0, 1.38fr);
+  gap: 20px;
+  height: 100%;
+  min-height: 0;
+}
+
+.link-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  background: rgba(30, 41, 59, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.link-pane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.link-pane-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.link-pane-title i {
+  color: #38bdf8;
+  font-size: 16px;
+}
+
+.link-pane-hint {
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.flc-group-name-field {
+  flex-shrink: 0;
+}
+
+.flc-cat-select {
+  height: 36px;
+  min-width: 170px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  background: rgba(15, 23, 42, 0.85);
+}
+
+.flc-search-input {
+  height: 40px;
+  flex-shrink: 0;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.link-selected-scroll,
+.link-picker-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.link-selected-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.link-picker-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.link-pane-empty {
+  flex: 1;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px dashed rgba(148, 163, 184, 0.25);
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.link-pane-empty i {
+  font-size: 26px;
+  opacity: 0.7;
+}
+
+.link-item-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 9px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.link-item-thumb.is-empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-size: 18px;
+}
+
+.flc-selected-card {
+  padding: 10px;
+  gap: 10px;
+}
+
+.flc-short-input {
+  height: 32px;
+  margin-top: 6px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.flc-pick-card {
+  align-items: center;
+  padding: 10px;
+  gap: 10px;
+}
+
+.flc-pick-price {
+  color: #6ee7b7;
+  font-weight: 700;
+}
+
+.flc-footer {
+  padding: 16px 24px;
+  flex-shrink: 0;
+}
+
+.flc-footer-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+@media (max-width: 960px) {
+  .flc-workspace-body {
+    overflow-y: auto;
+    padding: 14px;
+  }
+  .link-workspace-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .link-selected-scroll,
+  .link-picker-scroll {
+    max-height: 360px;
+  }
+}
+
+.inline-link-section {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(14, 165, 233, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ils-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ils-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #7dd3fc;
+}
+
+.ils-badge {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(148, 163, 184, 0.16);
+  color: #94a3b8;
+}
+
+.ils-badge.active {
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+}
+
+.ils-selected-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 185px;
+  overflow-y: auto;
+}
+
+.ils-selected-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.ils-selected-row.is-current {
+  border-color: rgba(52, 211, 153, 0.5);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.ils-sel-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.ils-sel-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ils-cur-tag {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  background: rgba(16, 185, 129, 0.25);
+  color: #6ee7b7;
+}
+
+.ils-sel-meta {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.ils-short-input {
+  width: 170px;
+  max-width: 44%;
+  height: 30px;
+  font-size: 12px;
+  padding: 0 8px;
+}
+
+.ils-search-input {
+  height: 34px;
+  font-size: 12.5px;
+}
+
+.ils-empty {
+  padding: 12px;
+  text-align: center;
+  font-size: 12.5px;
+  color: #94a3b8;
+}
+
+.ils-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 7px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.ils-pick-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 9px;
+  border-radius: 9px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.55);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.ils-pick-item input[type='checkbox'] {
+  margin-top: 2px;
+  accent-color: #38bdf8;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.ils-pick-item.checked {
+  border-color: #38bdf8;
+  background: rgba(14, 165, 233, 0.16);
+}
+
+.ils-pick-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.ils-pick-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #f8fafc;
+  word-break: break-word;
+}
+
+.ils-pick-meta {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.parent-cat-modal-card {
+  max-width: 780px;
+}
+
+.pcm-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pcm-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pcm-section-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.pcm-parent-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pcm-parent-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(30, 41, 59, 0.85);
+  color: #e2e8f0;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pcm-parent-pill.is-new {
+  border-color: rgba(52, 211, 153, 0.5);
+  color: #6ee7b7;
+}
+
+.pcm-parent-pill.active {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border-color: #34d399;
+  color: #ffffff;
+}
+
+.pcm-pill-count {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.pcm-name-card {
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(30, 41, 59, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.pcm-name-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  gap: 10px;
+}
+
+.pcm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pcm-field label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.pcm-sub-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pcm-sub-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.pcm-sub-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.pcm-mini-btn {
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(30, 41, 59, 0.85);
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pcm-mini-btn:hover {
+  border-color: #34d399;
+  color: #6ee7b7;
+}
+
+.pcm-sub-search {
+  margin-bottom: 2px;
+}
+
+.pcm-empty {
+  padding: 18px;
+  text-align: center;
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.45);
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.pcm-sub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 8px;
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.pcm-sub-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(30, 41, 59, 0.65);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pcm-sub-item input[type='checkbox'] {
+  margin-top: 2px;
+  accent-color: #10b981;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.pcm-sub-item.checked {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.14);
+}
+
+.pcm-sub-item.other-parent {
+  opacity: 0.82;
+}
+
+.pcm-sub-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.pcm-sub-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f8fafc;
+  word-break: break-word;
+}
+
+.pcm-sub-meta {
+  font-size: 11.5px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.pcm-other-badge {
+  color: #fbbf24;
+  font-weight: 600;
 }
 
 /* MOBILE: vẫn 3 cột x 2 hàng (nếu muốn) */
@@ -5781,6 +8276,17 @@ function onMoneyInput(e, key) {
   box-shadow: 0 6px 18px rgba(16, 185, 129, 0.45);
 }
 
+.bfb-btn-delete {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
+}
+
+.bfb-btn-delete:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.48);
+}
+
 /* ===== BULK EDIT MODAL ===== */
 .bulk-modal-overlay {
   position: fixed;
@@ -5979,10 +8485,24 @@ function onMoneyInput(e, key) {
 @media (max-width: 768px) {
   .bulk-floating-bar {
     bottom: 76px;
-    width: calc(100% - 24px);
-    max-width: 460px;
+    width: calc(100% - 20px);
+    max-width: 480px;
     border-radius: 14px;
     padding: 10px 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .bfb-actions {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .bfb-btn {
+    padding: 7px 11px;
+    font-size: 12.5px;
   }
 
   .bulk-fields-grid {

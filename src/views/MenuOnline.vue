@@ -221,16 +221,54 @@
             </h4>
             <div
               v-for="c in categories"
-              style="text-transform: uppercase;"
               :key="c"
-              class="cat"
-              :class="{
-                active: c === currentCategory,
-                sale: c === 'Sale'
-              }"
-              @click="selectCategory(c)"
+              class="cat-group-wrap"
             >
-              {{ c }}
+              <div
+                style="text-transform: uppercase;"
+                class="cat cat-tree-parent"
+                :class="{
+                  active: c === currentCategory && !currentSubCategory,
+                  'is-parent-active': c === currentCategory && Boolean(currentSubCategory),
+                  sale: c === 'Sale'
+                }"
+                @click="selectCategory(c)"
+              >
+                <span class="cat-label-text">{{ c }}</span>
+                <button
+                  v-if="getHierarchySubCategories(c).length"
+                  type="button"
+                  class="cat-chevron-btn"
+                  :title="isCatParentExpanded(c) ? 'Thu gọn' : 'Mở rộng'"
+                  @click.stop="toggleCatParentExpanded(c)"
+                >
+                  <span class="cat-sub-count">{{ getHierarchySubCategories(c).length }}</span>
+                  <i :class="isCatParentExpanded(c) ? 'ri-arrow-down-s-line' : 'ri-arrow-right-s-line'"></i>
+                </button>
+              </div>
+              <div
+                v-if="getHierarchySubCategories(c).length && isCatParentExpanded(c)"
+                class="sub-cat-tree"
+              >
+                <button
+                  type="button"
+                  class="sub-cat-tree-item"
+                  :class="{ active: c === currentCategory && !currentSubCategory }"
+                  @click.stop="selectParentAndSub(c, '')"
+                >
+                  <span>{{ $t('filter.all') }}</span>
+                </button>
+                <button
+                  v-for="sub in getHierarchySubCategories(c)"
+                  :key="'side-sub-' + c + '-' + sub.label"
+                  type="button"
+                  class="sub-cat-tree-item"
+                  :class="{ active: c === currentCategory && currentSubCategory === sub.label }"
+                  @click.stop="selectParentAndSub(c, sub.label)"
+                >
+                  <span>{{ sub.label }}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -310,12 +348,27 @@
   <template v-else>
       <!-- HERO SECTION: NOTICE + BANNER -->
       <div v-if="thongBaoTexts.length || bannerList.length > 0" class="hero-container">
-        <div v-if="thongBaoTexts.length" class="notice-bar">
-          <div class="notice-icon"><i class="ri-volume-up-line"></i></div>
-          <div class="notice-marquee">
-            <span class="notice-text">
-              {{ thongBaoTexts.join('   •   ') }}
-            </span>
+        <div
+          v-if="marqueeNoticeText"
+          class="notice-bar"
+          :class="{ 'is-marquee': noticeOverflowing, 'is-paused': noticePaused }"
+          @click="noticeOverflowing && (noticePaused = !noticePaused)"
+        >
+          <div class="notice-badge" :title="$t('menu.noticeLabel')" :aria-label="$t('menu.noticeLabel')">
+            <i class="ri-volume-up-fill notice-badge-ico"></i>
+            <span v-if="!isMobile" class="notice-badge-text">{{ $t('menu.noticeLabel') }}</span>
+          </div>
+          <div class="notice-marquee" ref="noticeViewportRef">
+            <div class="notice-track" :style="noticeTrackStyle">
+              <span class="notice-item">
+                <span class="notice-text" ref="noticeMeasureRef">{{ marqueeNoticeText }}</span>
+                <span v-if="noticeOverflowing" class="notice-sep" aria-hidden="true">•</span>
+              </span>
+              <span v-if="noticeOverflowing" class="notice-item" aria-hidden="true">
+                <span class="notice-text">{{ marqueeNoticeText }}</span>
+                <span class="notice-sep">•</span>
+              </span>
+            </div>
           </div>
         </div>
 
@@ -472,7 +525,8 @@
                 class="sct-cat-pill"
                 :class="{
                   active: c === currentCategory,
-                  sale: c === 'Sale'
+                  sale: c === 'Sale',
+                  'is-parent-cat': isParentCategoryEntry(c)
                 }"
                 @click="selectCategory(c)"
               >
@@ -510,12 +564,12 @@
               </div>
               <div class="sct-all-cats-grid">
                 <button
-                  v-for="c in categories"
+                  v-for="c in standaloneCategories"
                   :key="'drop-cat-' + c"
                   type="button"
                   class="sct-cat-pill"
                   :class="{
-                    active: c === currentCategory,
+                    active: c === currentCategory && !currentSubCategory,
                     sale: c === 'Sale'
                   }"
                   @click="selectCategory(c)"
@@ -524,6 +578,72 @@
                   <span>{{ c }}</span>
                 </button>
               </div>
+              <div
+                v-if="parentCategoriesWithSubs.length"
+                class="sct-parent-groups-wrap"
+              >
+                <div
+                  v-for="pNode in parentCategoriesWithSubs"
+                  :key="'drop-grp-' + pNode.label"
+                  class="sct-parent-group-card"
+                >
+                  <div class="sct-parent-group-head">
+                    <button
+                      type="button"
+                      class="sct-cat-pill sct-parent-head-pill is-parent-cat"
+                      :class="{
+                        active: pNode.label === currentCategory && !currentSubCategory,
+                        'is-parent-active': pNode.label === currentCategory && Boolean(currentSubCategory)
+                      }"
+                      @click="selectParentAndSub(pNode.label, '')"
+                    >
+                      <i class="ri-folder-3-line"></i>
+                      <span>{{ pNode.label }}</span>
+                    </button>
+                    <span class="sct-parent-subcount">{{ pNode.subCategories.length }}</span>
+                  </div>
+                  <div class="sct-all-cats-grid">
+                    <button
+                      v-for="sub in pNode.subCategories"
+                      :key="'drop-sub-' + pNode.label + '-' + sub.label"
+                      type="button"
+                      class="sct-cat-pill is-sub-pill"
+                      :class="{ active: pNode.label === currentCategory && currentSubCategory === sub.label }"
+                      @click="selectParentAndSub(pNode.label, sub.label)"
+                    >
+                      <span>{{ sub.label }}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-if="subCategories.length" class="sct-subcat-bar">
+          <div class="sct-subcat-inner">
+            <span class="sct-subcat-parent-label">
+              <i class="ri-node-tree"></i>
+              <span>{{ currentCategory }}:</span>
+            </span>
+            <div class="sct-subcat-scroll">
+              <button
+                type="button"
+                class="sct-cat-pill is-sub-pill"
+                :class="{ active: !currentSubCategory }"
+                @click="selectSubCategory('')"
+              >
+                <span>{{ $t('filter.all') }}</span>
+              </button>
+              <button
+                v-for="sub in subCategories"
+                :key="'desk-sub-' + sub"
+                type="button"
+                class="sct-cat-pill is-sub-pill"
+                :class="{ active: currentSubCategory === sub }"
+                @click="selectSubCategory(sub)"
+              >
+                <span>{{ sub }}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -582,11 +702,11 @@
           <button
             type="button"
             class="filter-btn filter-cat-btn"
-            :class="{ active: showCategoryModal || (currentCategory && currentCategory !== allCategoryLabel) }"
+            :class="{ active: showCategoryModal || (currentCategory && currentCategory !== allCategoryLabel) || Boolean(currentSubCategory) }"
             @click="openMobilePanel('category')"
           >
             <i class="ri-apps-2-line"></i>
-            <span>{{ currentCategory && currentCategory !== allCategoryLabel ? currentCategory : $t('menu.category') }}</span>
+            <span>{{ currentSubCategory ? `${currentCategory} › ${currentSubCategory}` : (currentCategory && currentCategory !== allCategoryLabel ? currentCategory : $t('mobile.menu')) }}</span>
             <i class="ri-arrow-down-s-line"></i>
           </button>
 
@@ -637,12 +757,33 @@
           class="sct-cat-pill mob-cat-pill"
           :class="{
             active: c === currentCategory,
-            sale: c === 'Sale'
+            sale: c === 'Sale',
+            'is-parent-cat': isParentCategoryEntry(c)
           }"
           @click="selectCategory(c)"
         >
           <i v-if="c === 'Sale'" class="ri-fire-fill"></i>
           <span>{{ c }}</span>
+        </button>
+      </div>
+      <div v-if="isMobile && subCategories.length" class="mobile-cat-strip is-sub-strip">
+        <button
+          type="button"
+          class="sct-cat-pill mob-cat-pill is-sub-pill"
+          :class="{ active: !currentSubCategory }"
+          @click="selectSubCategory('')"
+        >
+          <span>{{ $t('filter.all') }}</span>
+        </button>
+        <button
+          v-for="sub in subCategories"
+          :key="'mob-sub-' + sub"
+          type="button"
+          class="sct-cat-pill mob-cat-pill is-sub-pill"
+          :class="{ active: currentSubCategory === sub }"
+          @click="selectSubCategory(sub)"
+        >
+          <span>{{ sub }}</span>
         </button>
       </div>
 
@@ -652,13 +793,13 @@
           <span class="mfb-active-cat">
             <i v-if="currentCategory === 'Sale'" class="ri-fire-fill"></i>
             <i v-else class="ri-price-tag-3-line"></i>
-            <span>{{ currentCategory || allCategoryLabel }}</span>
+            <span>{{ currentSubCategory ? `${currentCategory} › ${currentSubCategory}` : (currentCategory || allCategoryLabel) }}</span>
           </span>
           <span class="mfb-count-pill">
             {{ filteredMenu.length }} {{ $t('menu.itemsUnit') }}
           </span>
           <button
-            v-if="currentCategory !== allCategoryLabel || priceSort !== 'all' || keyword"
+            v-if="currentCategory !== allCategoryLabel || currentSubCategory || priceSort !== 'all' || keyword"
             type="button"
             class="mfb-reset-btn"
             @click="onAllFilter"
@@ -703,126 +844,140 @@
         <div v-if="keyword" class="search-result-line">
           Kết quả tìm kiếm cho: "{{ keyword }}"
         </div>
-        <div
-          v-for="m in pagedMenu"
-          :key="m.Ma_hang"
-          class="card-border"
-          :class="{ out: m.Trang_thai === 'Hết hàng' }"
-        >
+        <template v-for="entry in menuDisplayEntries" :key="entry.rowKey">
           <div
-            class="card"
-            @click="openDetail(m)"
+            v-if="entry.type === 'heading'"
+            class="menu-group-heading"
+            @click="selectParentAndSub(entry.parentLabel, entry.subLabel)"
           >
-            <div class="card-img-wrap">
-              <transition name="card-fade" mode="out-in">
-                <img
-                  v-if="getCardImage(m)"
-                  :key="getCardImageKey(m)"
-                  :src="getCardImage(m)"
-                  loading="lazy"
-                  decoding="async"
-                  :alt="m.Ten_hang || ''"
-                  @error="onCardImgError(m, getCardImage(m))"
-                />
-                <div v-else :key="'fallback-' + m.Ma_hang" class="card-img-name-fallback">
-                  <span>{{ m.Ten_hang }}</span>
-                </div>
-              </transition>
-
-              <!-- TAG GIẢM GIÁ -->
-              <div
-                v-if="isDiscount(m)"
-                class="discount-tag"
-              >
-                <span>-{{ discountPercent(m) }}%</span>
-              </div>
-
-              <!-- TAG TRẠNG THÁI TRÊN ẢNH -->
-              <div
-                class="status-tag card-status-pill"
-                :class="{
-                  available: m.Trang_thai === 'Còn hàng',
-                  out: m.Trang_thai === 'Hết hàng'
-                }"
-              >
-                {{ $t(getStatusKey(m.Trang_thai)) }}
-              </div>
-            </div>
-
-            <div class="info">
-              <!-- TÊN -->
-              <h4 class="name">{{ m.Ten_hang }}</h4>
-
-              <!-- MÔ TẢ -->
-              <p v-if="String(m.Mo_ta || '').trim()" class="desc">
-                {{ m.Mo_ta }}
-              </p>
-
-              <!-- GIÁ + CHI TIẾT / GHI CHÚ -->
-              <div class="card-meta-row">
-                <div class="price-row price-discount">
-                  <span class="price" :class="{ 'is-sale-price': isDiscount(m) }">
-                    {{ formatPrice(finalPrice(m), m.Don_vi_tien_te) }}<span v-if="m.Dvt" class="unit">/{{ m.Dvt }}</span>
-                  </span>
-
-                  <span
-                    v-if="isDiscount(m)"
-                    class="price-old"
-                  >
-                    {{ formatPrice(m.Gia_ban, m.Don_vi_tien_te) }}
-                  </span>
-                </div>
-
-                <a
-                  class="detail-link"
-                  @click.stop.prevent="openDetail(m)"
-                >
-                  <i class="ri-sticky-note-line"></i>
-                  <span>{{ $t('menu.detailNote') }}</span>
-                </a>
-              </div>
-
-              <!-- THANH HÀNH ĐỘNG GỘP: SỐ LƯỢNG + THÊM -->
-              <div class="card-action-bar">
-                <div class="qty-row">
-                  <button type="button" class="btn-qty" @click.stop="decTemp(m)">
-                    <i class="app-ico ri-subtract-line"></i>
-                  </button>
-
-                  <input
-                    type="number"
-                    min="1"
-                    v-model.number="tempQty[m.Ma_hang]"
-                    @click.stop
+            <span class="mgh-title">
+              <i class="ri-node-tree"></i>
+              <span>{{ entry.headingText }}</span>
+            </span>
+            <span v-if="entry.subLabel" class="mgh-action">
+              <i class="ri-arrow-right-s-line"></i>
+            </span>
+          </div>
+          <div
+            v-else
+            class="card-border"
+            :class="{ out: entry.item.Trang_thai === 'Hết hàng' }"
+          >
+            <div
+              class="card"
+              @click="openDetail(entry.item)"
+            >
+              <div class="card-img-wrap">
+                <transition name="card-fade" mode="out-in">
+                  <img
+                    v-if="getCardImage(entry.item)"
+                    :key="getCardImageKey(entry.item)"
+                    :src="getCardImage(entry.item)"
+                    loading="lazy"
+                    decoding="async"
+                    :alt="entry.item.Ten_hang || ''"
+                    @error="onCardImgError(entry.item, getCardImage(entry.item))"
                   />
+                  <div v-else :key="'fallback-' + entry.item.Ma_hang" class="card-img-name-fallback">
+                    <span>{{ entry.item.Ten_hang }}</span>
+                  </div>
+                </transition>
 
-                  <button type="button" class="btn-qty" @click.stop="incTemp(m)">
-                    <i class="app-ico ri-add-line"></i>
-                  </button>
+                <!-- TAG GIẢM GIÁ -->
+                <div
+                  v-if="isDiscount(entry.item)"
+                  class="discount-tag"
+                >
+                  <span>-{{ discountPercent(entry.item) }}%</span>
                 </div>
 
-                <button
-                  type="button"
-                  class="add-btn"
-                  :class="{ added: addedMap[m.Ma_hang] }"
-                  :disabled="m.Trang_thai === 'Hết hàng'"
-                  @click.stop="addToCart(m)"
+                <!-- TAG TRẠNG THÁI TRÊN ẢNH -->
+                <div
+                  class="status-tag card-status-pill"
+                  :class="{
+                    available: entry.item.Trang_thai === 'Còn hàng',
+                    out: entry.item.Trang_thai === 'Hết hàng'
+                  }"
                 >
-                  <template v-if="addedMap[m.Ma_hang]">
-                    <i class="ri-check-line"></i>
-                  </template>
-                  <template v-else-if="m.Trang_thai === 'Hết hàng'">
-                    {{ $t('status.outOfStock') }}
-                  </template>
-                  <template v-else>
-                    <i class="ri-add-line add-btn-ico"></i>
-                    <span>{{ $t('menu.add') }}</span>
-                  </template>
-                </button>
+                  {{ $t(getStatusKey(entry.item.Trang_thai)) }}
+                </div>
+              </div>
+
+              <div class="info">
+                <!-- TÊN -->
+                <h4 class="name">{{ entry.item.Ten_hang }}</h4>
+
+                <!-- MÔ TẢ -->
+                <p v-if="String(entry.item.Mo_ta || '').trim()" class="desc">
+                  {{ entry.item.Mo_ta }}
+                </p>
+
+                <!-- GIÁ + CHI TIẾT / GHI CHÚ -->
+                <div class="card-meta-row">
+                  <div class="price-row price-discount">
+                    <span class="price" :class="{ 'is-sale-price': isDiscount(entry.item) }">
+                      {{ formatPrice(finalPrice(entry.item), entry.item.Don_vi_tien_te) }}<span v-if="entry.item.Dvt" class="unit">/{{ entry.item.Dvt }}</span>
+                    </span>
+
+                    <span
+                      v-if="isDiscount(entry.item)"
+                      class="price-old"
+                    >
+                      {{ formatPrice(entry.item.Gia_ban, entry.item.Don_vi_tien_te) }}
+                    </span>
+                  </div>
+
+                  <a
+                    class="detail-link"
+                    @click.stop.prevent="openDetail(entry.item)"
+                  >
+                    <i class="ri-sticky-note-line"></i>
+                    <span>{{ $t('menu.detailNote') }}</span>
+                  </a>
+                </div>
+
+                <!-- THANH HÀNH ĐỘNG GỘP: SỐ LƯỢNG + THÊM -->
+                <div class="card-action-bar">
+                  <div class="qty-row">
+                    <button type="button" class="btn-qty" @click.stop="decTemp(entry.item)">
+                      <i class="app-ico ri-subtract-line"></i>
+                    </button>
+
+                    <input
+                      type="number"
+                      min="1"
+                      v-model.number="tempQty[entry.item.Ma_hang]"
+                      @click.stop
+                    />
+
+                    <button type="button" class="btn-qty" @click.stop="incTemp(entry.item)">
+                      <i class="app-ico ri-add-line"></i>
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    class="add-btn"
+                    :class="{ added: addedMap[entry.item.Ma_hang] }"
+                    :disabled="entry.item.Trang_thai === 'Hết hàng'"
+                    @click.stop="addToCart(entry.item)"
+                  >
+                    <template v-if="addedMap[entry.item.Ma_hang]">
+                      <i class="ri-check-line"></i>
+                    </template>
+                    <template v-else-if="entry.item.Trang_thai === 'Hết hàng'">
+                      {{ $t('status.outOfStock') }}
+                    </template>
+                    <template v-else>
+                      <i class="ri-add-line add-btn-ico"></i>
+                      <span>{{ $t('menu.add') }}</span>
+                    </template>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </template>
       </div>
 
       <!-- EMPTY STATE -->
@@ -873,169 +1028,229 @@
 </transition>
 <transition name="detail-slide">
   <aside
-    v-if="showDetailSidebar && isMobile"
-    class="detail-sidebar"
+    v-if="showDetailSidebar && isMobile && selectedItem"
+    class="detail-sidebar is-fullpage"
   >
-    <!-- HEADER -->
-   <div class="detail-header">
-  <button class="detail-back" @click="closeDetailSidebar">
-    <i class="ri-arrow-left-line"></i>
-  </button>
+    <!-- STICKY TOPBAR -->
+    <header class="detail-header dp-mob-header">
+      <button type="button" class="detail-back dp-mob-back" @click="closeDetailSidebar" aria-label="Back">
+        <i class="ri-arrow-left-line"></i>
+      </button>
 
-  <div class="detail-title">
-    {{ selectedItem?.Ten_hang }}
-  </div>
-  <button
-    class="detail-add-btn"
-    type="button"
-    :disabled="selectedItem?.Trang_thai === 'Hết hàng'"
-    @click.stop="addFromDetailSidebar"
-  >
-    {{ selectedItem?.Trang_thai === 'Hết hàng' ? $t('status.outOfStock') : $t('menu.add') }}
-  </button>
-</div>
-   <!--  ẢNH SẢN PHẨM (BỊ THIẾU) -->
-    <div class="detail-image-wrap">
-      <div class="detail-image-main">
-        <img
-          :src="modalImages[activeModalIndex] || selectedItem?.Main_img"
-          class="detail-img clickable"
-          alt=""
-          @click="openImageModal(modalImages[activeModalIndex] || selectedItem.Main_img)"
-        />
-        <button
-          v-if="modalImages.length > 1"
-          type="button"
-          class="detail-img-nav prev"
-          aria-label="Prev image"
-          @click.stop="prevModalImage"
-        >
-          <
-        </button>
-        <button
-          v-if="modalImages.length > 1"
-          type="button"
-          class="detail-img-nav next"
-          aria-label="Next image"
-          @click.stop="nextModalImage"
-        >
+      <div class="detail-title dp-mob-title">
+        {{ selectedItem.Ten_hang }}
+      </div>
+    </header>
+
+    <div class="dp-mob-scroll">
+      <!-- HERO GALLERY -->
+      <div class="dp-mob-gallery">
+        <div class="detail-image-main dp-mob-hero">
+          <img
+            v-if="activeDetailImageUrl"
+            :src="activeDetailImageUrl"
+            class="detail-img clickable"
+            :alt="selectedItem.Ten_hang || ''"
+            @click="openImageModal(activeDetailImageUrl)"
+            @error="onCardImgError(selectedItem, activeDetailImageUrl)"
+          />
+          <div v-else class="card-img-name-fallback dp-img-name-fallback">
+            <span>{{ selectedItem.Ten_hang }}</span>
+          </div>
+          <button
+            v-if="activeDetailImageUrl"
+            type="button"
+            class="dp-zoom-pill"
+            aria-label="Zoom image"
+            @click.stop="openImageModal(activeDetailImageUrl)"
           >
-        </button>
+            <i class="ri-zoom-in-line"></i>
+            <span v-if="modalImages.length > 1">{{ activeModalIndex + 1 }}/{{ modalImages.length }}</span>
+          </button>
+          <button
+            v-if="modalImages.length > 1"
+            type="button"
+            class="detail-img-nav prev dp-nav-btn"
+            aria-label="Prev image"
+            @click.stop="prevModalImage"
+          >
+            <i class="ri-arrow-left-s-line"></i>
+          </button>
+          <button
+            v-if="modalImages.length > 1"
+            type="button"
+            class="detail-img-nav next dp-nav-btn"
+            aria-label="Next image"
+            @click.stop="nextModalImage"
+          >
+            <i class="ri-arrow-right-s-line"></i>
+          </button>
+        </div>
+
+        <div v-if="modalImages.length > 1" class="detail-thumbs dp-mob-thumbs">
+          <button
+            v-for="(img, idx) in modalImages"
+            :key="`${img}-${idx}`"
+            type="button"
+            class="detail-thumb dp-thumb"
+            :class="{ active: idx === activeModalIndex }"
+            @click.stop="setActiveModalImage(idx)"
+          >
+            <img :src="img" alt="" />
+          </button>
+        </div>
       </div>
-      <div v-if="modalImages.length > 1" class="detail-thumbs">
-        <button
-          v-for="(img, idx) in modalImages"
-          :key="`${img}-${idx}`"
-          type="button"
-          class="detail-thumb"
-          :class="{ active: idx === activeModalIndex }"
-          @click.stop="setActiveModalImage(idx)"
-        >
-          <img :src="img" alt="" />
-        </button>
+
+      <!-- CONTENT -->
+      <div class="detail-body dp-mob-sheet">
+        <div class="dp-meta-line">
+          <button
+            v-if="selectedItem.Danh_muc_cha"
+            type="button"
+            class="dp-meta-link"
+            @click="selectCategoryFromDetail(selectedItem.Danh_muc_cha, '')"
+          >
+            {{ selectedItem.Danh_muc_cha }}
+          </button>
+          <span v-if="selectedItem.Danh_muc_cha && selectedItem.Danh_muc && selectedItem.Danh_muc !== selectedItem.Danh_muc_cha" class="dp-meta-sep">/</span>
+          <button
+            v-if="selectedItem.Danh_muc && selectedItem.Danh_muc !== selectedItem.Danh_muc_cha"
+            type="button"
+            class="dp-meta-link"
+            @click="selectCategoryFromDetail(selectedItem.Danh_muc_cha || selectedItem.Danh_muc, selectedItem.Danh_muc)"
+          >
+            {{ selectedItem.Danh_muc }}
+          </button>
+          <template v-if="selectedItem.Size">
+            <span v-if="selectedItem.Danh_muc_cha || selectedItem.Danh_muc" class="dp-meta-sep">·</span>
+            <span class="dp-meta-text">Size {{ selectedItem.Size }}</span>
+          </template>
+          <template v-if="selectedItem.Trang_thai === 'Hết hàng'">
+            <span v-if="selectedItem.Danh_muc_cha || selectedItem.Danh_muc || selectedItem.Size" class="dp-meta-sep">·</span>
+            <span class="dp-out-text">{{ $t(getStatusKey(selectedItem.Trang_thai)) }}</span>
+          </template>
+        </div>
+
+        <h1 class="dp-title is-mobile">{{ selectedItem.Ten_hang }}</h1>
+
+        <div class="dp-price-row">
+          <span class="dp-price-current" :class="{ 'is-sale': isDiscount(selectedItem) }">
+            {{ formatPrice(finalPrice(selectedItem), selectedItem.Don_vi_tien_te) }}
+          </span>
+          <span v-if="selectedItem.Dvt" class="dp-price-unit">/ {{ selectedItem.Dvt }}</span>
+          <span v-if="isDiscount(selectedItem)" class="dp-price-old">
+            {{ formatPrice(selectedItem.Gia_ban, selectedItem.Don_vi_tien_te) }}
+          </span>
+        </div>
+
+        <div v-if="selectedProductVariants.length" class="dp-variant-group">
+          <div class="dp-variant-label">{{ $t('menu.chooseVariant') }}</div>
+          <div class="dp-variant-pills">
+            <button
+              v-for="v in selectedProductVariants"
+              :key="'mob-var-' + v.maHang"
+              type="button"
+              class="dp-variant-pill"
+              :class="{
+                active: v.maHang === selectedItem.Ma_hang,
+                'is-out': v.item.Trang_thai === 'Hết hàng'
+              }"
+              @click="switchDetailVariant(v.item)"
+            >
+              <span class="dvp-name">{{ v.label }}</span>
+              <span class="dvp-price">{{ formatPrice(finalPrice(v.item), v.item.Don_vi_tien_te) }}</span>
+            </button>
+          </div>
+        </div>
+
+        <p v-if="String(selectedItem.Mo_ta || '').trim()" class="dp-desc-text">
+          {{ selectedItem.Mo_ta }}
+        </p>
+
+        <div class="dp-controls-box">
+          <div class="dp-note-card">
+            <label class="dp-note-label">
+              <span>{{ $t('menu.note') }}</span>
+            </label>
+            <textarea
+              rows="2"
+              v-model="itemNotes[selectedItem.Ma_hang]"
+              class="dp-note-input"
+              :placeholder="$t('menu.notePlaceholder')"
+            ></textarea>
+          </div>
+        </div>
+
+        <section v-if="relatedDetailItems.length" class="dp-related-section is-mobile">
+          <h3 class="dp-related-heading">
+            <span>{{ $t('menu.relatedItems') }}</span>
+          </h3>
+          <div class="dp-related-scroll">
+            <button
+              v-for="rel in relatedDetailItems"
+              :key="'mob-rel-' + rel.Ma_hang"
+              type="button"
+              class="dp-related-card"
+              @click="openDetail(rel)"
+            >
+              <div class="dp-rel-thumb">
+                <img v-if="rel.Main_img" :src="rel.Main_img" :alt="rel.Ten_hang" loading="lazy" />
+                <div v-else class="dp-rel-thumb-empty"><i class="ri-image-line"></i></div>
+              </div>
+              <div class="dp-rel-info">
+                <div class="dp-rel-name">{{ rel.Ten_hang }}</div>
+                <div class="dp-rel-price">
+                  {{ formatPrice(finalPrice(rel), rel.Don_vi_tien_te) }}
+                </div>
+              </div>
+            </button>
+          </div>
+        </section>
       </div>
     </div>
 
-    <!-- BODY (COPY 100% TỪ MODAL) -->
-    <div class="detail-body modal-right">
+    <!-- STICKY BOTTOM BAR -->
+    <div class="dp-mob-bottom-bar">
+      <div class="dp-qty-line">
+        <div class="qty-row dp-stepper">
+          <button type="button" class="dp-qty-minus" @click="decTemp(selectedItem)" aria-label="Decrease">
+            <i class="ri-subtract-line"></i>
+          </button>
+          <input
+            type="number"
+            min="1"
+            v-model.number="tempQty[selectedItem.Ma_hang]"
+          />
+          <button type="button" class="dp-qty-plus" @click="incTemp(selectedItem)" aria-label="Increase">
+            <i class="ri-add-line"></i>
+          </button>
+        </div>
+      </div>
 
-  <div class="status-row">
-    <!-- TAG TRẠNG THÁI -->
-    <div
-      class="status-tag"
-      :class="{
-        available: selectedItem.Trang_thai === 'Còn hàng',
-        out: selectedItem.Trang_thai === 'Hết hàng'
-      }"
-    >
-      {{ $t(getStatusKey(selectedItem.Trang_thai)) }}
+      <button
+        type="button"
+        class="dp-cta-btn"
+        :class="{
+          added: addedMap[selectedItem.Ma_hang],
+          closing: closingDetailSidebar
+        }"
+        :disabled="selectedItem.Trang_thai === 'Hết hàng'"
+        @click="addFromDetailSidebar"
+      >
+        <template v-if="addedMap[selectedItem.Ma_hang]">
+          <i class="ri-checkbox-circle-fill"></i>
+        </template>
+        <template v-else-if="selectedItem.Trang_thai === 'Hết hàng'">
+          <span>{{ $t('status.outOfStock') }}</span>
+        </template>
+        <template v-else>
+          <i class="ri-shopping-bag-3-fill"></i>
+          <span>{{ $t('menu.add') }}</span>
+          <span class="dp-cta-dot">•</span>
+          <span>{{ getDetailCtaTotal(selectedItem) }}</span>
+        </template>
+      </button>
     </div>
-
-    <!-- BADGE DANH MỤC -->
-    <div v-if="selectedItem.Danh_muc" class="meta-tag inline">
-      {{ $t('menu.category') }}: {{ selectedItem.Danh_muc }}
-    </div>
-  </div>
-
-  <!-- BADGE SIZE -->
-  <div v-if="selectedItem.Size" class="meta-tag size-badge">
-    Size: {{ selectedItem.Size }}
-  </div>
-
-  <!-- TÊN -->
-  <h3 class="modal-title">
-    {{ selectedItem.Ten_hang }}
-  </h3>
-
-  <!-- MÔ TẢ -->
-  <p v-if="String(selectedItem.Mo_ta || '').trim()" class="modal-desc">
-    {{ selectedItem.Mo_ta }}
-  </p>
-
-  <!-- GIÁ -->
-<div class="modal-price price-discount">
-  <!-- GIÁ CŨ -->
-  <span
-    v-if="isDiscount(selectedItem)"
-    class="price-old"
-  >
-    {{ formatPrice(selectedItem.Gia_ban, selectedItem.Don_vi_tien_te) }}
-  </span>
-
-  <!-- GIÁ SAU GIẢM -->
-  <span class="price" :class="{ 'is-sale-price': isDiscount(selectedItem) }">
-    {{ formatPrice(finalPrice(selectedItem), selectedItem.Don_vi_tien_te) }}
-    <span v-if="selectedItem.Dvt" class="modal-unit">
-      / {{ selectedItem.Dvt }}
-    </span>
-  </span>
-</div>
-
-
-  <!-- QTY (Y CHANG MODAL) -->
-  <div class="qty-row modal-qty">
-    <button @click="decTemp(selectedItem)">−</button>
-    <input
-      type="number"
-      min="1"
-      v-model.number="tempQty[selectedItem.Ma_hang]"
-    />
-    <button @click="incTemp(selectedItem)">+</button>
-  </div>
-<!-- ===== GHI CHÚ MÓN (MOBILE) ===== -->
-<div class="form-field">
-  <label>{{ $t('menu.note') }}</label>
-  <textarea
-    rows="2"
-    v-model="itemNotes[selectedItem.Ma_hang]"
-   
-  ></textarea>
-</div>
-
-  <!-- ADD -->
-<button
-  class="add-btn"
-  :class="{
-    added: addedMap[selectedItem.Ma_hang],
-    closing: closingDetailSidebar
-  }"
-  :disabled="selectedItem.Trang_thai === 'Hết hàng'"
-  @click="addFromDetailSidebar"
->
-
-    <template v-if="addedMap[selectedItem.Ma_hang]">
-      <i class="ri-checkbox-circle-fill"></i>
-    </template>
-    <template v-else-if="selectedItem.Trang_thai === 'Hết hàng'">
-      {{ $t('status.outOfStock') }}
-    </template>
-    <template v-else>
-      {{ $t('menu.add') }}
-    </template>
-  </button>
-
-</div>
-
   </aside>
 </transition>
 
@@ -1711,148 +1926,267 @@
   </div>
 
   <!-- ===== MODAL CHI TIẾT SẢN PHẨM ===== -->
-<!-- ===== MODAL CHI TIẾT SẢN PHẨM ===== -->
-<div v-if="showDetail && !isMobile" class="modal-overlay" @click="closeDetail" >
+<!-- ===== TRANG CHI TIẾT SẢN PHẨM FULL 100% (DESKTOP) ===== -->
+<div v-if="showDetail && !isMobile && selectedItem" class="modal-overlay detail-page-overlay" @click="closeDetail">
   <div
-  class="modal-card modal-wide"
-  :class="{ closing: closingModal }"
-  @click.stop
->
-
-    <button class="modal-close" @click="closeDetail">✕</button>
-
-    <div class="modal-content">
-      <!-- ẢNH BÊN TRÁI -->
-      <div class="modal-media" :class="{ 'no-thumbs': !hasModalThumbs }">
-        <div class="modal-left">
-         <img
-    :src="modalImages[activeModalIndex] || selectedItem.Main_img"
-    alt=""
-    class="modal-img clickable"
-    @click="openImageModal(modalImages[activeModalIndex] || selectedItem.Main_img)"
-  />
-          <button
-            v-if="modalImages.length > 1"
-            type="button"
-            class="modal-img-nav prev"
-            aria-label="Prev image"
-            @click.stop="prevModalImage"
-          >
-            ‹
-          </button>
-          <button
-            v-if="modalImages.length > 1"
-            type="button"
-            class="modal-img-nav next"
-            aria-label="Next image"
-            @click.stop="nextModalImage"
-          >
-            ›
-          </button>
-        </div>
-        <div v-if="hasModalThumbs" class="modal-thumbs">
-          <button
-            v-for="(img, idx) in modalImages"
-            :key="`${img}-${idx}`"
-            type="button"
-            class="modal-thumb"
-            :class="{ active: idx === activeModalIndex }"
-            @click="setActiveModalImage(idx)"
-          >
-            <img :src="img" alt="" />
-          </button>
-        </div>
-      </div>
-
-      <!-- THÔNG TIN BÊN PHẢI -->
-      <div class="modal-right">
-        <!-- TAG TRẠNG THÁI -->
-        <div
-          class="status-tag"
-          :class="{
-            available: selectedItem.Trang_thai === 'Còn hàng',
-            out: selectedItem.Trang_thai === 'Hết hàng'
-          }"
-        >
-          {{ $t(getStatusKey(selectedItem.Trang_thai)) }}
-        </div>
-
-        <!-- TAG DANH MỤC -->
-        <div v-if="selectedItem.Danh_muc" class="meta-tag">
- {{ $t('menu.category') }}: {{ selectedItem.Danh_muc }}
-        </div>
-
-        <!-- TAG SIZE (NẾU CÓ) -->
-        <div v-if="selectedItem.Size" class="meta-tag size-badge">
-           Size: {{ selectedItem.Size }}
-        </div>
-
-        <h3 class="modal-title">
-          {{ selectedItem.Ten_hang }}
-        </h3>
-
-        <p v-if="String(selectedItem.Mo_ta || '').trim()" class="modal-desc">
-          {{ selectedItem.Mo_ta }}
-        </p>
-
-<div class="modal-price price-discount">
-  <!-- GIÁ CŨ -->
-  <span
-    v-if="isDiscount(selectedItem)"
-    class="price-old"
+    class="modal-card modal-wide detail-page-card"
+    :class="{ closing: closingModal }"
+    @click.stop
   >
-    {{ formatPrice(selectedItem.Gia_ban, selectedItem.Don_vi_tien_te) }}
-  </span>
+    <header class="detail-page-topbar">
+      <div class="detail-page-topbar-inner">
+        <button type="button" class="detail-page-back-btn" @click="closeDetail">
+          <i class="ri-arrow-left-line"></i>
+          <span>{{ $t('cart.backToMenu') }}</span>
+        </button>
 
-  <!-- GIÁ SAU GIẢM -->
-  <span class="price" :class="{ 'is-sale-price': isDiscount(selectedItem) }">
-    {{ formatPrice(finalPrice(selectedItem), selectedItem.Don_vi_tien_te) }}
-    <span v-if="selectedItem.Dvt" class="modal-unit">
-      / {{ selectedItem.Dvt }}
-    </span>
-  </span>
-</div>
+        <nav class="detail-breadcrumb-bar is-desktop" aria-label="Breadcrumb">
+          <button type="button" class="detail-bc-link" @click="closeDetail">
+            <i class="ri-store-2-line"></i>
+            <span>Menu</span>
+          </button>
+          <template v-if="selectedItem.Danh_muc_cha || selectedItem.Danh_muc">
+            <i class="ri-arrow-right-s-line detail-bc-sep"></i>
+            <button
+              type="button"
+              class="detail-bc-link"
+              @click="selectCategoryFromDetail(selectedItem.Danh_muc_cha || selectedItem.Danh_muc, '')"
+            >
+              {{ selectedItem.Danh_muc_cha || selectedItem.Danh_muc }}
+            </button>
+          </template>
+          <template v-if="selectedItem.Danh_muc_cha && selectedItem.Danh_muc && selectedItem.Danh_muc !== selectedItem.Danh_muc_cha">
+            <i class="ri-arrow-right-s-line detail-bc-sep"></i>
+            <button
+              type="button"
+              class="detail-bc-link"
+              @click="selectCategoryFromDetail(selectedItem.Danh_muc_cha, selectedItem.Danh_muc)"
+            >
+              {{ selectedItem.Danh_muc }}
+            </button>
+          </template>
+          <i class="ri-arrow-right-s-line detail-bc-sep"></i>
+          <span class="detail-bc-current">{{ selectedItem.Ten_hang }}</span>
+        </nav>
 
-
-<div class="qty-row modal-qty">
-  <button @click="decTemp(selectedItem)">−</button>
-  <input
-    type="number"
-    min="1"
-    v-model.number="tempQty[selectedItem.Ma_hang]"
-  />
-  <button @click="incTemp(selectedItem)">+</button>
-</div>
-
-<div class="form-field">
-  <label>{{ $t('menu.note') }}</label>
-  <textarea
-    rows="2"
-    v-model="itemNotes[selectedItem.Ma_hang]"
-    placeholder="VD: ít cay, không hành, thêm sốt..."
-  ></textarea>
-</div>
-
-<button
-  class="add-btn"
-  :class="{ added: addedMap[selectedItem.Ma_hang] }"
-  :disabled="selectedItem.Trang_thai === 'Hết hàng'"
-  @click.stop="addToCartFromModal(selectedItem)"
->
-  <template v-if="addedMap[selectedItem.Ma_hang]">
-    <i class="ri-checkbox-circle-fill"></i>
-  </template>
-  <template v-else-if="selectedItem.Trang_thai === 'Hết hàng'">
-    {{ $t('status.outOfStock') }}
-  </template>
-  <template v-else>
-    {{ $t('menu.add') }}
-  </template>
-</button>
-
-
-
+        <button type="button" class="modal-close detail-page-close" @click="closeDetail" aria-label="Close">
+          <i class="ri-close-line"></i>
+        </button>
       </div>
+    </header>
+
+    <div class="detail-page-scroll">
+      <div class="modal-content detail-page-body">
+        <!-- ẢNH BÊN TRÁI -->
+        <div class="dp-gallery-card" :class="{ 'no-thumbs': !hasModalThumbs }">
+          <div class="dp-hero-frame">
+            <img
+              v-if="activeDetailImageUrl"
+              :src="activeDetailImageUrl"
+              :alt="selectedItem.Ten_hang"
+              class="modal-img clickable"
+              @click="openImageModal(activeDetailImageUrl)"
+              @error="onCardImgError(selectedItem, activeDetailImageUrl)"
+            />
+            <div v-else class="card-img-name-fallback dp-img-name-fallback">
+              <span>{{ selectedItem.Ten_hang }}</span>
+            </div>
+            <button
+              v-if="activeDetailImageUrl"
+              type="button"
+              class="dp-zoom-pill"
+              aria-label="Zoom image"
+              @click.stop="openImageModal(activeDetailImageUrl)"
+            >
+              <i class="ri-zoom-in-line"></i>
+              <span v-if="modalImages.length > 1">{{ activeModalIndex + 1 }} / {{ modalImages.length }}</span>
+            </button>
+            <button
+              v-if="modalImages.length > 1"
+              type="button"
+              class="modal-img-nav prev dp-nav-btn"
+              aria-label="Prev image"
+              @click.stop="prevModalImage"
+            >
+              <i class="ri-arrow-left-s-line"></i>
+            </button>
+            <button
+              v-if="modalImages.length > 1"
+              type="button"
+              class="modal-img-nav next dp-nav-btn"
+              aria-label="Next image"
+              @click.stop="nextModalImage"
+            >
+              <i class="ri-arrow-right-s-line"></i>
+            </button>
+          </div>
+          <div v-if="hasModalThumbs" class="dp-thumbs-rail">
+            <button
+              v-for="(img, idx) in modalImages"
+              :key="`${img}-${idx}`"
+              type="button"
+              class="dp-thumb"
+              :class="{ active: idx === activeModalIndex }"
+              @click="setActiveModalImage(idx)"
+            >
+              <img :src="img" alt="" />
+            </button>
+          </div>
+        </div>
+
+        <!-- THÔNG TIN BÊN PHẢI (TỐI GIẢN, KHÔNG KHUNG, KHÔNG BADGE) -->
+        <div class="dp-info-card">
+          <div class="dp-header-group">
+            <div class="dp-meta-line">
+              <button
+                v-if="selectedItem.Danh_muc_cha"
+                type="button"
+                class="dp-meta-link"
+                @click="selectCategoryFromDetail(selectedItem.Danh_muc_cha, '')"
+              >
+                {{ selectedItem.Danh_muc_cha }}
+              </button>
+              <span v-if="selectedItem.Danh_muc_cha && selectedItem.Danh_muc && selectedItem.Danh_muc !== selectedItem.Danh_muc_cha" class="dp-meta-sep">/</span>
+              <button
+                v-if="selectedItem.Danh_muc && selectedItem.Danh_muc !== selectedItem.Danh_muc_cha"
+                type="button"
+                class="dp-meta-link"
+                @click="selectCategoryFromDetail(selectedItem.Danh_muc_cha || selectedItem.Danh_muc, selectedItem.Danh_muc)"
+              >
+                {{ selectedItem.Danh_muc }}
+              </button>
+              <template v-if="selectedItem.Size">
+                <span v-if="selectedItem.Danh_muc_cha || selectedItem.Danh_muc" class="dp-meta-sep">·</span>
+                <span class="dp-meta-text">Size {{ selectedItem.Size }}</span>
+              </template>
+              <template v-if="selectedItem.Trang_thai === 'Hết hàng'">
+                <span v-if="selectedItem.Danh_muc_cha || selectedItem.Danh_muc || selectedItem.Size" class="dp-meta-sep">·</span>
+                <span class="dp-out-text">{{ $t(getStatusKey(selectedItem.Trang_thai)) }}</span>
+              </template>
+            </div>
+
+            <h1 class="dp-title">
+              {{ selectedItem.Ten_hang }}
+            </h1>
+          </div>
+
+          <div class="dp-price-row">
+            <span class="dp-price-current" :class="{ 'is-sale': isDiscount(selectedItem) }">
+              {{ formatPrice(finalPrice(selectedItem), selectedItem.Don_vi_tien_te) }}
+            </span>
+            <span v-if="selectedItem.Dvt" class="dp-price-unit">
+              / {{ selectedItem.Dvt }}
+            </span>
+            <span v-if="isDiscount(selectedItem)" class="dp-price-old">
+              {{ formatPrice(selectedItem.Gia_ban, selectedItem.Don_vi_tien_te) }}
+            </span>
+          </div>
+
+          <div v-if="selectedProductVariants.length" class="dp-variant-group">
+            <div class="dp-variant-label">{{ $t('menu.chooseVariant') }}</div>
+            <div class="dp-variant-pills">
+              <button
+                v-for="v in selectedProductVariants"
+                :key="'pc-var-' + v.maHang"
+                type="button"
+                class="dp-variant-pill"
+                :class="{
+                  active: v.maHang === selectedItem.Ma_hang,
+                  'is-out': v.item.Trang_thai === 'Hết hàng'
+                }"
+                @click="switchDetailVariant(v.item)"
+              >
+                <span class="dvp-name">{{ v.label }}</span>
+                <span class="dvp-price">{{ formatPrice(finalPrice(v.item), v.item.Don_vi_tien_te) }}</span>
+              </button>
+            </div>
+          </div>
+
+          <p v-if="String(selectedItem.Mo_ta || '').trim()" class="dp-desc-text">
+            {{ selectedItem.Mo_ta }}
+          </p>
+
+          <div class="dp-note-card dp-note-divider">
+            <label class="dp-note-label">
+              <span>{{ $t('menu.note') }}</span>
+            </label>
+            <textarea
+              rows="3"
+              v-model="itemNotes[selectedItem.Ma_hang]"
+              class="dp-note-input"
+              :placeholder="$t('menu.notePlaceholder')"
+            ></textarea>
+          </div>
+
+          <div class="dp-action-group">
+            <div class="dp-qty-line">
+              <div class="qty-row dp-stepper">
+                <button type="button" class="dp-qty-minus" @click="decTemp(selectedItem)" aria-label="Decrease">
+                  <i class="ri-subtract-line"></i>
+                </button>
+                <input
+                  type="number"
+                  min="1"
+                  v-model.number="tempQty[selectedItem.Ma_hang]"
+                />
+                <button type="button" class="dp-qty-plus" @click="incTemp(selectedItem)" aria-label="Increase">
+                  <i class="ri-add-line"></i>
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              class="dp-cta-btn"
+              :class="{ added: addedMap[selectedItem.Ma_hang] }"
+              :disabled="selectedItem.Trang_thai === 'Hết hàng'"
+              @click.stop="addToCartFromModal(selectedItem)"
+            >
+              <template v-if="addedMap[selectedItem.Ma_hang]">
+                <i class="ri-checkbox-circle-fill"></i>
+              </template>
+              <template v-else-if="selectedItem.Trang_thai === 'Hết hàng'">
+                <span>{{ $t('status.outOfStock') }}</span>
+              </template>
+              <template v-else>
+                <span>{{ $t('menu.add') }}</span>
+                <span class="dp-cta-dot">·</span>
+                <span>{{ getDetailCtaTotal(selectedItem) }}</span>
+              </template>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MÓN CÙNG DANH MỤC -->
+      <section v-if="relatedDetailItems.length" class="dp-related-section">
+        <div class="dp-related-header">
+          <h3 class="dp-related-heading">
+            <span>{{ $t('menu.relatedItems') }}</span>
+          </h3>
+        </div>
+        <div class="dp-related-grid">
+          <button
+            v-for="rel in relatedDetailItems"
+            :key="'desk-rel-' + rel.Ma_hang"
+            type="button"
+            class="dp-related-card"
+            @click="openDetail(rel)"
+          >
+            <div class="dp-rel-thumb">
+              <img v-if="rel.Main_img" :src="rel.Main_img" :alt="rel.Ten_hang" loading="lazy" />
+              <div v-else class="dp-rel-thumb-empty"><i class="ri-image-line"></i></div>
+              <span v-if="isDiscount(rel)" class="dp-rel-sale">-{{ discountPercent(rel) }}%</span>
+            </div>
+            <div class="dp-rel-info">
+              <div class="dp-rel-name">{{ rel.Ten_hang }}</div>
+              <div class="dp-rel-price">
+                {{ formatPrice(finalPrice(rel), rel.Don_vi_tien_te) }}
+              </div>
+            </div>
+          </button>
+        </div>
+      </section>
     </div>
   </div>
 </div>
@@ -2020,7 +2354,7 @@
 
     <h3 class="export-title category-modal-title">
       <i class="ri-list-check category-title-icon"></i>
-      <span style="color:green;font-weight: bold;">{{ $t('modal.chooseCategory') }}</span>
+      <span class="category-title-text">{{ $t('modal.chooseCategory') }}</span>
       <span
         v-if="hasSale"
         class="category-sale-badge"
@@ -2033,23 +2367,60 @@
       <div
         v-for="c in categories"
         :key="c"
-        class="cat"
-        :class="{
-          active: c === currentCategory,
-          sale: c === 'Sale'
-        }"
-        @click="selectCategory(c)"
-        
+        class="cat-group-wrap"
       >
-        <span class="cat-label">{{ c }}</span>
-
-        <span
-        
-          v-if="c === 'Sale'"
-          class="category-sale-badge cat-sale-pill"
+        <div
+          class="cat cat-tree-parent"
+          :class="{
+            active: c === currentCategory && !currentSubCategory,
+            'is-parent-active': c === currentCategory && Boolean(currentSubCategory),
+            sale: c === 'Sale',
+            'is-parent-cat': isParentCategoryEntry(c)
+          }"
+          @click="selectCategory(c, { keepModalOpenIfHasSub: true })"
         >
-          SALE
-        </span>
+          <span class="cat-label">{{ c }}</span>
+
+          <span
+            v-if="c === 'Sale'"
+            class="category-sale-badge cat-sale-pill"
+          >
+            SALE
+          </span>
+
+          <button
+            v-if="getHierarchySubCategories(c).length"
+            type="button"
+            class="cat-chevron-btn"
+            @click.stop="toggleCatParentExpanded(c)"
+          >
+            <span class="cat-sub-count">{{ getHierarchySubCategories(c).length }}</span>
+            <i :class="isCatParentExpanded(c) ? 'ri-arrow-down-s-line' : 'ri-arrow-right-s-line'"></i>
+          </button>
+        </div>
+        <div
+          v-if="getHierarchySubCategories(c).length && isCatParentExpanded(c)"
+          class="sub-cat-tree is-modal"
+        >
+          <button
+            type="button"
+            class="sub-cat-tree-item"
+            :class="{ active: c === currentCategory && !currentSubCategory }"
+            @click.stop="selectParentAndSub(c, '')"
+          >
+            <span>{{ $t('filter.all') }}</span>
+          </button>
+          <button
+            v-for="sub in getHierarchySubCategories(c)"
+            :key="'mod-sub-' + c + '-' + sub.label"
+            type="button"
+            class="sub-cat-tree-item"
+            :class="{ active: c === currentCategory && currentSubCategory === sub.label }"
+            @click.stop="selectParentAndSub(c, sub.label)"
+          >
+            <span>{{ sub.label }}</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -2238,15 +2609,9 @@
       </div>
     </button>
 
-    <!-- 3. CHƯA GỬI ĐƠN (GIỎ HÀNG / THANH TOÁN MÀU ĐỎ) -->
+    <!-- 3. CHƯA GỬI ĐƠN (THANH TOÁN TRÁI / GIỎ HÀNG PHẢI) -->
     <div v-else class="mcb-pills-row">
-      <!-- PILL TRÁI: Icon giỏ hàng + badge số lượng -->
-      <div class="cart-bar-pill-left" @click="openMobilePanel('cart')">
-        <i class="ri-shopping-cart-2-fill cart-bar-icon"></i>
-        <span class="cart-bar-badge">{{ cartQtyTotal }}</span>
-      </div>
-
-      <!-- PILL PHẢI: Thanh toán / Hoàn thành + số tiền -->
+      <!-- PILL TRÁI: Thanh toán / Hoàn thành + số tiền -->
       <button class="cart-bar-pill-right" @click="openMobilePanel('cart')">
         <span class="cart-bar-label">
           {{
@@ -2257,6 +2622,12 @@
         </span>
         <span class="cart-bar-total">{{ formatPrice(customerPayableTotal, cartCurrency) }}</span>
       </button>
+
+      <!-- PILL PHẢI: Icon giỏ hàng + badge số lượng -->
+      <div class="cart-bar-pill-left" @click="openMobilePanel('cart')">
+        <i class="ri-shopping-cart-2-fill cart-bar-icon"></i>
+        <span class="cart-bar-badge">{{ cartQtyTotal }}</span>
+      </div>
     </div>
   </div>
 </transition>
@@ -2296,7 +2667,7 @@
       </span>
 
       <span class="btn-label">
-        {{ $t('mobile.category') }}
+        {{ $t('mobile.menu') }}
       </span>
     </div>
   </div>
@@ -2502,24 +2873,33 @@
         </div>
 
         <div
-          v-if="liveStatus && liveStatus !== 'Nháp'"
+          v-if="(liveStatus && liveStatus !== 'Nháp') || liveAdminMessage"
           class="mps-status-notice"
           :class="orderStatusInfo.stateClass"
         >
           <i :class="orderStatusInfo.icon"></i>
-          <span>
-            {{
-              liveStatus === 'Đã hủy'
-                ? $t('orderStatus.cancelledNotice')
-                : liveStatus === 'Hoàn thành'
-                  ? $t('orderStatus.completedNotice')
-                  : liveStatus === 'Đang ship'
-                    ? $t('orderStatus.shippingNotice')
-                    : liveStatus === 'Đang xử lý'
-                      ? $t('group.statusApproved')
-                      : $t('group.statusPending')
-            }}
-          </span>
+          <div class="status-notice-body">
+            <span v-if="liveStatus && liveStatus !== 'Nháp'">
+              {{
+                liveStatus === 'Đã hủy'
+                  ? $t('orderStatus.cancelledNotice')
+                  : liveStatus === 'Hoàn thành'
+                    ? $t('orderStatus.completedNotice')
+                    : liveStatus === 'Đang ship'
+                      ? $t('orderStatus.shippingNotice')
+                      : liveStatus === 'Đang xử lý'
+                        ? $t('group.statusApproved')
+                        : $t('group.statusPending')
+              }}
+            </span>
+            <div
+              v-if="liveAdminMessage"
+              class="status-shop-msg-box"
+            >
+              <strong class="status-shop-msg-lbl">{{ $t('orderStatus.shopMessageLabel') }}:</strong>
+              <span>{{ liveAdminMessage }}</span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -3665,17 +4045,35 @@
                       : 'ri-lock-line'
               "
             ></i>
-            <span>
-              {{
-                liveStatus === 'Đã hủy'
-                  ? $t('orderStatus.cancelledNotice')
-                  : liveStatus === 'Hoàn thành'
-                    ? $t('orderStatus.completedNotice')
-                    : liveStatus === 'Đang ship'
-                      ? $t('orderStatus.shippingNotice')
-                      : $t('group.lockedHint')
-              }}
-            </span>
+            <div class="status-notice-body">
+              <span>
+                {{
+                  liveStatus === 'Đã hủy'
+                    ? $t('orderStatus.cancelledNotice')
+                    : liveStatus === 'Hoàn thành'
+                      ? $t('orderStatus.completedNotice')
+                      : liveStatus === 'Đang ship'
+                        ? $t('orderStatus.shippingNotice')
+                        : $t('group.lockedHint')
+                }}
+              </span>
+              <div
+                v-if="liveAdminMessage"
+                class="status-shop-msg-box"
+              >
+                <strong class="status-shop-msg-lbl">{{ $t('orderStatus.shopMessageLabel') }}:</strong>
+                <span>{{ liveAdminMessage }}</span>
+              </div>
+            </div>
+          </div>
+          <div v-else-if="liveAdminMessage" class="fcm-locked-box">
+            <i class="ri-notification-3-fill"></i>
+            <div class="status-notice-body">
+              <div class="status-shop-msg-box">
+                <strong class="status-shop-msg-lbl">{{ $t('orderStatus.shopMessageLabel') }}:</strong>
+                <span>{{ liveAdminMessage }}</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -3962,6 +4360,117 @@
     </div>
   </div>
 </div>
+<!-- ===== MODAL THÔNG BÁO HOÀN THÀNH / HỦY ĐƠN TỪ QUÁN ===== -->
+<div
+  v-if="orderFinalNoticeModal.show"
+  class="modal-overlay z-top ofn-overlay"
+  @click="closeOrderFinalNoticeModal()"
+>
+  <div
+    class="modal-card ofn-modal-card"
+    :class="orderFinalNoticeModal.status === 'Đã hủy' ? 'is-cancelled' : 'is-completed'"
+    @click.stop
+  >
+    <button
+      type="button"
+      class="modal-close"
+      @click="closeOrderFinalNoticeModal()"
+    >
+      ✕
+    </button>
+    <div class="ofn-content">
+      <div
+        class="ofn-icon-badge"
+        :class="
+          orderFinalNoticeModal.status === 'Đã hủy'
+            ? 'is-cancelled'
+            : orderFinalNoticeModal.status === 'message'
+              ? 'is-message'
+              : 'is-completed'
+        "
+      >
+        <i
+          :class="
+            orderFinalNoticeModal.status === 'Đã hủy'
+              ? 'ri-close-circle-fill'
+              : orderFinalNoticeModal.status === 'message'
+                ? 'ri-notification-3-fill'
+                : 'ri-checkbox-circle-fill'
+          "
+        ></i>
+      </div>
+      <h3 class="ofn-title">
+        {{
+          orderFinalNoticeModal.status === 'Đã hủy'
+            ? $t('orderStatus.finalCancelledTitle', { code: orderFinalNoticeModal.orderId || 'WEB' })
+            : orderFinalNoticeModal.status === 'message'
+              ? `${$t('orderStatus.shopMessageLabel')} #${orderFinalNoticeModal.orderId || 'WEB'}`
+              : $t('orderStatus.finalCompletedTitle', { code: orderFinalNoticeModal.orderId || 'WEB' })
+        }}
+      </h3>
+      <p v-if="orderFinalNoticeModal.status !== 'message'" class="ofn-desc">
+        {{
+          orderFinalNoticeModal.status === 'Đã hủy'
+            ? $t('orderStatus.cancelledNotice')
+            : $t('orderStatus.completedNotice')
+        }}
+      </p>
+
+      <div v-if="orderFinalNoticeModal.adminMessage" class="ofn-shop-msg">
+        <div v-if="orderFinalNoticeModal.status !== 'message'" class="ofn-shop-msg-head">
+          <i class="ri-notification-3-fill"></i>
+          <span>{{ $t('orderStatus.shopMessageLabel') }}</span>
+        </div>
+        <p class="ofn-shop-msg-text">{{ orderFinalNoticeModal.adminMessage }}</p>
+      </div>
+
+      <div class="ofn-actions-stack">
+        <button
+          v-if="messagingContactList.length || shopContactList.length"
+          type="button"
+          class="ofn-btn is-contact"
+          @click="openShopChatFromFinalNotice"
+        >
+          <img
+            v-if="messagingContactList[0]?.URL_img"
+            :src="messagingContactList[0].URL_img"
+            class="ofn-contact-img"
+            alt=""
+          />
+          <i v-else class="ri-chat-3-fill"></i>
+          <span>
+            {{
+              messagingContactList[0]?.PLATFORM_name
+                ? $t('group.messageViaChannel', { platform: messagingContactList[0].PLATFORM_name })
+                : $t('group.messageShopBtn')
+            }}
+          </span>
+        </button>
+
+        <div class="ofn-actions">
+          <button
+            v-if="!orderFinalNoticeModal.switchOnClose"
+            type="button"
+            class="ofn-btn"
+            :class="orderFinalNoticeModal.status === 'message' ? 'is-primary' : 'is-secondary'"
+            @click="closeOrderFinalNoticeModal()"
+          >
+            {{ $t('orderStatus.finalCloseBtn') }}
+          </button>
+          <button
+            v-if="orderFinalNoticeModal.status !== 'message'"
+            type="button"
+            class="ofn-btn is-primary"
+            @click="closeOrderFinalNoticeModal({ startNew: true })"
+          >
+            {{ $t('orderStatus.finalNewOrderBtn') }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== MODAL THÔNG BÁO GIỎ HÀNG TRỐNG ===== -->
 <div v-if="showEmptyCartModal" class="modal-overlay z-top" @click="showEmptyCartModal = false">
   <div class="modal-card empty-cart-modal" @click.stop>
@@ -4481,20 +4990,26 @@ import {
   dispatchAction,
   genOrderId,
   makeLineId,
-  IMGBB_KEY,
 } from '@/config/api'
 import {
   localizeProduct,
   productMatchesKeyword,
   resolveNoticeText,
+  getProductUrlParams,
+  findProductByUrlParams,
 } from '@/utils/i18nData'
 import {
   normalizeDisplayConfig,
   sortProductsFlat,
   sortLocalizedCategories,
+  buildCategoryHierarchy,
+  getEffectiveParentCategory,
+  getSubCategoriesForParent,
+  getLinkedProductVariants,
   sortProductsByCategoryOrder,
   DISPLAY_MODE_BY_CATEGORY,
 } from '@/utils/displayOrder'
+import { bindOrderBellUnlock, playOrderBell } from '@/utils/orderBell'
 const route = useRoute()
 const router = useRouter()
 const { locale, t } = useI18n()
@@ -4773,6 +5288,9 @@ function saveCustomerFormLocal() {
 }
 
 const liveStatus = computed(() => String(liveOrderData.value?.meta?.Trang_thai || '').trim())
+const liveAdminMessage = computed(() =>
+  String(liveOrderData.value?.meta?.Admin_message || '').trim(),
+)
 const liveCreatedAt = computed(() =>
   String(liveOrderData.value?.meta?.Ngay_tao_duong_lich || '').trim(),
 )
@@ -5209,7 +5727,83 @@ function resetClosedOrStaleOrder(showNotice = false, { autoCreateNew = true } = 
   }
 }
 
+const orderFinalNoticeModal = ref({
+  show: false,
+  orderId: '',
+  status: 'Hoàn thành',
+  adminMessage: '',
+  switchOnClose: false,
+})
+
+function getFinalSeenStorageKey(oid) {
+  return `sa_final_seen_${String(oid || '').trim()}`
+}
+
+function hasSeenFinalNotice(oid, closedAt = 0) {
+  const cleanOid = String(oid || '').trim()
+  if (!cleanOid) return false
+  try {
+    const raw = localStorage.getItem(getFinalSeenStorageKey(cleanOid))
+    if (!raw) return false
+    if (closedAt && raw !== String(closedAt)) return false
+    return true
+  } catch {
+    return false
+  }
+}
+
+function markFinalNoticeSeen(oid, closedAt = 0) {
+  const cleanOid = String(oid || '').trim()
+  if (!cleanOid) return
+  try {
+    localStorage.setItem(getFinalSeenStorageKey(cleanOid), String(closedAt || Date.now()))
+  } catch {}
+}
+
+function openOrderFinalNoticeModal({
+  orderId,
+  status,
+  adminMessage = '',
+  closedAt = 0,
+  switchOnClose = false,
+}) {
+  if (status !== 'message') {
+    markFinalNoticeSeen(orderId, closedAt)
+  }
+  orderFinalNoticeModal.value = {
+    show: true,
+    orderId: String(orderId || '').trim(),
+    status: status === 'Đã hủy' ? 'Đã hủy' : status === 'message' ? 'message' : 'Hoàn thành',
+    adminMessage: String(adminMessage || '').trim(),
+    switchOnClose: Boolean(switchOnClose),
+  }
+  playOrderBell(status === 'Đã hủy' ? 'cancel' : 'complete')
+}
+
+function closeOrderFinalNoticeModal({ startNew = false } = {}) {
+  const shouldSwitch = Boolean(startNew || orderFinalNoticeModal.value.switchOnClose)
+  orderFinalNoticeModal.value.show = false
+  if (shouldSwitch) {
+    startNewOrder()
+  }
+}
+
+function openShopChatFromFinalNotice() {
+  const allowedContact = messagingContactList.value?.[0] || null
+  closeOrderFinalNoticeModal()
+  if (allowedContact) {
+    openShopChatOnly(allowedContact)
+    return
+  }
+  if (isMobile.value) {
+    openMobilePanel('contact')
+  } else {
+    showContactPopover.value = true
+  }
+}
+
 function startNewOrder() {
+  orderFinalNoticeModal.value.show = false
   resetClosedOrStaleOrder(false, { autoCreateNew: true })
   if (isMobile.value && showProgressModal.value) {
     showProgressModal.value = false
@@ -5258,6 +5852,13 @@ function connectLiveOrder(orderId, { fromUrl = false, syncUrl = false } = {}) {
   let lastSeenStatus = ''
   let initializedNudgeWatch = false
   let lastSeenNudgeAt = 0
+  let initializedAdminMsgWatch = false
+  let lastSeenAdminMsgAt = 0
+  const adminMsgSeenKey = `sa_admin_msg_seen_${cleanId}`
+  let savedAdminMsgSeenAt = 0
+  try {
+    savedAdminMsgSeenAt = Number(localStorage.getItem(adminMsgSeenKey) || 0)
+  } catch {}
 
   unsubLiveOrder = subscribeLiveOrder(cleanId, async (snap) => {
     if (!snap.exists) {
@@ -5276,6 +5877,9 @@ function connectLiveOrder(orderId, { fromUrl = false, syncUrl = false } = {}) {
 
     const st = String(snap.meta?.Trang_thai || '').trim()
     if (st === 'Hoàn thành' || st === 'Đã hủy') {
+      const adminMsg = String(snap.meta?.Admin_message || '').trim()
+      const closedAt = Number(snap.meta?.Closed_at || snap.meta?.Updated_at || 0)
+
       if (seenActiveLiveSnapshot) {
         const prev = liveOrderData.value
         liveOrderData.value = {
@@ -5302,7 +5906,41 @@ function connectLiveOrder(orderId, { fromUrl = false, syncUrl = false } = {}) {
           } else {
             triggerToast(t('orderStatus.cancelledToast', { code: cleanId }), 'warn', 4500)
           }
+          openOrderFinalNoticeModal({
+            orderId: cleanId,
+            status: st,
+            adminMessage: adminMsg,
+            closedAt,
+            switchOnClose: false,
+          })
         }
+        return
+      }
+
+      const canShowMissedFinalNotice =
+        !hasSeenFinalNotice(cleanId, closedAt) &&
+        (Boolean(adminMsg) || !closedAt || Date.now() - closedAt < 48 * 3600 * 1000)
+
+      if (canShowMissedFinalNotice && !switchingClosedUrlOnce) {
+        switchingClosedUrlOnce = true
+        if (unsubLiveOrder) {
+          unsubLiveOrder()
+          unsubLiveOrder = null
+        }
+        activeOrderId.value = ''
+        liveOrderData.value = null
+        localCartLines.value = {}
+        try {
+          localStorage.removeItem(SA_ACTIVE_ORDER_KEY)
+          localStorage.removeItem(SA_LOCAL_CART_KEY)
+        } catch {}
+        openOrderFinalNoticeModal({
+          orderId: cleanId,
+          status: st,
+          adminMessage: adminMsg,
+          closedAt,
+          switchOnClose: true,
+        })
         return
       }
 
@@ -5447,6 +6085,40 @@ function connectLiveOrder(orderId, { fromUrl = false, syncUrl = false } = {}) {
       if (!amHost && !isSnapLocked && !myMemberRec?.done) {
         showGuestNudgeModal.value = true
       }
+    }
+
+    const incomingAdminMsgAt = Number(snap.meta?.Admin_message_at || 0)
+    const incomingAdminMsg = String(snap.meta?.Admin_message || '').trim()
+    if (!initializedAdminMsgWatch) {
+      initializedAdminMsgWatch = true
+      lastSeenAdminMsgAt = Math.max(incomingAdminMsgAt, savedAdminMsgSeenAt)
+      if (
+        incomingAdminMsg &&
+        incomingAdminMsgAt > savedAdminMsgSeenAt &&
+        Date.now() - incomingAdminMsgAt < 12 * 3600 * 1000
+      ) {
+        try {
+          localStorage.setItem(adminMsgSeenKey, String(incomingAdminMsgAt))
+        } catch {}
+        openOrderFinalNoticeModal({
+          orderId: cleanId,
+          status: 'message',
+          adminMessage: incomingAdminMsg,
+          switchOnClose: false,
+        })
+      }
+    } else if (incomingAdminMsgAt > lastSeenAdminMsgAt && incomingAdminMsg) {
+      lastSeenAdminMsgAt = incomingAdminMsgAt
+      try {
+        localStorage.setItem(adminMsgSeenKey, String(incomingAdminMsgAt))
+      } catch {}
+      triggerToast(`${t('orderStatus.shopMessageLabel')}: ${incomingAdminMsg}`, 'info', 4500)
+      openOrderFinalNoticeModal({
+        orderId: cleanId,
+        status: 'message',
+        adminMessage: incomingAdminMsg,
+        switchOnClose: false,
+      })
     }
 
     if (amHost || isSnapLocked || myMemberRec?.done) {
@@ -6186,6 +6858,7 @@ onMounted(() => {
   document.addEventListener('click', onDocumentClick)
 })
 onMounted(() => {
+  bindOrderBellUnlock()
   loadPersistedLocalState()
 
   const qOrder = String(route.query?.order || '').trim()
@@ -6215,6 +6888,8 @@ onMounted(() => {
       if (selectedItem.value?.Ma_hang) {
         const updated = menu.value.find((m) => m.Ma_hang === selectedItem.value.Ma_hang)
         if (updated) selectedItem.value = updated
+      } else if (route.params.productId || route.params.productSlug) {
+        syncDetailFromRoute()
       }
     }
   })
@@ -6228,15 +6903,28 @@ onMounted(() => {
   })
 
   const savedLang = localStorage.getItem('APP_LANG')
+  const hasDeepProductLink = Boolean(
+    String(route.params.productId || route.params.productSlug || '').trim(),
+  )
+
+  // Nếu mở trực tiếp link chi tiết sản phẩm mà chưa từng chọn ngôn ngữ, ưu tiên ngôn ngữ trên URL
+  if (!savedLang && hasDeepProductLink && route.params.lang) {
+    const urlLang = String(route.params.lang)
+    localStorage.setItem('APP_LANG', urlLang)
+    locale.value = urlLang
+    reloadData()
+    return
+  }
 
   //  CHƯA BAO GIỜ CHỌN LANG
   if (!savedLang) {
     showLangModal.value = true
+    reloadData()
     return
   }
 
-  //  ĐÃ CÓ LANG, nhưng URL KHÁC
-  if (route.params.lang !== savedLang) {
+  //  ĐÃ CÓ LANG, nhưng URL KHÁC (nếu vào link chia sẻ có sẵn productSlug thì giữ ngôn ngữ trên link)
+  if (route.params.lang !== savedLang && !hasDeepProductLink) {
     redirectToLang(savedLang)
     return
   }
@@ -6301,15 +6989,41 @@ async function selectLanguage(lang) {
 
 
 function redirectToLang(lang) {
-  const isMobilePath = route.path.includes('/mobile')
   const { ncc: _ncc, ...cleanQuery } = route.query || {}
   const activeOrd = String(cleanQuery.order || activeOrderId.value || '').trim()
   if (activeOrd) {
     cleanQuery.order = activeOrd
   }
 
+  if (selectedItem.value) {
+    const { productSlug, productId } = getProductUrlParams(selectedItem.value, lang)
+    router.replace({
+      name: 'menu-online',
+      params: {
+        lang,
+        productSlug,
+        productId,
+      },
+      query: cleanQuery,
+    })
+    return
+  }
+
+  if (route.params.productId || route.params.productSlug) {
+    router.replace({
+      name: route.name === 'menu-online-legacy' ? 'menu-online-legacy' : 'menu-online',
+      params: {
+        ...route.params,
+        lang,
+      },
+      query: cleanQuery,
+    })
+    return
+  }
+
   router.replace({
-    path: `/${lang}${isMobilePath ? '/mobile' : ''}`,
+    name: 'menu-online',
+    params: { lang },
     query: cleanQuery,
   })
 }
@@ -6330,9 +7044,17 @@ watch(isMobile, (val) => {
   if (val) {
     // chuyển sang mobile
     showCart.value = false
+    if (selectedItem.value) {
+      showDetail.value = false
+      showDetailSidebar.value = true
+    }
   } else {
     // chuyển sang desktop
     showCart.value = true
+    if (selectedItem.value) {
+      showDetailSidebar.value = false
+      showDetail.value = true
+    }
   }
 })
 
@@ -6375,9 +7097,10 @@ const keyword = ref('')
 const searchInput = ref('')
 const cart = ref({})
 const currentCategory = ref('Tất cả')
+const currentSubCategory = ref('')
 
 const menuKey = computed(() => {
-  return `${keyword.value}-${currentCategory.value}-${priceSort.value}`
+  return `${keyword.value}-${currentCategory.value}-${currentSubCategory.value}-${priceSort.value}`
 })
 
 const CHECK_SCAM_LINKS = computed(() => [
@@ -6477,20 +7200,81 @@ function addToCartFromModal(m) {
 }
 
 /* ===== COMPUTED ===== */
+const categoryHierarchy = computed(() => {
+  const activeLocale = String(locale.value || 'vi').trim() || 'vi'
+  const hasSale = menu.value.some((m) => isDiscount(m))
+  return buildCategoryHierarchy(menu.value, activeLocale, displayConfig.value, hasSale)
+})
+
 const categories = computed(() => {
   const activeLocale = String(locale.value || 'vi').trim() || 'vi'
   const hasSale = menu.value.some((m) => isDiscount(m))
   return sortLocalizedCategories(
     menu.value,
     activeLocale,
-    displayConfig.value.categoryOrder,
+    displayConfig.value,
     hasSale,
   )
 })
 
+const categoryHierarchyMap = computed(() => {
+  const map = new Map()
+  for (const node of categoryHierarchy.value) {
+    map.set(node.label, node)
+  }
+  return map
+})
+
+const standaloneCategories = computed(() => {
+  const out = []
+  if (allCategoryLabel.value) out.push(allCategoryLabel.value)
+  for (const node of categoryHierarchy.value) {
+    if (!node.subCategories.length) out.push(node.label)
+  }
+  return out
+})
+
+const parentCategoriesWithSubs = computed(() =>
+  categoryHierarchy.value.filter((node) => node.subCategories.length > 0),
+)
+
+const collapsedCatParents = ref({})
+
+function isCatParentExpanded(parentLabel) {
+  return collapsedCatParents.value[parentLabel] !== true
+}
+
+function toggleCatParentExpanded(parentLabel) {
+  collapsedCatParents.value = {
+    ...collapsedCatParents.value,
+    [parentLabel]: isCatParentExpanded(parentLabel),
+  }
+}
+
+function getHierarchySubCategories(parentLabel) {
+  return categoryHierarchyMap.value.get(parentLabel)?.subCategories || []
+}
+
+function isParentCategoryEntry(categoryLabel) {
+  if (!categoryLabel || categoryLabel === 'Sale' || categoryLabel === allCategoryLabel.value) {
+    return false
+  }
+  return getHierarchySubCategories(categoryLabel).length > 0
+}
+
 const allCategoryLabel = computed(() => categories.value[0] || '')
+const subCategories = computed(() => {
+  const activeLocale = String(locale.value || 'vi').trim() || 'vi'
+  return getSubCategoriesForParent(
+    menu.value,
+    currentCategory.value,
+    activeLocale,
+    displayConfig.value,
+  )
+})
 function resetToAllCategory() {
   currentCategory.value = allCategoryLabel.value || 'Tất cả'
+  currentSubCategory.value = ''
 }
 
 const shopContactList = computed(() => shopContacts.value || [])
@@ -6508,13 +7292,21 @@ const messagingContactList = computed(() =>
 )
 const filteredMenu = computed(() => {
   let list = [...menu.value]
+  const activeLocale = locale.value || 'vi'
 
-  // CATEGORY
+  // CATEGORY (2-LEVEL: DANH MỤC CHA -> DANH MỤC CON)
   if (currentCategory.value === 'Sale') {
     list = list.filter(m => isDiscount(m))
   }
-  else if (currentCategory.value !== allCategoryLabel.value) {
-    list = list.filter(m => m.Danh_muc === currentCategory.value)
+  else if (currentCategory.value && currentCategory.value !== allCategoryLabel.value) {
+    list = list.filter(
+      (m) =>
+        getEffectiveParentCategory(m, displayConfig.value, activeLocale) === currentCategory.value ||
+        m.Danh_muc === currentCategory.value,
+    )
+    if (currentSubCategory.value) {
+      list = list.filter((m) => m.Danh_muc === currentSubCategory.value)
+    }
   }
 
   // SEARCH (matches across all 5 languages)
@@ -6530,14 +7322,19 @@ const filteredMenu = computed(() => {
     list.sort((a, b) => finalPrice(b) - finalPrice(a))
   }
   else if (
-    currentCategory.value === allCategoryLabel.value &&
-    !keyword.value &&
-    displayConfig.value.productSortMode === DISPLAY_MODE_BY_CATEGORY
+    (currentCategory.value === allCategoryLabel.value &&
+      !keyword.value &&
+      displayConfig.value.productSortMode === DISPLAY_MODE_BY_CATEGORY) ||
+    (currentCategory.value !== allCategoryLabel.value &&
+      currentCategory.value !== 'Sale' &&
+      !currentSubCategory.value &&
+      subCategories.value.length > 0 &&
+      !keyword.value)
   ) {
     list = sortProductsByCategoryOrder(
       list,
-      displayConfig.value.categoryOrder,
-      locale.value || 'vi',
+      displayConfig.value,
+      activeLocale,
     )
   }
 
@@ -6639,6 +7436,73 @@ const hasMoreItems = computed(() => visibleCount.value < filteredMenu.value.leng
 
 const pagedMenu = computed(() => {
   return filteredMenu.value.slice(0, visibleCount.value)
+})
+
+const shouldShowMenuGroupHeadings = computed(() => {
+  if (keyword.value || priceSort.value !== 'all') return false
+  if (
+    currentCategory.value !== allCategoryLabel.value &&
+    currentCategory.value !== 'Sale' &&
+    !currentSubCategory.value &&
+    subCategories.value.length > 0
+  ) {
+    return true
+  }
+  if (
+    currentCategory.value === allCategoryLabel.value &&
+    displayConfig.value.productSortMode === DISPLAY_MODE_BY_CATEGORY
+  ) {
+    return true
+  }
+  return false
+})
+
+const menuDisplayEntries = computed(() => {
+  const list = pagedMenu.value || []
+  if (!shouldShowMenuGroupHeadings.value) {
+    return list.map((item) => ({
+      type: 'item',
+      rowKey: `card-${item.Ma_hang}`,
+      item,
+    }))
+  }
+
+  const activeLocale = locale.value || 'vi'
+  const isAllView = currentCategory.value === allCategoryLabel.value
+  const entries = []
+  let lastGroupKey = ''
+
+  for (const item of list) {
+    const parentLabel = getEffectiveParentCategory(item, displayConfig.value, activeLocale)
+    const subLabel = String(item?.Danh_muc || '').trim()
+    const hasChildHeader = Boolean(subLabel && subLabel !== parentLabel)
+
+    const headingText = isAllView
+      ? hasChildHeader
+        ? `${parentLabel} › ${subLabel}`
+        : parentLabel || subLabel
+      : subLabel || parentLabel
+
+    const groupKey = `${parentLabel}::${subLabel}`
+    if (headingText && groupKey !== lastGroupKey) {
+      lastGroupKey = groupKey
+      entries.push({
+        type: 'heading',
+        rowKey: `hdr-${groupKey}-${entries.length}`,
+        headingText,
+        parentLabel: parentLabel || subLabel,
+        subLabel: hasChildHeader ? subLabel : '',
+      })
+    }
+
+    entries.push({
+      type: 'item',
+      rowKey: `card-${item.Ma_hang}`,
+      item,
+    })
+  }
+
+  return entries
 })
 
 let searchScrollTimer = null
@@ -7068,6 +7932,61 @@ const thongBaoTexts = computed(() =>
     .filter(Boolean)
     .slice(0, 1)
 )
+
+const marqueeNoticeText = computed(() => thongBaoTexts.value.join('   •   ').trim())
+const noticeViewportRef = ref(null)
+const noticeMeasureRef = ref(null)
+const noticeOverflowing = ref(false)
+const noticePaused = ref(false)
+const noticeDurationSec = ref(12)
+
+const noticeTrackStyle = computed(() =>
+  noticeOverflowing.value ? { '--notice-duration': `${noticeDurationSec.value}s` } : undefined
+)
+
+function updateNoticeOverflow() {
+  const viewport = noticeViewportRef.value
+  const textEl = noticeMeasureRef.value
+  if (!viewport || !textEl) {
+    noticeOverflowing.value = false
+    return
+  }
+  const viewportWidth = viewport.clientWidth
+  const textWidth = textEl.scrollWidth
+  const shouldMarquee = viewportWidth > 0 && textWidth > viewportWidth + 2
+  noticeOverflowing.value = shouldMarquee
+  if (shouldMarquee) {
+    const loopPx = textWidth + 52
+    noticeDurationSec.value = Math.max(8, Number((loopPx / 52).toFixed(1)))
+  } else {
+    noticePaused.value = false
+  }
+}
+
+let noticeResizeObserver = null
+
+watch(marqueeNoticeText, () => {
+  noticePaused.value = false
+  nextTick(updateNoticeOverflow)
+})
+
+watch(noticeViewportRef, (el) => {
+  if (noticeResizeObserver) {
+    noticeResizeObserver.disconnect()
+    noticeResizeObserver = null
+  }
+  if (el && typeof ResizeObserver !== 'undefined') {
+    noticeResizeObserver = new ResizeObserver(() => {
+      updateNoticeOverflow()
+    })
+    noticeResizeObserver.observe(el)
+  }
+  nextTick(updateNoticeOverflow)
+})
+
+watch([loadingMain, isMobile, leftDockCollapsed], () => {
+  nextTick(updateNoticeOverflow)
+}, { flush: 'post' })
 
 const popupNotices = computed(() =>
   thongBaoList.value
@@ -7584,7 +8503,55 @@ let cardImageTimer = null
 const CARD_IMAGE_INTERVAL = 2600
 const activeModalIndex = ref(0)
 const modalImages = computed(() => getModalImages(selectedItem.value))
+const activeDetailImageUrl = computed(() => {
+  const imgs = modalImages.value
+  if (!imgs.length) return ''
+  return imgs[activeModalIndex.value] || imgs[0] || ''
+})
 const hasModalThumbs = computed(() => modalImages.value.length > 1)
+const selectedProductVariants = computed(() =>
+  getLinkedProductVariants(
+    selectedItem.value?.Ma_hang,
+    displayConfig.value.productGroups,
+    menu.value,
+  ),
+)
+
+function switchDetailVariant(variantItem) {
+  if (!variantItem || variantItem.Ma_hang === selectedItem.value?.Ma_hang) return
+  ensureTempQty(variantItem)
+  openDetail(variantItem)
+}
+const relatedDetailItems = computed(() => {
+  const cur = selectedItem.value
+  if (!cur) return []
+  const curSub = String(cur.Danh_muc || '').trim()
+  const curParent = String(getEffectiveParentCategory(cur) || '').trim()
+
+  const sameSub = []
+  const sameParent = []
+  for (const item of menu.value) {
+    if (!item || item.Ma_hang === cur.Ma_hang) continue
+    if (curSub && String(item.Danh_muc || '').trim() === curSub) {
+      sameSub.push(item)
+    } else if (curParent && getEffectiveParentCategory(item) === curParent) {
+      sameParent.push(item)
+    }
+  }
+  return [...sameSub, ...sameParent].slice(0, 6)
+})
+
+function getDetailQty(item) {
+  if (!item?.Ma_hang) return 1
+  const q = Number(tempQty.value[item.Ma_hang] || 1)
+  return Number.isFinite(q) && q >= 1 ? Math.floor(q) : 1
+}
+
+function getDetailCtaTotal(item) {
+  if (!item) return ''
+  return formatPrice(finalPrice(item) * getDetailQty(item), item.Don_vi_tien_te)
+}
+
 // sidebar mới (mobile)
 const showDetailSidebar = ref(false)
 
@@ -7612,7 +8579,7 @@ function getValidItemImages(item) {
 }
 
 function getModalImages(item) {
-  return getItemImages(item)
+  return getValidItemImages(item)
 }
 
 function getCardImageIndex(item) {
@@ -7712,16 +8679,104 @@ function prevModalImage() {
     (activeModalIndex.value - 1 + total) % total
 }
 
-function openDetail(m) {
+function syncUrlToProduct(item, { replace = false } = {}) {
+  if (!item) return
+  const activeLang = String(locale.value || route.params.lang || 'vi').trim() || 'vi'
+  const { productSlug, productId } = getProductUrlParams(item, activeLang)
+  if (
+    route.name === 'menu-online' &&
+    route.params.lang === activeLang &&
+    route.params.productSlug === productSlug &&
+    route.params.productId === productId
+  ) {
+    return
+  }
+  const navMethod = replace ? router.replace : router.push
+  navMethod.call(router, {
+    name: 'menu-online',
+    params: {
+      lang: activeLang,
+      productSlug,
+      productId,
+    },
+    query: route.query,
+  })
+}
+
+function clearProductFromUrl() {
+  if (
+    !route.params.productId &&
+    !route.params.productSlug &&
+    !route.params.parentCategory &&
+    !route.params.subCategory
+  ) {
+    return
+  }
+  const activeLang = String(locale.value || route.params.lang || 'vi').trim() || 'vi'
+  router.replace({
+    name: 'menu-online',
+    params: { lang: activeLang },
+    query: route.query,
+  })
+}
+
+function syncDetailFromRoute() {
+  const productId = String(route.params.productId || '').trim()
+  const productSlug = String(route.params.productSlug || '').trim()
+  if (!productId && !productSlug) {
+    if (selectedItem.value) {
+      showDetail.value = false
+      showDetailSidebar.value = false
+      selectedItem.value = null
+      activeModalIndex.value = 0
+    }
+    return
+  }
+
+  if (!menu.value.length) return
+  const activeLang = String(locale.value || route.params.lang || 'vi').trim() || 'vi'
+  const matched = findProductByUrlParams(
+    menu.value,
+    {
+      productId,
+      productSlug,
+      parentSlug: route.params.parentCategory,
+      subSlug: route.params.subCategory,
+    },
+    activeLang,
+  )
+
+  if (matched) {
+    selectedItem.value = matched
+    activeModalIndex.value = 0
+    if (isMobile.value) {
+      showDetail.value = false
+      showDetailSidebar.value = true
+    } else {
+      showDetailSidebar.value = false
+      showDetail.value = true
+    }
+    syncUrlToProduct(matched, { replace: true })
+  }
+}
+
+function openDetail(m, options = {}) {
+  if (!m) return
   selectedItem.value = m
   activeModalIndex.value = 0
 
   if (isMobile.value) {
-    //  MOBILE → mở sidebar
+    //  MOBILE → mở trang chi tiết full
     showDetailSidebar.value = true
   } else {
-    //  DESKTOP → mở modal như cũ
+    //  DESKTOP → mở trang chi tiết full
     showDetail.value = true
+  }
+
+  if (!options.skipUrlSync) {
+    syncUrlToProduct(m, {
+      replace: Boolean(route.params.productId || route.params.productSlug),
+    })
   }
 }
 
@@ -7735,6 +8790,7 @@ function closeDetail() {
   showDetail.value = false
   selectedItem.value = null
   activeModalIndex.value = 0
+  clearProductFromUrl()
 }
 
 function clearSearchAll() {
@@ -7751,6 +8807,21 @@ function closeDetailSidebar() {
   showDetailSidebar.value = false
   selectedItem.value = null
   activeModalIndex.value = 0
+  clearProductFromUrl()
+}
+
+function selectCategoryFromDetail(parentCat, subCat = '') {
+  if (isMobile.value) {
+    closeDetailSidebar()
+  } else {
+    closeDetail()
+  }
+  if (parentCat) {
+    currentCategory.value = parentCat
+    currentSubCategory.value = subCat || ''
+    resetVisibleMenu()
+    nextTick(() => scrollToTop())
+  }
 }
 
 
@@ -8268,6 +9339,7 @@ function applyData(data) {
   if (data.display_config) {
     displayConfigRows.value = data.display_config
   }
+  syncDetailFromRoute()
 }
 
 const UNIFIED_MENU_CACHE_KEY = 'MENU_CACHE_SA_UNIFIED'
@@ -8654,9 +9726,9 @@ function scrollCategories(direction = 1) {
   })
 }
 
-function selectCategory(c) {
+function selectCategory(c, options = {}) {
   currentCategory.value = c
-  showAllCatsDrawer.value = false
+  currentSubCategory.value = ''
   resetVisibleMenu()
 
   if (c === allCategoryLabel.value) {
@@ -8665,8 +9737,26 @@ function selectCategory(c) {
     priceSort.value = 'all'
   }
 
-  // mobile thì đóng modal danh mục
-  if (isMobile.value) {
+  const nextSubCats = getSubCategoriesForParent(
+    menu.value,
+    c,
+    String(locale.value || 'vi').trim() || 'vi',
+    displayConfig.value,
+  )
+
+  if (nextSubCats.length && collapsedCatParents.value[c]) {
+    collapsedCatParents.value = {
+      ...collapsedCatParents.value,
+      [c]: false,
+    }
+  }
+
+  if (!nextSubCats.length) {
+    showAllCatsDrawer.value = false
+  }
+
+  // mobile thì đóng modal danh mục nếu không có danh mục con
+  if (isMobile.value && !(options.keepModalOpenIfHasSub && nextSubCats.length)) {
     showCategoryModal.value = false
     if (activeMobilePanel.value === 'category') {
       activeMobilePanel.value = null
@@ -8674,6 +9764,53 @@ function selectCategory(c) {
   }
 
   // đợi DOM update rồi scroll & căn pill đang chọn vào vùng nhìn thấy
+  nextTick(() => {
+    const activePill = catScrollRef.value?.querySelector('.sct-cat-pill.active')
+    if (activePill && typeof activePill.scrollIntoView === 'function') {
+      activePill.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+    }
+    scrollToTop()
+  })
+}
+
+function selectSubCategory(sub) {
+  currentSubCategory.value = sub || ''
+  showAllCatsDrawer.value = false
+  resetVisibleMenu()
+
+  if (isMobile.value) {
+    showCategoryModal.value = false
+    if (activeMobilePanel.value === 'category') {
+      activeMobilePanel.value = null
+    }
+  }
+
+  nextTick(() => {
+    scrollToTop()
+  })
+}
+
+function selectParentAndSub(parentCat, sub = '') {
+  const cleanParent = String(parentCat || '').trim()
+  if (!cleanParent) return
+  currentCategory.value = cleanParent
+  currentSubCategory.value = String(sub || '').trim()
+  if (collapsedCatParents.value[cleanParent]) {
+    collapsedCatParents.value = {
+      ...collapsedCatParents.value,
+      [cleanParent]: false,
+    }
+  }
+  showAllCatsDrawer.value = false
+  resetVisibleMenu()
+
+  if (isMobile.value) {
+    showCategoryModal.value = false
+    if (activeMobilePanel.value === 'category') {
+      activeMobilePanel.value = null
+    }
+  }
+
   nextTick(() => {
     const activePill = catScrollRef.value?.querySelector('.sct-cat-pill.active')
     if (activePill && typeof activePill.scrollIntoView === 'function') {
@@ -8764,7 +9901,12 @@ watch(
 
     if (selectedItem.value?.Ma_hang) {
       const updated = menu.value.find((m) => m.Ma_hang === selectedItem.value.Ma_hang)
-      if (updated) selectedItem.value = updated
+      if (updated) {
+        selectedItem.value = updated
+        syncUrlToProduct(updated, { replace: true })
+      }
+    } else if (route.params.productId || route.params.productSlug) {
+      syncDetailFromRoute()
     }
 
     if (!rawMenu.value.length) {
@@ -8772,6 +9914,18 @@ watch(
     }
   },
   { immediate: true }
+)
+
+watch(
+  () => [
+    route.params.productSlug,
+    route.params.productId,
+    route.params.parentCategory,
+    route.params.subCategory,
+  ],
+  () => {
+    syncDetailFromRoute()
+  },
 )
 
 onUnmounted(() => {
@@ -8799,6 +9953,10 @@ onUnmounted(() => {
   }
   if (metaSyncTimer) clearTimeout(metaSyncTimer)
   if (toastTimer) clearTimeout(toastTimer)
+  if (noticeResizeObserver) {
+    noticeResizeObserver.disconnect()
+    noticeResizeObserver = null
+  }
   window.removeEventListener('resize', checkMobile)
   window.removeEventListener('scroll', onWindowScroll)
   document.removeEventListener('click', onDocumentClick)
@@ -8822,9 +9980,8 @@ function addFromDetailSidebar() {
 
   // 3⃣ đợi animation xong → đóng sidebar
   setTimeout(() => {
-    showDetailSidebar.value = false
     closingDetailSidebar.value = false
-    selectedItem.value = null
+    closeDetailSidebar()
   }, 260) // khớp với CSS
 }
 function goHomeMobile() {
@@ -8835,6 +9992,9 @@ function goHomeMobile() {
   showCart.value = false
   showProgressModal.value = false
   showExportModal.value = false
+  if (showDetailSidebar.value) {
+    closeDetailSidebar()
+  }
 
   keyword.value = ''
   searchInput.value = ''
@@ -9076,10 +10236,10 @@ const hasSale = computed(() =>
   --sa-qty-text: #0f172a;
   --sa-card-shadow: 0 4px 12px rgba(15, 23, 42, 0.08), 0 12px 24px -6px rgba(15, 23, 42, 0.11);
   --sa-card-hover-shadow: 0 14px 30px rgba(15, 23, 42, 0.16), 0 4px 10px rgba(5, 150, 105, 0.14);
-  --sa-notice-bg: #fff5f5;
-  --sa-notice-border: rgba(220, 38, 38, 0.22);
-  --sa-notice-text: #dc2626;
-  --sa-notice-icon: #dc2626;
+  --sa-notice-bg: linear-gradient(90deg, #ecfdf5 0%, #f0fdf4 58%, #fefce8 100%);
+  --sa-notice-border: rgba(5, 150, 105, 0.28);
+  --sa-notice-text: #064e3b;
+  --sa-notice-icon: #065f46;
   --sa-pill-bg: #ffffff;
   --sa-pill-text: #475569;
   --sa-pill-hover: #f8fafc;
@@ -9127,10 +10287,10 @@ const hasSale = computed(() =>
   --sa-qty-text: #f8fafc;
   --sa-card-shadow: 0 8px 22px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.34);
   --sa-card-hover-shadow: 0 16px 36px rgba(0, 0, 0, 0.65), 0 4px 14px rgba(16, 185, 129, 0.18);
-  --sa-notice-bg: rgba(239, 68, 68, 0.12);
-  --sa-notice-border: rgba(248, 113, 113, 0.3);
-  --sa-notice-text: #f87171;
-  --sa-notice-icon: #f87171;
+  --sa-notice-bg: linear-gradient(90deg, rgba(6, 78, 59, 0.42) 0%, rgba(4, 120, 87, 0.24) 65%, rgba(234, 179, 8, 0.14) 100%);
+  --sa-notice-border: rgba(52, 211, 153, 0.32);
+  --sa-notice-text: #ecfdf5;
+  --sa-notice-icon: #052e16;
   --sa-pill-bg: #131a26;
   --sa-pill-text: #94a3b8;
   --sa-pill-hover: #1c2536;
@@ -9812,7 +10972,7 @@ const hasSale = computed(() =>
   gap: 6px;
   overflow-x: auto;
   scrollbar-width: none;
-  padding: 2px 2px;
+  padding: 4px 2px;
   scroll-behavior: smooth;
 }
 
@@ -9865,6 +11025,48 @@ const hasSale = computed(() =>
   border-color: var(--sa-sale);
   color: #ffffff;
   box-shadow: 0 2px 8px rgba(225, 29, 72, 0.24);
+}
+
+/* Desktop & shared parent category pill (Nền vàng, chữ xanh lá cây) */
+.sa-storefront .sct-cat-pill.is-parent-cat {
+  background: linear-gradient(135deg, #fef9c3 0%, #fef08a 100%);
+  border: 1.5px solid #eab308;
+  color: #065f46;
+  font-weight: 800;
+}
+
+.sa-storefront .sct-cat-pill.is-parent-cat:not(.active):not(.is-parent-active):hover {
+  background: linear-gradient(135deg, #fef08a 0%, #fde047 100%);
+  border-color: #ca8a04;
+  color: #064e3b;
+}
+
+.sa-storefront .sct-cat-pill.is-parent-cat.active,
+.sa-storefront .sct-cat-pill.is-parent-cat.is-parent-active {
+  background: linear-gradient(135deg, #fde047 0%, #facc15 100%);
+  border: 2px solid #059669;
+  color: #064e3b;
+  box-shadow: 0 3px 10px rgba(234, 179, 8, 0.35);
+}
+
+.sa-storefront.theme-dark .sct-cat-pill.is-parent-cat {
+  background: linear-gradient(135deg, #facc15 0%, #eab308 100%);
+  border: 1.5px solid #fde047;
+  color: #052e16;
+}
+
+.sa-storefront.theme-dark .sct-cat-pill.is-parent-cat:not(.active):not(.is-parent-active):hover {
+  background: linear-gradient(135deg, #fde047 0%, #facc15 100%);
+  border-color: #fef08a;
+  color: #052e16;
+}
+
+.sa-storefront.theme-dark .sct-cat-pill.is-parent-cat.active,
+.sa-storefront.theme-dark .sct-cat-pill.is-parent-cat.is-parent-active {
+  background: linear-gradient(135deg, #fde047 0%, #facc15 100%);
+  border: 2px solid #34d399;
+  color: #052e16;
+  box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.28), 0 4px 12px rgba(250, 204, 21, 0.32);
 }
 
 /* ALL CATEGORIES DROPDOWN DRAWER */
@@ -10510,6 +11712,7 @@ const hasSale = computed(() =>
   .main.dock-expanded .hero-container,
   .main.dock-expanded .scam-hub-section,
   .main.dock-expanded .sct-inner,
+  .main.dock-expanded .sct-subcat-inner,
   .main.dock-expanded .menu-container {
     width: min(1360px, calc(100% - 218px));
     margin-left: max(218px, calc((100% - 1360px) / 2));
@@ -10519,6 +11722,7 @@ const hasSale = computed(() =>
   .main.dock-collapsed .hero-container,
   .main.dock-collapsed .scam-hub-section,
   .main.dock-collapsed .sct-inner,
+  .main.dock-collapsed .sct-subcat-inner,
   .main.dock-collapsed .menu-container {
     width: min(1360px, calc(100% - 78px));
     margin-left: max(78px, calc((100% - 1360px) / 2));
@@ -12411,203 +13615,1005 @@ const hasSale = computed(() =>
 }
 
 @media (min-width: 769px) {
-  .modal-card.modal-wide {
-    width: min(960px, 92vw);
-    max-height: 86vh;
-    border-radius: 22px;
-    overflow: hidden;
-    border: 1px solid var(--sa-border);
-    box-shadow: 0 28px 68px rgba(15, 23, 42, 0.24);
-  }
-
-  .modal-card.modal-wide .modal-content {
-    grid-template-columns: 1.15fr 1fr;
-    gap: 28px;
-    padding: 24px;
+  .modal-overlay.detail-page-overlay {
+    padding: 0;
+    background: var(--sa-surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     align-items: stretch;
-    height: 100%;
+    justify-content: stretch;
   }
 
-  .modal-card.modal-wide .modal-media {
+  .modal-card.modal-wide.detail-page-card {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    padding: 0;
+    margin: 0;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    height: 500px;
+    overflow: hidden;
+    background: var(--sa-surface);
   }
 
-  .modal-card.modal-wide .modal-media.no-thumbs {
-    height: 460px;
+  .detail-page-topbar {
+    background: var(--sa-top-header-bg);
+    color: #ffffff;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 4px 14px rgba(5, 150, 105, 0.16);
+    flex-shrink: 0;
+    z-index: 10;
   }
 
-  .modal-card.modal-wide .modal-left {
-    border-radius: 16px;
-    border: 1px solid var(--sa-border);
+  .detail-page-topbar-inner {
+    width: 100%;
+    margin: 0;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .detail-page-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 13px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    flex-shrink: 0;
+  }
+
+  .detail-page-back-btn:hover {
+    background: rgba(255, 255, 255, 0.24);
+    border-color: rgba(255, 255, 255, 0.45);
+    color: #ffffff;
+  }
+
+  .detail-page-topbar .detail-bc-link {
+    color: rgba(255, 255, 255, 0.84);
+  }
+
+  .detail-page-topbar .detail-bc-link:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.16);
+  }
+
+  .detail-page-topbar .detail-bc-sep {
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .detail-page-topbar .detail-bc-current {
+    color: #ffffff;
+  }
+
+  .detail-page-topbar .detail-page-close {
+    position: static;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .detail-page-topbar .detail-page-close:hover {
+    background: rgba(255, 255, 255, 0.26);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: #ffffff;
+  }
+
+  .detail-page-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px 36px 56px;
+  }
+
+  .modal-card.modal-wide.detail-page-card .modal-content.detail-page-body {
+    width: min(1480px, 100%);
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 48px;
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .dp-gallery-card {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+  }
+
+  .dp-hero-frame {
+    position: relative;
+    border-radius: 20px;
     background: var(--sa-img-bg);
-    padding: 16px;
+    height: clamp(360px, 46vh, 430px);
+    width: 100%;
+    padding: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 430px;
-    position: relative;
+    overflow: hidden;
   }
 
-  .modal-card.modal-wide .modal-media.no-thumbs .modal-left {
-    height: 460px;
-  }
-
-  .modal-card.modal-wide .modal-left .modal-img {
+  .dp-hero-frame .modal-img {
     width: 100%;
     height: 100%;
     max-height: none;
     object-fit: contain;
     border-radius: 12px;
-    background: transparent;
-    box-shadow: none;
+    transition: transform 0.28s ease;
   }
 
-  .modal-card.modal-wide .modal-img-nav {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 36px;
-    height: 36px;
-    border-radius: 999px;
-    border: 1px solid var(--sa-border);
-    background: var(--sa-surface);
-    color: var(--sa-heading);
-    font-size: 20px;
-    line-height: 1;
+  .dp-hero-frame .modal-img:hover {
+    transform: scale(1.02);
+  }
+
+  .dp-thumbs-rail {
     display: flex;
     align-items: center;
-    justify-content: center;
-    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
-    cursor: pointer;
-    transition: all 0.16s ease;
-  }
-
-  .modal-card.modal-wide .modal-img-nav.prev {
-    left: 12px;
-  }
-
-  .modal-card.modal-wide .modal-img-nav.next {
-    right: 12px;
-  }
-
-  .modal-card.modal-wide .modal-img-nav:hover {
-    background: var(--sa-accent);
-    border-color: var(--sa-accent);
-    color: #ffffff;
-    transform: translateY(-50%) scale(1.05);
-  }
-
-  .modal-card.modal-wide .modal-img-nav:active {
-    transform: translateY(-50%) scale(0.96);
-  }
-
-  .modal-card.modal-wide .modal-thumbs {
-    display: flex;
-    flex-wrap: nowrap;
-    gap: 8px;
-    justify-content: flex-start;
-    width: 100%;
-    height: 60px;
-    padding: 0 2px;
+    gap: 10px;
     overflow-x: auto;
-    overflow-y: hidden;
+    padding: 2px;
     scrollbar-width: thin;
   }
 
-  .modal-card.modal-wide .modal-thumb {
-    width: 64px;
-    height: 52px;
-    border-radius: 10px;
-    border: 1px solid var(--sa-border);
-    background: var(--sa-img-bg);
-    overflow: hidden;
-    padding: 0;
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
-
-  .modal-card.modal-wide .modal-thumb img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-
-  .modal-card.modal-wide .modal-thumb:hover {
-    border-color: var(--sa-border-strong);
-  }
-
-  .modal-card.modal-wide .modal-thumb.active {
-    border-color: var(--sa-accent);
-    box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.2);
-  }
-
-  .modal-card.modal-wide .modal-right {
-    padding: 4px 4px 8px;
-    gap: 12px;
-    overflow-y: auto;
-  }
-
-  .modal-card.modal-wide .modal-title {
-    font-size: 22px;
-    font-weight: 700;
-    line-height: 1.3;
-    letter-spacing: -0.3px;
-  }
-
-  .modal-card.modal-wide .modal-desc {
-    font-size: 14px;
-    color: var(--sa-muted);
-    max-height: 140px;
-    overflow-y: auto;
-    padding-right: 4px;
-  }
-
-  .modal-card.modal-wide .modal-price {
-    justify-content: flex-start;
-    font-size: 23px;
-    margin-bottom: 4px;
-  }
-
-  .modal-card.modal-wide .modal-qty {
-    justify-content: flex-start;
-    width: fit-content;
-  }
-
-  .modal-card.modal-wide .form-field textarea {
-    background: var(--sa-input-bg);
-    border-color: var(--sa-input-border);
-    border-radius: 10px;
-  }
-
-  .modal-card.modal-wide .add-btn {
-    margin-top: 6px;
-    height: 44px;
-    flex: 0 0 auto;
-    border-radius: 12px;
-    font-size: 14.5px;
-    font-weight: 600;
-  }
-
-  .modal-card.modal-wide .modal-close {
-    top: 14px;
-    right: 14px;
-    width: 34px;
-    height: 34px;
-    background: var(--sa-surface-2);
-    color: var(--sa-heading);
-    border: 1px solid var(--sa-border);
+  .dp-info-card {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 2px 0;
     box-shadow: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 100%;
   }
 
-  .modal-card.modal-wide .modal-close:hover {
-    background: #fee2e2;
-    border-color: #fecaca;
-    color: #dc2626;
+  .dp-header-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
   }
+
+  .dp-info-card .dp-title {
+    font-size: 28px;
+    line-height: 1.3;
+  }
+
+  .dp-info-card .dp-desc-text {
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  .dp-note-divider {
+    padding-top: 16px;
+    border-top: 1px solid var(--sa-border);
+  }
+
+  .dp-info-card .dp-note-input {
+    min-height: 76px;
+  }
+
+  .dp-action-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .dp-related-section {
+    width: min(1480px, 100%);
+    margin: 44px auto 0;
+    padding-top: 28px;
+    border-top: 1px solid var(--sa-border);
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1080px) {
+  .dp-related-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* SHARED MINIMAL DETAIL PAGE ELEMENTS */
+.dp-thumb {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background: var(--sa-img-bg);
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  opacity: 0.65;
+  transition: all 0.16s ease;
+}
+
+.dp-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.dp-thumb:hover {
+  opacity: 1;
+}
+
+.dp-thumb.active {
+  opacity: 1;
+  border-color: var(--sa-accent);
+}
+
+.dp-zoom-pill {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(15, 23, 42, 0.56);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 2;
+  transition: background 0.15s ease;
+}
+
+.dp-zoom-pill:hover {
+  background: rgba(15, 23, 42, 0.76);
+}
+
+.dp-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--sa-border);
+  background: var(--sa-surface);
+  color: var(--sa-heading);
+  font-size: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+  cursor: pointer;
+  z-index: 2;
+  transition: all 0.16s ease;
+}
+
+.dp-nav-btn.prev { left: 12px; }
+.dp-nav-btn.next { right: 12px; }
+
+.dp-nav-btn:hover {
+  background: var(--sa-accent);
+  border-color: var(--sa-accent);
+  color: #ffffff;
+}
+
+.dp-meta-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--sa-muted);
+}
+
+.dp-meta-link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--sa-accent);
+  cursor: pointer;
+}
+
+.dp-meta-link:hover {
+  text-decoration: underline;
+}
+
+.dp-meta-sep {
+  opacity: 0.5;
+}
+
+.dp-meta-text {
+  font-weight: 500;
+  color: var(--sa-muted);
+}
+
+.dp-out-text {
+  font-weight: 700;
+  color: var(--sa-sale);
+}
+
+.dp-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  color: var(--sa-heading);
+}
+
+.dp-title.is-mobile {
+  font-size: 22px;
+}
+
+.dp-price-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dp-price-current {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--sa-price);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.dp-price-current.is-sale {
+  color: var(--sa-sale);
+}
+
+.dp-price-unit {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--sa-muted);
+}
+
+.dp-price-old {
+  font-size: 15px;
+  color: var(--sa-muted);
+  text-decoration: line-through;
+  font-variant-numeric: tabular-nums;
+  margin-left: 4px;
+}
+
+.dp-desc-text {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--sa-muted);
+  white-space: pre-line;
+}
+
+.dp-controls-box {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 16px;
+  margin-top: 4px;
+  border-top: 1px solid var(--sa-border);
+}
+
+.dp-qty-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dp-stepper {
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  gap: 8px;
+  width: fit-content;
+}
+
+.dp-stepper button {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: none;
+  background: var(--sa-surface-2);
+  color: var(--sa-heading);
+  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+
+.dp-stepper button.dp-qty-minus:hover {
+  background: var(--sa-border-strong);
+}
+
+.dp-stepper button.dp-qty-plus {
+  background: var(--sa-accent);
+  color: #ffffff;
+}
+
+.dp-stepper button.dp-qty-plus:hover {
+  background: var(--sa-accent-hover);
+  color: #ffffff;
+}
+
+.dp-stepper button:active {
+  transform: scale(0.94);
+}
+
+.dp-stepper input {
+  width: 34px;
+  text-align: center;
+  border: none;
+  background: transparent;
+  color: var(--sa-heading);
+  font-size: 15px;
+  font-weight: 700;
+  outline: none;
+}
+
+.dp-note-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dp-note-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sa-muted);
+}
+
+.dp-note-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--sa-input-border);
+  background: var(--sa-input-bg);
+  color: var(--sa-text);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+  resize: vertical;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.dp-note-input:focus {
+  outline: none;
+  border-color: var(--sa-accent);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+}
+
+.dp-cta-btn {
+  width: 100%;
+  height: 48px;
+  border: none;
+  border-radius: 12px;
+  background: var(--sa-accent);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 0.16s ease, transform 0.14s ease;
+}
+
+.dp-cta-btn:hover:not(:disabled) {
+  background: var(--sa-accent-hover);
+}
+
+.dp-cta-btn:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.dp-cta-btn:disabled {
+  background: var(--sa-surface-2);
+  color: var(--sa-muted);
+  cursor: not-allowed;
+}
+
+.dp-cta-dot {
+  opacity: 0.7;
+}
+
+.dp-related-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--sa-heading);
+}
+
+.dp-related-heading i {
+  color: var(--sa-accent);
+}
+
+.dp-related-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.dp-related-card {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid var(--sa-border);
+  background: var(--sa-surface);
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.dp-related-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--sa-accent);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.dp-rel-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  background: var(--sa-img-bg);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.dp-rel-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.dp-rel-thumb-empty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sa-muted);
+  font-size: 22px;
+}
+
+.dp-rel-sale {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--sa-sale);
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.dp-rel-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dp-rel-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sa-heading);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.35;
+}
+
+.dp-rel-price {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--sa-price);
+}
+
+.detail-meta-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-breadcrumb-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  background: var(--sa-surface-2, #f8fafc);
+  border-bottom: 1px solid var(--sa-border);
+}
+
+.detail-breadcrumb-bar.is-desktop {
+  flex: 1;
+  background: transparent;
+  border-bottom: none;
+  padding: 0;
+  font-size: 13.5px;
+}
+
+.detail-bc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  color: var(--sa-muted);
+  font-size: inherit;
+  font-weight: 600;
+  padding: 2px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.detail-bc-link:hover {
+  color: var(--sa-accent);
+  background: rgba(5, 150, 105, 0.08);
+}
+
+.detail-bc-sep {
+  color: var(--sa-muted);
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.detail-bc-current {
+  color: var(--sa-heading);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 360px;
+}
+
+/* 2-LEVEL SUB-CATEGORY BARS */
+.sct-subcat-bar {
+  width: 100%;
+  background: transparent;
+}
+
+.sct-subcat-inner {
+  max-width: 1360px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2px 28px 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sct-subcat-parent-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--sa-accent);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.sct-subcat-scroll {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  overflow: visible;
+}
+
+.sct-cat-pill.is-sub-pill {
+  height: auto;
+  min-height: 30px;
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+  font-size: 12.5px;
+  padding: 5px 12px;
+}
+
+.mobile-cat-strip.is-sub-strip {
+  flex-wrap: wrap;
+  overflow-x: visible;
+  gap: 6px;
+  padding: 2px 0 10px;
+}
+
+.cat-group-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.cat.cat-tree-parent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cat-label-text {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cat-chevron-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--sa-border);
+  background: var(--sa-surface-2, rgba(15, 23, 42, 0.05));
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.cat-sub-count {
+  font-size: 10.5px;
+  font-weight: 800;
+  opacity: 0.85;
+}
+
+.sct-parent-groups-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--sa-border);
+}
+
+.sct-parent-group-card {
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--sa-surface-soft, rgba(15, 23, 42, 0.03));
+  border: 1px solid var(--sa-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sct-parent-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sct-parent-head-pill {
+  font-weight: 800;
+}
+
+.sct-parent-subcount {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  background: var(--sa-surface);
+  border: 1px solid var(--sa-border);
+  color: var(--sa-muted);
+}
+
+.menu-group-heading {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px;
+  margin-top: 4px;
+  border-radius: 12px;
+  background: var(--sa-surface-soft, rgba(16, 185, 129, 0.08));
+  border: 1px solid var(--sa-border-green, rgba(16, 185, 129, 0.28));
+  color: var(--sa-accent, #059669);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.14s ease, border-color 0.14s ease;
+}
+
+.menu-group-heading:hover {
+  border-color: var(--sa-accent, #059669);
+}
+
+.mgh-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.mgh-action {
+  font-size: 16px;
+  opacity: 0.8;
+}
+
+/* Linked Product Variant Switcher inside Detail Modal */
+.dp-variant-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dp-variant-label {
+  font-size: 12.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--sa-muted, #64748b);
+}
+
+.dp-variant-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dp-variant-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 13px;
+  border-radius: 12px;
+  border: 1.5px solid var(--sa-border, #cbd5e1);
+  background: var(--sa-surface-2, #f8fafc);
+  color: var(--sa-heading, #0f172a);
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.dp-variant-pill:hover {
+  border-color: var(--sa-accent, #10b981);
+}
+
+.dp-variant-pill.active {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border-color: #059669;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.28);
+}
+
+.dp-variant-pill.is-out {
+  opacity: 0.6;
+}
+
+.dvp-price {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.sa-storefront.theme-dark .dvp-price {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.dp-variant-pill.active .dvp-price {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.cat.is-parent-active {
+  border-color: var(--sa-accent);
+  color: var(--sa-accent);
+  font-weight: 700;
+}
+
+.sub-cat-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0 8px 14px;
+  margin-left: 10px;
+  border-left: 2px solid var(--sa-border);
+}
+
+.sub-cat-tree.is-modal {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px;
+  margin-left: 0;
+  border-left: none;
+  background: var(--sa-surface-2, #f8fafc);
+  border-radius: 10px;
+}
+
+.sub-cat-tree-item {
+  text-align: left;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--sa-text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sub-cat-tree.is-modal .sub-cat-tree-item {
+  border-color: var(--sa-border);
+  background: var(--sa-surface);
+  color: var(--sa-text);
+  border-radius: 999px;
+  padding: 5px 12px;
+}
+
+.sub-cat-tree-item.active,
+.sub-cat-tree.is-modal .sub-cat-tree-item.active {
+  background: var(--sa-accent);
+  border-color: var(--sa-accent);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.sct-all-subcats-section {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--sa-border);
+}
+
+.sct-all-cats-header.is-sub {
+  margin-bottom: 8px;
+  font-size: 12.5px;
+  color: var(--sa-accent);
 }
 
 /* TAG DANH MỤC / SIZE */
@@ -13244,38 +15250,6 @@ const hasSale = computed(() =>
     animation: catPulseActive 0.9s ease-in-out infinite;
   }
 }
-/* KHUNG THÔNG BÁO */
-.notice {
-  overflow: hidden;        /*  bắt buộc */
-  white-space: nowrap;
-  position: relative;
-}
-
-/* KHUNG CHẠY */
-.notice-marquee {
-  flex: 1;
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-.notice-text {
-  display: inline-block;
-  white-space: nowrap;
-  will-change: transform;
- animation-delay: -10s; /*  CHẠY NGAY */
-  animation: notice-move 12s linear infinite;
-}
-
-/* CHẠY NGAY LẬP TỨC */
-@keyframes notice-move {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(-100%);
-  }
-}
-
 @keyframes catPulse {
   0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.6), 0 0 8px rgba(34,197,94,0.25); }
   45% { box-shadow: 0 0 0 6px rgba(34,197,94,0.35), 0 0 12px rgba(34,197,94,0.35); }
@@ -13290,70 +15264,137 @@ const hasSale = computed(() =>
   100% { box-shadow: 0 0 0 0 rgba(254,240,138,0), 0 0 0 rgba(254,240,138,0); }
 }
 
-/* hover pause */
-.notice-bar:hover .notice-text {
-  animation-play-state: paused;
-}
-
-
-
-/* PAUSE KHI HOVER (RẤT APP) */
-.notice:hover .notice-text {
-  animation-play-state: paused;
-}
-
-/* ===============================
-   NOTICE BAR (FRAMELESS BOLD RED TEXT)
-   =============================== */
+/* =========================================================
+   NOTICE BAR (PA1 — EMERALD PILL + GOLD BADGE + SEAMLESS TICKER)
+   ========================================================= */
 .notice-bar {
   position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 0;
-  padding: 4px 2px;
-  margin-bottom: 8px;
-  background: transparent !important;
-  border-radius: 0;
-  border: none !important;
-  box-shadow: none !important;
+  min-height: 40px;
+  margin: 0 0 10px;
+  padding: 5px 12px 5px 6px;
+  border-radius: 12px;
+  background: var(--sa-notice-bg);
+  border: 1px solid var(--sa-notice-border);
+  box-shadow: 0 3px 12px rgba(5, 150, 105, 0.08);
   overflow: hidden;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
-.notice-icon {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--sa-notice-icon);
-  flex-shrink: 0;
-  display: flex;
+.sa-storefront.theme-dark .notice-bar {
+  box-shadow: 0 4px 16px rgba(2, 6, 23, 0.36);
+}
+
+.notice-bar.is-marquee {
+  cursor: pointer;
+}
+
+.notice-bar.is-marquee.is-paused {
+  border-color: var(--sa-accent);
+}
+
+.notice-badge {
+  display: inline-flex;
   align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #fef08a 0%, #fde047 100%);
+  border: 1px solid #eab308;
+  color: #064e3b;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.35px;
+  line-height: 1.2;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(234, 179, 8, 0.2);
+}
+
+.sa-storefront.theme-dark .notice-badge {
+  background: linear-gradient(135deg, #facc15 0%, #eab308 100%);
+  border-color: #fde047;
+  color: #052e16;
+}
+
+.notice-badge-ico {
+  font-size: 13.5px;
+  color: #059669;
+  line-height: 1;
+}
+
+.sa-storefront.theme-dark .notice-badge-ico {
+  color: #052e16;
 }
 
 .notice-marquee {
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
 }
 
-.notice-text {
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.4;
-  letter-spacing: 0.1px;
-  color: var(--sa-notice-text) !important;
-  animation: notice-move 16s linear infinite;
+.notice-bar.is-marquee .notice-marquee {
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 18px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 18px), transparent 100%);
 }
 
-.notice-bar:hover .notice-text {
+.notice-track {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  will-change: transform;
+}
+
+.notice-bar.is-marquee .notice-track {
+  animation: notice-ticker var(--notice-duration, 12s) linear infinite;
+}
+
+.notice-bar.is-marquee:hover .notice-track,
+.notice-bar.is-marquee.is-paused .notice-track {
   animation-play-state: paused;
 }
 
-@keyframes notice-move {
-  from {
-    transform: translateX(100%);
+.notice-item {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.notice-bar.is-marquee .notice-item {
+  gap: 22px;
+  padding-right: 22px;
+}
+
+.notice-text {
+  display: inline-block;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.1px;
+  color: var(--sa-notice-text);
+}
+
+.notice-sep {
+  font-size: 13px;
+  font-weight: 800;
+  color: #059669;
+  opacity: 0.72;
+}
+
+.sa-storefront.theme-dark .notice-sep {
+  color: #34d399;
+}
+
+@keyframes notice-ticker {
+  0% {
+    transform: translate3d(0, 0, 0);
   }
-  to {
-    transform: translateX(-100%);
+  100% {
+    transform: translate3d(-50%, 0, 0);
   }
 }
 
@@ -13654,6 +15695,21 @@ const hasSale = computed(() =>
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-word;
+}
+
+.dp-img-name-fallback {
+  border-radius: 12px;
+  padding: 24px 20px;
+}
+
+.dp-mob-hero .dp-img-name-fallback {
+  height: 260px;
+}
+
+.dp-img-name-fallback span {
+  font-size: 20px;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
 }
 
 .scroll-top-fab:hover {
@@ -14072,16 +16128,31 @@ const hasSale = computed(() =>
   }
 
   .notice-bar {
-    padding: 2px 2px;
-    margin-bottom: 6px;
+    min-height: 36px;
+    gap: 8px;
+    padding: 4px 10px 4px 5px;
+    border-radius: 11px;
+    margin-bottom: 8px;
   }
 
-  .notice-icon {
-    font-size: 18px;
+  .notice-badge {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 8px;
+  }
+
+  .notice-badge-text {
+    display: none;
+  }
+
+  .notice-badge-ico {
+    font-size: 14px;
   }
 
   .notice-text {
-    font-size: 15px;
+    font-size: 13.5px;
     font-weight: 700;
   }
 
@@ -14879,26 +16950,29 @@ const hasSale = computed(() =>
 
 .cart-bar-pill-left {
   position: relative;
+  flex-shrink: 0;
   width: 46px;
   height: 46px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  background: linear-gradient(135deg, #052e16 0%, #065f46 58%, #047857 100%);
+  border: 1.5px solid rgba(163, 230, 53, 0.72);
   border-radius: 13px;
-  box-shadow: 0 6px 18px rgba(220, 38, 38, 0.32);
+  box-shadow: 0 6px 18px rgba(6, 78, 59, 0.34);
   cursor: pointer;
-  transition: transform 0.15s ease, background-color 0.15s ease;
+  transition: transform 0.15s ease, filter 0.15s ease;
 }
 
 .cart-bar-pill-left:active {
   transform: scale(0.94);
-  background: #b91c1c;
+  background: linear-gradient(135deg, #022c22 0%, #064e3b 100%);
 }
 
 .cart-bar-icon {
   font-size: 22px;
-  color: #ffffff;
+  color: #bef264;
+  text-shadow: 0 1px 3px rgba(2, 44, 34, 0.45);
 }
 
 .cart-bar-badge {
@@ -14908,50 +16982,91 @@ const hasSale = computed(() =>
   min-width: 20px;
   height: 20px;
   padding: 0 5px;
-  background: #ffffff;
-  color: #dc2626;
+  background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);
+  color: #ffffff;
   font-size: 11px;
   font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  border: 2px solid #dc2626;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.22);
+  border: 2px solid #fef08a;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.24);
 }
 
 .cart-bar-pill-right {
   flex: 1;
+  min-width: 0;
   height: 46px;
-  padding: 0 18px;
+  padding: 0 8px 0 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-  border: none;
+  gap: 8px;
+  background: linear-gradient(128deg, #fef08a 0%, #fde047 38%, #f59e0b 78%, #ea580c 100%);
+  border: 1.5px solid rgba(101, 163, 13, 0.72);
   border-radius: 13px;
-  box-shadow: 0 6px 18px rgba(220, 38, 38, 0.32);
+  box-shadow:
+    0 8px 22px rgba(234, 88, 12, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
   cursor: pointer;
-  transition: transform 0.15s ease, background-color 0.15s ease;
+  transition: transform 0.15s ease, filter 0.15s ease;
 }
 
 .cart-bar-pill-right:active {
   transform: scale(0.98);
-  background: #b91c1c;
+  filter: brightness(0.95);
 }
 
 .cart-bar-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 14px;
-  font-weight: 600;
-  color: #ffffff;
+  font-weight: 800;
+  color: #052e16;
   text-transform: none;
-  letter-spacing: 0;
+  letter-spacing: 0.2px;
 }
 
 .cart-bar-total {
-  font-size: 16px;
-  font-weight: 700;
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 5px 11px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #052e16 0%, #065f46 65%, #15803d 100%);
+  border: 1.5px solid #a3e635;
+  font-size: 14px;
+  font-weight: 800;
+  color: #fde047;
+  box-shadow: 0 2px 8px rgba(2, 44, 34, 0.26);
+}
+
+.sa-storefront.theme-dark .cart-bar-pill-left {
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 58%, #047857 100%);
+  border-color: rgba(163, 230, 53, 0.8);
+  box-shadow: 0 8px 22px rgba(5, 150, 105, 0.28);
+}
+
+.sa-storefront.theme-dark .cart-bar-badge {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
   color: #ffffff;
+  border-color: #fde047;
+}
+
+.sa-storefront.theme-dark .cart-bar-pill-right {
+  background: linear-gradient(128deg, #fde047 0%, #facc15 40%, #f59e0b 78%, #ea580c 100%);
+  border-color: rgba(254, 240, 138, 0.72);
+  box-shadow:
+    0 8px 24px rgba(245, 158, 11, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.52);
+}
+
+.sa-storefront.theme-dark .cart-bar-total {
+  background: linear-gradient(135deg, #022c22 0%, #064e3b 65%, #15803d 100%);
+  border-color: #a3e635;
+  color: #fde047;
 }
 
 /* FLOATING LIVE ORDER TRACKER (MOBILE PROGRESS STATE) */
@@ -15452,130 +17567,192 @@ const hasSale = computed(() =>
 }
 
   .detail-sidebar {
-    --sa-mob-sheet-top: calc(48px + env(safe-area-inset-top, 0px));
+    --sa-mob-sheet-top: 0px;
     position: fixed;
-    top: var(--sa-mob-sheet-top);
+    top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    border-radius: 20px 20px 0 0;
-    box-shadow: 0 -10px 36px rgba(15, 23, 42, 0.28);
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+    box-shadow: none;
     background: var(--sa-surface);
     color: var(--sa-text);
     z-index: 2000;
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow: hidden;
     transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease;
   }
 
-  .detail-header {
-    height: 56px;
-    background: var(--sa-surface);
-    color: var(--sa-heading);
-    border-bottom: 1px solid var(--sa-border);
-    border-radius: 20px 20px 0 0;
+  .detail-header.dp-mob-header {
+    height: calc(54px + env(safe-area-inset-top, 0px));
+    padding: env(safe-area-inset-top, 0px) 10px 0;
+    background: var(--sa-top-header-bg);
+    color: #ffffff;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 4px 14px rgba(5, 150, 105, 0.18);
+    border-radius: 0;
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 0 14px;
+    gap: 10px;
     position: sticky;
     top: 0;
-    z-index: 5;
-    justify-content: center;
+    z-index: 10;
+    justify-content: flex-start;
+    flex-shrink: 0;
   }
 
-  .detail-title {
-    color: var(--sa-heading);
+  .detail-back.dp-mob-back {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .detail-title.dp-mob-title {
+    flex: 1;
+    min-width: 0;
+    color: #ffffff;
     font-family: inherit;
     font-weight: 700;
     font-size: 15px;
     text-transform: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  .detail-back {
-    background: var(--sa-surface-2);
-    color: var(--sa-heading);
-    border: 1px solid var(--sa-border);
+  .dp-mob-scroll {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: var(--sa-surface);
   }
 
-  .detail-add-btn {
-    background: var(--sa-accent);
-    color: #ffffff;
-    box-shadow: none;
-    font-weight: 600;
+  .dp-mob-gallery {
+    background: var(--sa-surface);
+    padding: 12px 14px 4px;
   }
 
-  .detail-add-btn::after {
-    display: none;
-  }
-
-  .detail-body {
-    flex: 0 0 auto;
-    overflow: visible;
-    padding: 16px;
+  .dp-mob-hero {
+    position: relative;
+    border-radius: 16px;
+    background: var(--sa-img-bg);
+    padding: 10px;
+    overflow: hidden;
   }
 
   .detail-img {
     width: 100%;
-    max-height: 320px;
+    height: 260px;
+    max-height: 300px;
     object-fit: contain;
+    display: block;
   }
 
-  .detail-thumbs {
+  .dp-mob-thumbs {
     display: flex;
     gap: 8px;
-    padding: 10px 14px 4px;
+    padding: 10px 2px 0;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
 
-  .detail-thumbs::-webkit-scrollbar {
+  .dp-mob-thumbs::-webkit-scrollbar {
     display: none;
   }
 
-  .detail-thumb {
-    background: transparent;
-    padding: 0;
-    flex: 0 0 auto;
+  .dp-mob-thumbs .dp-thumb {
+    width: 56px;
+    height: 56px;
     border-radius: 10px;
-    overflow: hidden;
-    border: 1.5px solid var(--sa-border);
   }
 
-  .detail-thumb img {
-    width: 60px;
-    height: 60px;
-    object-fit: cover;
-    display: block;
+  .dp-mob-sheet {
+    position: relative;
+    margin-top: 0;
+    border-radius: 0;
+    background: var(--sa-surface);
+    padding: 16px 16px 28px;
+    box-shadow: none;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
   }
 
-  .detail-thumb.active {
-    border-color: var(--sa-accent);
+  .dp-mob-breadcrumb {
+    background: transparent;
+    border-bottom: none;
+    padding: 0;
+    font-size: 12.5px;
   }
 
-  .detail-img-nav {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
+  .dp-related-section.is-mobile {
+    margin-top: 4px;
+  }
+
+  .dp-related-scroll {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .dp-related-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dp-related-scroll .dp-related-card {
+    flex: 0 0 132px;
+  }
+
+  .dp-mob-bottom-bar {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 10px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    background: var(--sa-bottom-bar-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid var(--sa-border);
+    box-shadow: 0 -6px 20px rgba(15, 23, 42, 0.08);
+  }
+
+  .dp-mob-bottom-bar .dp-qty-line {
+    width: 100%;
+  }
+
+  .dp-mob-bottom-bar .dp-stepper {
+    flex-shrink: 0;
+    padding: 0;
+  }
+
+  .dp-mob-bottom-bar .dp-stepper button {
     width: 32px;
     height: 32px;
-    border-radius: 50%;
-    border: 1px solid var(--sa-border);
-    background: var(--sa-surface);
-    color: var(--sa-heading);
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.14);
   }
 
-  .detail-img-nav.prev { left: 8px; }
-  .detail-img-nav.next { right: 8px; }
-  .detail-img-nav:active {
-    transform: translateY(-50%) scale(0.95);
+  .dp-mob-bottom-bar .dp-stepper input {
+    width: 32px;
+  }
+
+  .dp-mob-bottom-bar .dp-cta-btn {
+    width: 100%;
+    height: 46px;
+    border-radius: 12px;
+    font-size: 14.5px;
   }
 
   .detail-slide-enter-from {
@@ -17082,6 +19259,229 @@ const hasSale = computed(() =>
 .expand-cart-btn:hover {
   background: var(--sa-surface-soft);
   color: var(--sa-price);
+}
+
+/* =========================================================
+   MOBILE CATEGORY PARENT STYLING (LIGHT MODE & DARK MODE)
+   ========================================================= */
+@media (max-width: 768px) {
+  .modal-card .export-title.category-modal-title .category-title-text {
+    color: inherit;
+    font-weight: 900;
+  }
+
+  /* Light mode parent category pills, search Danh mục button & modal cards (Nền vàng, chữ xanh) */
+  .sa-storefront.theme-light .search-wrapper .filter-cat-btn {
+    background: linear-gradient(135deg, #fef08a 0%, #fde047 100%);
+    border: 1.5px solid #eab308;
+    color: #065f46;
+    font-weight: 800;
+  }
+
+  .sa-storefront.theme-light .search-wrapper .filter-cat-btn.active {
+    background: linear-gradient(135deg, #fde047 0%, #facc15 100%);
+    border: 1.5px solid #059669;
+    color: #064e3b;
+    box-shadow: 0 2px 8px rgba(234, 179, 8, 0.35);
+  }
+
+  .sa-storefront.theme-light .sub-cat-tree.is-modal {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+  }
+
+  .sa-storefront.theme-light .sub-cat-tree.is-modal .sub-cat-tree-item {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    color: #0f172a;
+    font-weight: 600;
+  }
+
+  .sa-storefront.theme-light .sub-cat-tree.is-modal .sub-cat-tree-item.active {
+    background: linear-gradient(135deg, #16a34a, #059669);
+    border-color: #059669;
+    color: #ffffff;
+    font-weight: 800;
+    box-shadow: 0 3px 10px rgba(5, 150, 105, 0.28);
+  }
+
+  .sa-storefront.theme-light .mob-cat-pill.is-parent-cat {
+    background: linear-gradient(135deg, #fef9c3 0%, #fef08a 100%);
+    border: 1.5px solid #eab308;
+    color: #065f46;
+    font-weight: 800;
+  }
+
+  .sa-storefront.theme-light .mob-cat-pill.is-parent-cat.active {
+    background: linear-gradient(135deg, #fde047 0%, #facc15 100%);
+    border: 2px solid #059669;
+    color: #064e3b;
+    box-shadow: 0 3px 10px rgba(234, 179, 8, 0.35);
+  }
+
+  .sa-storefront.theme-light .modal-card .modal-categories .cat.cat-tree-parent.is-parent-cat {
+    background: linear-gradient(135deg, #fef08a 0%, #fde047 100%);
+    border: 1.5px solid #eab308;
+    color: #065f46;
+    box-shadow: 0 4px 12px rgba(234, 179, 8, 0.24);
+  }
+
+  .sa-storefront.theme-light .modal-card .modal-categories .cat.cat-tree-parent.is-parent-cat .cat-label {
+    color: #065f46;
+    font-weight: 800;
+  }
+
+  .sa-storefront.theme-light .modal-card .modal-categories .cat.cat-tree-parent.is-parent-cat::before {
+    background: linear-gradient(135deg, #16a34a, #059669);
+    box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
+  }
+
+  .sa-storefront.theme-light .modal-card .modal-categories .cat.cat-tree-parent.is-parent-cat .cat-chevron-btn {
+    background: rgba(255, 255, 255, 0.8);
+    border-color: rgba(6, 95, 70, 0.32);
+    color: #065f46;
+  }
+
+  .sa-storefront.theme-light .modal-card .modal-categories .cat.cat-tree-parent.is-parent-cat.active,
+  .sa-storefront.theme-light .modal-card .modal-categories .cat.cat-tree-parent.is-parent-cat.is-parent-active {
+    background: linear-gradient(135deg, #fde047 0%, #facc15 100%);
+    border: 2px solid #059669;
+    color: #064e3b;
+    box-shadow: 0 8px 20px rgba(234, 179, 8, 0.38);
+  }
+
+  .sa-storefront.theme-light .modal-card .modal-categories .cat.cat-tree-parent.is-parent-cat.active .cat-label,
+  .sa-storefront.theme-light .modal-card .modal-categories .cat.cat-tree-parent.is-parent-cat.is-parent-active .cat-label {
+    color: #064e3b;
+  }
+
+  .sa-storefront.theme-light .modal-card .modal-categories .cat.cat-tree-parent.is-parent-cat.active::before {
+    background: #059669;
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.25);
+  }
+
+  /* Dark mode category modal & parent category sync (Nền vàng, chữ xanh nổi bật, không chìm màu) */
+  .sa-storefront.theme-dark .search-wrapper .filter-cat-btn {
+    background: linear-gradient(135deg, #facc15 0%, #eab308 100%);
+    border: 1.5px solid #fde047;
+    color: #052e16;
+    font-weight: 800;
+  }
+
+  .sa-storefront.theme-dark .search-wrapper .filter-cat-btn.active {
+    background: linear-gradient(135deg, #fde047 0%, #facc15 100%);
+    border: 1.5px solid #34d399;
+    color: #052e16;
+    box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.28);
+  }
+
+  .sa-storefront.theme-dark .sub-cat-tree.is-modal {
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(148, 163, 184, 0.16);
+  }
+
+  .sa-storefront.theme-dark .sub-cat-tree.is-modal .sub-cat-tree-item {
+    background: #1e293b;
+    border-color: rgba(148, 163, 184, 0.24);
+    color: #e2e8f0;
+    font-weight: 600;
+  }
+
+  .sa-storefront.theme-dark .sub-cat-tree.is-modal .sub-cat-tree-item.active {
+    background: linear-gradient(135deg, #10b981, #059669);
+    border-color: #34d399;
+    color: #ffffff;
+    font-weight: 800;
+    box-shadow: 0 3px 10px rgba(16, 185, 129, 0.35);
+  }
+
+  .sa-storefront.theme-dark .modal-card .export-title.category-modal-title {
+    background: #131a26;
+    color: #4ade80;
+    border-bottom: 2px solid #10b981;
+  }
+
+  .sa-storefront.theme-dark .modal-card .modal-categories {
+    background: linear-gradient(145deg, #0f172a 0%, #131a26 100%);
+    border: 1px solid rgba(52, 211, 153, 0.22);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.48);
+  }
+
+  .sa-storefront.theme-dark .modal-card .modal-categories .cat:not(.sale):not(.is-parent-cat) {
+    background: #1e293b;
+    border-color: rgba(148, 163, 184, 0.22);
+    color: #e2e8f0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .sa-storefront.theme-dark .modal-card .modal-categories .cat:not(.sale):not(.is-parent-cat) .cat-label {
+    color: #e2e8f0;
+  }
+
+  .sa-storefront.theme-dark .modal-card .modal-categories .cat:not(.sale):not(.is-parent-cat).active {
+    background: linear-gradient(135deg, #10b981, #059669);
+    border-color: transparent;
+    color: #ffffff;
+  }
+
+  .sa-storefront.theme-dark .modal-card .modal-categories .cat:not(.sale):not(.is-parent-cat).active .cat-label {
+    color: #ffffff;
+  }
+
+  .sa-storefront.theme-dark .mob-cat-pill.is-parent-cat {
+    background: linear-gradient(135deg, #facc15 0%, #eab308 100%);
+    border: 1.5px solid #fde047;
+    color: #052e16;
+    font-weight: 800;
+  }
+
+  .sa-storefront.theme-dark .mob-cat-pill.is-parent-cat.active {
+    background: linear-gradient(135deg, #fde047 0%, #facc15 100%);
+    border: 2px solid #34d399;
+    color: #052e16;
+    box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.28), 0 4px 12px rgba(250, 204, 21, 0.32);
+  }
+
+  .sa-storefront.theme-dark .modal-card .modal-categories .cat.cat-tree-parent.is-parent-cat {
+    background: linear-gradient(135deg, #facc15 0%, #eab308 100%);
+    border: 1.5px solid #fde047;
+    color: #052e16;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.36);
+  }
+
+  .sa-storefront.theme-dark .modal-card .modal-categories .cat.cat-tree-parent.is-parent-cat .cat-label {
+    color: #052e16;
+    font-weight: 900;
+  }
+
+  .sa-storefront.theme-dark .modal-card .modal-categories .cat.cat-tree-parent.is-parent-cat::before {
+    background: #065f46;
+    box-shadow: 0 0 0 2px rgba(6, 95, 70, 0.24);
+  }
+
+  .sa-storefront.theme-dark .modal-card .modal-categories .cat.cat-tree-parent.is-parent-cat .cat-chevron-btn {
+    background: rgba(5, 46, 22, 0.14);
+    border-color: rgba(5, 46, 22, 0.36);
+    color: #052e16;
+  }
+
+  .sa-storefront.theme-dark .modal-card .modal-categories .cat.cat-tree-parent.is-parent-cat.active,
+  .sa-storefront.theme-dark .modal-card .modal-categories .cat.cat-tree-parent.is-parent-cat.is-parent-active {
+    background: linear-gradient(135deg, #fde047 0%, #facc15 100%);
+    border: 2px solid #34d399;
+    color: #052e16;
+    box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.28), 0 8px 20px rgba(250, 204, 21, 0.32);
+  }
+
+  .sa-storefront.theme-dark .modal-card .modal-categories .cat.cat-tree-parent.is-parent-cat.active .cat-label,
+  .sa-storefront.theme-dark .modal-card .modal-categories .cat.cat-tree-parent.is-parent-cat.is-parent-active .cat-label {
+    color: #052e16;
+  }
+
+  .sa-storefront.theme-dark .modal-card .modal-categories .cat.cat-tree-parent.is-parent-cat.active::before {
+    background: #064e3b;
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.28);
+  }
 }
 </style>
 
@@ -23012,6 +25412,207 @@ const hasSale = computed(() =>
   background: var(--sa-chip-bg, #f1f5f9);
   border-color: var(--sa-border, #cbd5e1);
   color: var(--sa-heading, #334155);
+}
+
+/* ===== STATUS NOTICE SHOP MESSAGE & FINAL ORDER NOTICE MODAL ===== */
+.status-notice-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.status-shop-msg-box {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px dashed rgba(15, 23, 42, 0.16);
+  color: #0f172a;
+  font-size: 12.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.sa-storefront.theme-dark .status-shop-msg-box {
+  background: rgba(15, 23, 42, 0.45);
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #f8fafc;
+}
+
+.status-shop-msg-lbl {
+  margin-right: 4px;
+  font-weight: 800;
+}
+
+.ofn-overlay {
+  z-index: 99999;
+}
+
+.ofn-modal-card {
+  max-width: 430px;
+  width: 92vw;
+  border-radius: 22px;
+  padding: 26px 22px 22px;
+  background: var(--sa-surface, #ffffff);
+  color: var(--sa-heading, #0f172a);
+}
+
+.ofn-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.ofn-icon-badge {
+  width: 58px;
+  height: 58px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  margin-bottom: 12px;
+}
+
+.ofn-icon-badge.is-completed {
+  background: rgba(16, 185, 129, 0.14);
+  color: #10b981;
+}
+
+.ofn-icon-badge.is-cancelled {
+  background: rgba(239, 68, 68, 0.14);
+  color: #ef4444;
+}
+
+.ofn-icon-badge.is-message {
+  background: rgba(59, 130, 246, 0.14);
+  color: #2563eb;
+}
+
+.ofn-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--sa-heading, #0f172a);
+}
+
+.ofn-desc {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--sa-muted, #64748b);
+}
+
+.ofn-shop-msg {
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--sa-chip-bg, #f8fafc);
+  border: 1px solid var(--sa-border, #e2e8f0);
+  margin-bottom: 18px;
+}
+
+.ofn-modal-card.is-cancelled .ofn-shop-msg {
+  background: rgba(239, 68, 68, 0.06);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.ofn-modal-card.is-completed .ofn-shop-msg {
+  background: rgba(16, 185, 129, 0.07);
+  border-color: rgba(16, 185, 129, 0.28);
+}
+
+.ofn-shop-msg-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+  color: var(--sa-accent, #059669);
+}
+
+.ofn-modal-card.is-cancelled .ofn-shop-msg-head {
+  color: #ef4444;
+}
+
+.ofn-shop-msg-text {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--sa-heading, #0f172a);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ofn-actions-stack {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ofn-actions {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+}
+
+.ofn-btn {
+  flex: 1;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 800;
+  border: 1px solid transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition: transform 0.14s ease, opacity 0.14s ease;
+}
+
+.ofn-btn.is-contact {
+  width: 100%;
+  flex: none;
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.36);
+  color: #1d4ed8;
+}
+
+.sa-storefront.theme-dark .ofn-btn.is-contact {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(96, 165, 250, 0.45);
+  color: #93c5fd;
+}
+
+.ofn-contact-img {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.ofn-btn.is-secondary {
+  background: var(--sa-chip-bg, #f1f5f9);
+  border-color: var(--sa-border, #cbd5e1);
+  color: var(--sa-heading, #334155);
+}
+
+.ofn-btn.is-primary {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
 }
 </style>
 

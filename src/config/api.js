@@ -15,8 +15,10 @@ import {
   normalizeNccDiscountValue,
   calcOrderLineProfit,
 } from '../utils/nccDiscount'
+import { buildUniqueProductCode } from '../utils/productCode'
 
-export const IMGBB_KEY = 'b202a4bdc79bf1dc72f6f6ded6b74501'
+export const CLOUDINARY_CLOUD_NAME = 'dsmtq5rbh'
+export const CLOUDINARY_SIGN_ENDPOINT = '/api/cloudinary-sign'
 
 // Legacy constant kept empty/unused so any external import does not break
 export const API_URL = ''
@@ -38,11 +40,15 @@ export const SHEETS = [
   'time',
   'thong_tin_chuyen_khoan',
   'display_config',
+  'chiet_khau_doi_soat',
   'Login',
 ]
 
 export const DATA_SHEETS = SHEETS.filter(
-  (sName) => sName !== 'Login' && sName !== 'live_orders',
+  (sName) =>
+    sName !== 'Login' &&
+    sName !== 'live_orders' &&
+    sName !== 'chiet_khau_doi_soat',
 )
 
 export const STOREFRONT_SHEETS = [
@@ -472,6 +478,7 @@ async function handleHoanThanhDon(payload) {
           Ten_hang: s(i.Ten_hang),
           Main_img: s(i.Main_img),
           Mo_ta: s(i.Mo_ta),
+          Danh_muc_cha: s(i.Danh_muc_cha),
           Danh_muc: s(i.Danh_muc),
           Size: s(i.Size),
           Dvt: s(i.Dvt),
@@ -656,6 +663,7 @@ async function handleHoanThanhDon(payload) {
       s(baseLiveMeta.Host_id),
     )
     if (targetOrderStatus === 'Hoàn thành') {
+      const adminMessage = s(payload.Admin_message ?? hoa_don.Admin_message).trim()
       updates[`live_orders/${orderKey}`] = {
         meta: sanitizeRow({
           ...baseLiveMeta,
@@ -675,6 +683,8 @@ async function handleHoanThanhDon(payload) {
           Tong_tien_chiet_khau: n(hoa_don.Tong_tien_chiet_khau),
           Phi_ship: n(hoa_don.Phi_ship),
           Tong_cong: 0,
+          Admin_message: adminMessage,
+          ...(adminMessage ? { Admin_message_at: Date.now() } : {}),
           Synced_by_admin: true,
           Last_source: 'admin',
           Closed_at: Date.now(),
@@ -1681,6 +1691,27 @@ export async function updateLiveOrderMeta({
   return { success: true }
 }
 
+export async function sendAdminOrderMessage({ orderId, message } = {}) {
+  const cleanOrderId = s(orderId).trim()
+  const cleanMsg = s(message).trim()
+  if (!cleanOrderId) return { success: false, message: 'Thiếu mã đơn' }
+  if (!cleanMsg) return { success: false, message: 'Chưa nhập nội dung lời nhắn' }
+
+  const orderKey = safeFirebaseKey(cleanOrderId)
+  const orderSnap = await get(dbRef(db, `live_orders/${orderKey}`))
+  if (!orderSnap.exists()) {
+    return { success: false, message: 'Không tìm thấy phiên đơn web của khách' }
+  }
+
+  const now = Date.now()
+  await update(dbRef(db), {
+    [`live_orders/${orderKey}/meta/Admin_message`]: cleanMsg,
+    [`live_orders/${orderKey}/meta/Admin_message_at`]: now,
+    [`live_orders/${orderKey}/meta/Updated_at`]: now,
+  })
+  return { success: true, sentAt: now }
+}
+
 export async function restoreSubmittedLiveOrderDraft({ orderId } = {}) {
   const cleanOrderId = s(orderId).trim()
   if (!cleanOrderId) return { success: false, message: 'Thiếu mã đơn' }
@@ -1905,22 +1936,35 @@ export async function submitCustomerOrder(body = {}) {
 
   await update(dbRef(db), updates)
 
-  if (isNewOrderNotification) {
+  const updateChanges = isNewOrderNotification
+    ? []
+    : buildOrderUpdateSummaryForTelegram(
+        existingParsed?.submittedMeta || dhTarget?.row || null,
+        existingParsed?.submittedItemsList?.length
+          ? existingParsed.submittedItemsList
+          : existingParsed?.itemsList || [],
+        { tenKhach, sdt, diaChi, thoiGian, thanhToan, ghiChu },
+        resolvedList,
+      )
+
+  try {
     notifyNewOrderTelegram({
       orderId: cleanOrderId,
+      isUpdate: !isNewOrderNotification,
+      updateChanges,
       tenKhach,
       sdt,
       diaChi,
       thoiGian,
       hinhThucTT: thanhToan,
-      ghiChu: stripAutoPromoTagText(rawGhiChu),
+      ghiChu,
       khuyenMai: earnedPromoVi,
       tongCong,
       donViTienTe: currency,
       items: resolvedList,
       adminUrl: 'https://checkscam8888.vercel.app/admin',
     })
-  }
+  } catch {}
 
   return {
     success: true,
@@ -1928,6 +1972,84 @@ export async function submitCustomerOrder(body = {}) {
     status: 'Chờ duyệt',
     Tong_cong: tongCong,
   }
+}
+
+function buildOrderUpdateSummaryForTelegram(prevMeta, prevItems, nextMeta, nextItems) {
+  const changes = []
+  const prevList = Array.isArray(prevItems) ? prevItems : []
+  const nextList = Array.isArray(nextItems) ? nextItems : []
+  const prevMap = new Map()
+  for (const it of prevList) {
+    const key = safeFirebaseKey(it?.lineId || it?.Ma_hang || it?.Ten_hang)
+    if (key) prevMap.set(key, it)
+  }
+  const nextMap = new Map()
+  for (const it of nextList) {
+    const key = safeFirebaseKey(it?.lineId || it?.Ma_hang || it?.Ten_hang)
+    if (key) nextMap.set(key, it)
+  }
+
+  for (const [key, nextIt] of nextMap.entries()) {
+    const name = s(nextIt?.Ten_hang || nextIt?.Ma_hang || 'Món').trim()
+    const nextQty = n(nextIt?.So_luong, 0)
+    const prevIt = prevMap.get(key)
+    if (!prevIt) {
+      changes.push(`+ Thêm ${name} ×${nextQty}`)
+      continue
+    }
+    const prevQty = n(prevIt?.So_luong, 0)
+    if (nextQty !== prevQty) {
+      changes.push(`~ Đổi SL ${name}: ×${prevQty} → ×${nextQty}`)
+    }
+    if (s(nextIt?.Ghi_chu).trim() !== s(prevIt?.Ghi_chu).trim()) {
+      const nextNote = s(nextIt?.Ghi_chu).trim()
+      changes.push(nextNote ? `~ Ghi chú ${name}: ${nextNote}` : `~ Xóa ghi chú ${name}`)
+    }
+  }
+
+  for (const [key, prevIt] of prevMap.entries()) {
+    if (!nextMap.has(key)) {
+      const name = s(prevIt?.Ten_hang || prevIt?.Ma_hang || 'Món').trim()
+      const prevQty = n(prevIt?.So_luong, 0)
+      changes.push(`- Bỏ ${name} (trước ×${prevQty})`)
+    }
+  }
+
+  if (prevMeta && typeof prevMeta === 'object') {
+    const prevTen = s(prevMeta.Ten_khach_hang).trim()
+    const nextTen = s(nextMeta.tenKhach).trim()
+    if (nextTen !== prevTen && nextTen) {
+      changes.push(`~ Đổi tên khách: ${prevTen || '—'} → ${nextTen}`)
+    }
+    const prevSdt = s(prevMeta.So_dien_thoai).trim()
+    const nextSdt = s(nextMeta.sdt).trim()
+    if (nextSdt !== prevSdt) {
+      changes.push(`~ Đổi SĐT: ${prevSdt || '—'} → ${nextSdt || '—'}`)
+    }
+    const prevAddr = s(prevMeta.Dia_chi).trim()
+    const nextAddr = s(nextMeta.diaChi).trim()
+    if (nextAddr !== prevAddr) {
+      changes.push(`~ Đổi địa chỉ: ${prevAddr || '—'} → ${nextAddr || '—'}`)
+    }
+    const prevTime = s(prevMeta.Thoi_gian_nhan_hang).trim()
+    const nextTime = s(nextMeta.thoiGian).trim()
+    if (nextTime !== prevTime) {
+      changes.push(`~ Đổi giờ nhận: ${prevTime || '—'} → ${nextTime || '—'}`)
+    }
+    const prevPay = s(prevMeta.Hinh_thuc_thanh_toan).trim()
+    const nextPay = s(nextMeta.thanhToan).trim()
+    if (nextPay !== prevPay) {
+      const label = (v) => (v === 'CHUYEN_KHOAN' ? 'Chuyển khoản' : 'Tiền mặt')
+      changes.push(`~ Đổi thanh toán: ${label(prevPay)} → ${label(nextPay)}`)
+    }
+    const prevNote = stripAutoPromoTagText(prevMeta.Ghi_chu)
+    const nextNote = s(nextMeta.ghiChu).trim()
+    if (nextNote !== prevNote) {
+      changes.push(nextNote ? `~ Đổi ghi chú đơn: ${nextNote}` : '~ Xóa ghi chú đơn')
+    }
+  }
+
+  return changes
 }
 
 function notifyNewOrderTelegram(payload) {
@@ -2770,12 +2892,15 @@ async function hoanThanhTrangThaiDon(payload) {
   // Close live order session & wipe items so revisiting old link never shows leftover dishes
   if (liveSnap.exists()) {
     const curVal = liveSnap.val() || {}
+    const adminMessage = s(payload.Admin_message).trim()
     updates[`live_orders/${orderKey}`] = {
       meta: sanitizeRow({
         ...(curVal.meta || {}),
         Ma_hoa_don: maHoaDon,
         Trang_thai: 'Hoàn thành',
         Tong_cong: 0,
+        Admin_message: adminMessage,
+        ...(adminMessage ? { Admin_message_at: Date.now() } : {}),
         Closed_at: Date.now(),
         Updated_at: Date.now(),
       }),
@@ -2864,12 +2989,15 @@ async function huyDonHang(body) {
   // Close live order session & wipe items so revisiting old link never shows leftover dishes
   if (liveSnap.exists()) {
     const curVal = liveSnap.val() || {}
+    const adminMessage = s(body.Admin_message).trim()
     updates[`live_orders/${orderKey}`] = {
       meta: sanitizeRow({
         ...(curVal.meta || {}),
         Ma_hoa_don: maHoaDon,
         Trang_thai: 'Đã hủy',
         Tong_cong: 0,
+        Admin_message: adminMessage,
+        ...(adminMessage ? { Admin_message_at: Date.now() } : {}),
         Closed_at: Date.now(),
         Updated_at: Date.now(),
       }),
@@ -2902,6 +3030,7 @@ function mergeProductI18n(existingRow, incomingItem) {
   for (const code of DATA_LANG_CODES) {
     merged[code] = {
       Ten_hang: incI18n[code].Ten_hang || curI18n[code].Ten_hang || '',
+      Danh_muc_cha: incI18n[code].Danh_muc_cha || curI18n[code].Danh_muc_cha || '',
       Danh_muc: incI18n[code].Danh_muc || curI18n[code].Danh_muc || '',
       Dvt: incI18n[code].Dvt || curI18n[code].Dvt || '',
       Mo_ta: incI18n[code].Mo_ta || curI18n[code].Mo_ta || '',
@@ -2925,17 +3054,25 @@ async function nhapHangHoa(body) {
   let skipped = 0
 
   for (const item of items) {
-    if (!item.Ma_hang) {
-      skipped++
-      continue
+    let candidateMaHang = s(item.Ma_hang)
+    if (!candidateMaHang) {
+      if (!s(item.Ten_hang)) {
+        skipped++
+        continue
+      }
+      const existingMaList = entries.map((e) => s(e.row.Ma_hang)).filter(Boolean)
+      candidateMaHang = buildUniqueProductCode(s(item.Ten_hang), existingMaList)
     }
 
-    const existing = entries.find((e) => s(e.row.Ma_hang) === s(item.Ma_hang))
+    const existing = item._forceCreateNew
+      ? null
+      : entries.find((e) => s(e.row.Ma_hang) === s(candidateMaHang))
 
     if (existing) {
       const mergedI18n = mergeProductI18n(existing.row, item)
       existing.row.i18n = mergedI18n
       existing.row.Ten_hang = mergedI18n.vi.Ten_hang || s(existing.row.Ten_hang)
+      existing.row.Danh_muc_cha = mergedI18n.vi.Danh_muc_cha || s(existing.row.Danh_muc_cha)
       existing.row.Danh_muc = mergedI18n.vi.Danh_muc || s(existing.row.Danh_muc)
       existing.row.Dvt = mergedI18n.vi.Dvt || s(existing.row.Dvt)
       existing.row.Mo_ta = mergedI18n.vi.Mo_ta || s(existing.row.Mo_ta)
@@ -2991,7 +3128,7 @@ async function nhapHangHoa(body) {
     }
 
     const existingMaList = entries.map((e) => s(e.row.Ma_hang)).filter(Boolean)
-    const finalMaHang = genUniqueMaHang(s(item.Ma_hang), existingMaList)
+    const finalMaHang = genUniqueMaHang(candidateMaHang, existingMaList)
     const trangThaiMoi = s(item.Trang_thai) === 'Hết hàng' ? 'Hết hàng' : 'Còn hàng'
 
     const newKey = createRowKey()
@@ -3000,6 +3137,7 @@ async function nhapHangHoa(body) {
       Ten_hang: s(item.Ten_hang),
       Main_img: s(item.Main_img),
       Mo_ta: s(item.Mo_ta),
+      Danh_muc_cha: s(item.Danh_muc_cha),
       Danh_muc: s(item.Danh_muc),
       Size: s(item.Size),
       Dvt: s(item.Dvt),
@@ -3018,18 +3156,22 @@ async function nhapHangHoa(body) {
       img_6: s(item.img_6),
       i18n: item.i18n,
       Ten_hang_en: item.Ten_hang_en,
+      Danh_muc_cha_en: item.Danh_muc_cha_en,
       Danh_muc_en: item.Danh_muc_en,
       Dvt_en: item.Dvt_en,
       Mo_ta_en: item.Mo_ta_en,
       'Ten_hang_zh-CN': item['Ten_hang_zh-CN'] || item.Ten_hang_zh,
+      'Danh_muc_cha_zh-CN': item['Danh_muc_cha_zh-CN'] || item.Danh_muc_cha_zh,
       'Danh_muc_zh-CN': item['Danh_muc_zh-CN'] || item.Danh_muc_zh,
       'Dvt_zh-CN': item['Dvt_zh-CN'] || item.Dvt_zh,
       'Mo_ta_zh-CN': item['Mo_ta_zh-CN'] || item.Mo_ta_zh,
       Ten_hang_fil: item.Ten_hang_fil,
+      Danh_muc_cha_fil: item.Danh_muc_cha_fil,
       Danh_muc_fil: item.Danh_muc_fil,
       Dvt_fil: item.Dvt_fil,
       Mo_ta_fil: item.Mo_ta_fil,
       Ten_hang_ko: item.Ten_hang_ko,
+      Danh_muc_cha_ko: item.Danh_muc_cha_ko,
       Danh_muc_ko: item.Danh_muc_ko,
       Dvt_ko: item.Dvt_ko,
       Mo_ta_ko: item.Mo_ta_ko,
@@ -3130,12 +3272,13 @@ async function updateHangHoa(item) {
     const nextI18n = normalizeProductI18n(item)
     target.row.i18n = nextI18n
     target.row.Ten_hang = nextI18n.vi.Ten_hang || s(target.row.Ten_hang)
+    target.row.Danh_muc_cha = nextI18n.vi.Danh_muc_cha || ''
     target.row.Danh_muc = nextI18n.vi.Danh_muc || ''
     target.row.Dvt = nextI18n.vi.Dvt || ''
     target.row.Mo_ta = nextI18n.vi.Mo_ta || ''
   } else {
     // Keep i18n.vi in sync when top-level text fields are edited directly (e.g. bulk edit)
-    for (const f of ['Ten_hang', 'Danh_muc', 'Dvt', 'Mo_ta']) {
+    for (const f of ['Ten_hang', 'Danh_muc_cha', 'Danh_muc', 'Dvt', 'Mo_ta']) {
       if (item[f] !== undefined) {
         currentI18n.vi[f] = s(item[f]).trim()
       }
@@ -3218,6 +3361,11 @@ async function bulkUpdateHangHoa(body = {}) {
     const row = { ...entry.row }
     const nextI18n = normalizeProductI18n(row)
 
+    if (patch.Danh_muc_cha !== undefined) {
+      const dmc = s(patch.Danh_muc_cha).trim()
+      nextI18n[lang].Danh_muc_cha = dmc
+      if (lang === 'vi') row.Danh_muc_cha = dmc
+    }
     if (patch.Danh_muc !== undefined) {
       const dm = s(patch.Danh_muc).trim()
       nextI18n[lang].Danh_muc = dm
@@ -3384,6 +3532,64 @@ async function reorderHangHoa(body = {}) {
   return { success: true, updated }
 }
 
+function normalizeParentMapInput(rawMap) {
+  if (!rawMap || typeof rawMap !== 'object') return {}
+  const out = {}
+  for (const [subKey, parentVal] of Object.entries(rawMap)) {
+    const cleanSub = s(subKey).trim()
+    const cleanParent = s(parentVal).trim()
+    if (!cleanSub || !cleanParent || cleanSub === cleanParent) continue
+    out[cleanSub] = cleanParent
+  }
+  return out
+}
+
+function normalizeParentI18nInput(rawI18n) {
+  if (!rawI18n || typeof rawI18n !== 'object') return {}
+  const out = {}
+  for (const [parentKey, langObj] of Object.entries(rawI18n)) {
+    const cleanParent = s(parentKey).trim()
+    if (!cleanParent || !langObj || typeof langObj !== 'object') continue
+    const cleanLangs = { vi: cleanParent }
+    for (const code of DATA_LANG_CODES) {
+      if (code === 'vi') continue
+      const val = s(langObj[code]).trim()
+      if (val) cleanLangs[code] = val
+    }
+    out[cleanParent] = cleanLangs
+  }
+  return out
+}
+
+function normalizeProductGroupsInput(rawGroups) {
+  if (!Array.isArray(rawGroups)) return []
+  const out = []
+  const seenGroupIds = new Set()
+  for (const raw of rawGroups) {
+    if (!raw || typeof raw !== 'object') continue
+    const items = Array.isArray(raw.items) ? raw.items : []
+    const cleanItems = []
+    const seenCodes = new Set()
+    for (const it of items) {
+      const maHang = s(typeof it === 'string' ? it : it?.maHang).trim()
+      if (!maHang || seenCodes.has(maHang)) continue
+      seenCodes.add(maHang)
+      const shortLabel = s(typeof it === 'object' ? it?.shortLabel : '').trim()
+      cleanItems.push({ maHang, shortLabel })
+    }
+    if (cleanItems.length < 2) continue
+    let id = s(raw.id).trim() || `pg_${out.length + 1}`
+    if (seenGroupIds.has(id)) id = `${id}_${out.length + 1}`
+    seenGroupIds.add(id)
+    out.push({
+      id,
+      name: s(raw.name).trim(),
+      items: cleanItems,
+    })
+  }
+  return out
+}
+
 async function saveDisplayConfig(body = {}) {
   const d = body.data || {}
   const existingEntries = await readSheetEntries('display_config')
@@ -3395,6 +3601,21 @@ async function saveDisplayConfig(body = {}) {
     : Array.isArray(existingRow.categoryOrder)
       ? existingRow.categoryOrder
       : []
+
+  const hasParentMapUpdate = d.parentMap !== undefined
+  const nextParentMap = hasParentMapUpdate
+    ? normalizeParentMapInput(d.parentMap)
+    : normalizeParentMapInput(existingRow.parentMap)
+
+  const nextParentI18n =
+    d.parentI18n !== undefined
+      ? normalizeParentI18nInput(d.parentI18n)
+      : normalizeParentI18nInput(existingRow.parentI18n)
+
+  const nextProductGroups =
+    d.productGroups !== undefined
+      ? normalizeProductGroupsInput(d.productGroups)
+      : normalizeProductGroupsInput(existingRow.productGroups)
 
   const nextProductSortMode =
     d.productSortMode !== undefined
@@ -3408,6 +3629,9 @@ async function saveDisplayConfig(body = {}) {
   const payload = sanitizeRow({
     ID: 'main',
     categoryOrder: nextCategoryOrder,
+    parentMap: nextParentMap,
+    parentI18n: nextParentI18n,
+    productGroups: nextProductGroups,
     productSortMode: nextProductSortMode,
     updatedAt: Date.now(),
   })
@@ -3417,6 +3641,66 @@ async function saveDisplayConfig(body = {}) {
     if (e.key !== 'main') updates[`display_config/${e.key}`] = null
   }
   updates['display_config/main'] = payload
+
+  // Sync Danh_muc_cha onto hang_hoa products when category hierarchy is saved
+  if (hasParentMapUpdate) {
+    const hhEntries = await readSheetEntries('hang_hoa')
+    // Harvest existing translations per canonical parent name as fallback
+    const harvestedParentLangs = {}
+    for (const e of hhEntries) {
+      const i18n = normalizeProductI18n(e.row)
+      const pVi = s(i18n.vi?.Danh_muc_cha || e.row?.Danh_muc_cha).trim()
+      if (!pVi) continue
+      if (!harvestedParentLangs[pVi]) harvestedParentLangs[pVi] = { vi: pVi }
+      for (const code of DATA_LANG_CODES) {
+        if (code === 'vi') continue
+        const val = s(i18n[code]?.Danh_muc_cha).trim()
+        if (val && !harvestedParentLangs[pVi][code]) {
+          harvestedParentLangs[pVi][code] = val
+        }
+      }
+    }
+
+    for (const e of hhEntries) {
+      const curRow = e.row || {}
+      const curI18n = normalizeProductI18n(curRow)
+      const subVi = s(curI18n.vi?.Danh_muc || curRow.Danh_muc).trim()
+      if (!subVi) continue
+
+      const targetParentVi = nextParentMap[subVi] || ''
+      const curParentVi = s(curI18n.vi?.Danh_muc_cha || curRow.Danh_muc_cha).trim()
+      const langDefaults = targetParentVi
+        ? nextParentI18n[targetParentVi] || harvestedParentLangs[targetParentVi] || { vi: targetParentVi }
+        : null
+
+      let changed = curParentVi !== targetParentVi
+      const nextI18n = { ...curI18n }
+      for (const code of DATA_LANG_CODES) {
+        const prevLangParent = s(curI18n[code]?.Danh_muc_cha).trim()
+        const nextLangParent = targetParentVi
+          ? s(langDefaults?.[code] || (code === 'vi' ? targetParentVi : prevLangParent || targetParentVi)).trim()
+          : ''
+        if (prevLangParent !== nextLangParent) {
+          changed = true
+          nextI18n[code] = {
+            ...(curI18n[code] || {}),
+            Danh_muc_cha: nextLangParent,
+          }
+        }
+      }
+
+      if (changed) {
+        updates[`hang_hoa/${e.key}`] = sanitizeRow(
+          syncProductWithI18n({
+            ...curRow,
+            Danh_muc_cha: targetParentVi,
+            i18n: nextI18n,
+          }),
+        )
+      }
+    }
+  }
+
   await update(dbRef(db), updates)
 
   return { success: true, data: payload }
@@ -4191,6 +4475,38 @@ const ACTION_HANDLERS = {
   addThongTinChuyenKhoan,
   updateThongTinChuyenKhoan,
   deleteThongTinChuyenKhoan,
+}
+
+export async function saveDiscountSettlementPeriod(payload = {}) {
+  const rawId = s(payload.id).trim() || `CK_${Date.now()}_${genShortId()}`
+  const nodeKey = safeFirebaseKey(rawId)
+  const now = Date.now()
+
+  const record = sanitizeRow({
+    id: rawId,
+    sheetName: s(payload.sheetName).trim() || 'Doi_soat',
+    fromDate: s(payload.fromDate).trim(),
+    toDate: s(payload.toDate).trim(),
+    exchangeRate: n(payload.exchangeRate, 425),
+    groupMode: s(payload.groupMode).trim() === 'by_member' ? 'by_member' : 'grouped',
+    tienThuHoMode: s(payload.tienThuHoMode).trim() || 'sell_minus_cost',
+    excelLayoutMode: s(payload.excelLayoutMode).trim() || 'row_formula',
+    rows: Array.isArray(payload.rows) ? payload.rows : [],
+    summary: payload.summary && typeof payload.summary === 'object' ? payload.summary : {},
+    createdAt: n(payload.createdAt, now),
+    updatedAt: now,
+  })
+
+  await set(dbRef(db, `chiet_khau_doi_soat/${nodeKey}`), record)
+  return { success: true, id: rawId, data: record }
+}
+
+export async function deleteDiscountSettlementPeriod(periodId) {
+  const cleanId = s(periodId).trim()
+  if (!cleanId) return { success: false, message: 'Thiếu ID kỳ đối soát' }
+  const nodeKey = safeFirebaseKey(cleanId)
+  await remove(dbRef(db, `chiet_khau_doi_soat/${nodeKey}`))
+  return { success: true, id: cleanId }
 }
 
 export async function dispatchAction(body = {}) {

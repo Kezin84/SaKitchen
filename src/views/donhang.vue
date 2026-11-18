@@ -1093,12 +1093,53 @@
 
     <!-- CUSTOM CONFIRM MODAL -->
     <div v-if="confirmModal.show" class="confirm-overlay" @click.self="closeConfirm">
-      <div class="confirm-box">
+      <div class="confirm-box" :class="{ 'has-msg-box': confirmModalHasMessageBox }">
         <div class="confirm-icon" :class="confirmModal.type.includes('cancel') ? 'danger' : 'success'">
           <i class="app-ico ri-question-mark"></i>
         </div>
         <div class="confirm-title">{{ confirmModal.title }}</div>
         <div class="confirm-desc">{{ confirmModal.message }}</div>
+
+        <div v-if="confirmModalHasMessageBox" class="confirm-msg-wrap">
+          <div class="confirm-msg-head">
+            <span class="confirm-msg-label">
+              <i class="ri-notification-3-line"></i>
+              Gửi thông báo tới khách của đơn (tùy chọn)
+            </span>
+            <button
+              v-if="confirmModal.messageInput"
+              type="button"
+              class="confirm-msg-clear"
+              @click="confirmModal.messageInput = ''"
+            >
+              Xóa
+            </button>
+          </div>
+          <div class="confirm-msg-chips">
+            <button
+              v-for="preset in confirmMessagePresets"
+              :key="preset"
+              type="button"
+              class="confirm-msg-chip"
+              :class="{ active: confirmModal.messageInput.trim() === preset }"
+              @click="confirmModal.messageInput = preset"
+            >
+              {{ preset }}
+            </button>
+          </div>
+          <textarea
+            v-model="confirmModal.messageInput"
+            class="confirm-msg-input"
+            rows="3"
+            maxlength="400"
+            :placeholder="
+              confirmModal.type.includes('cancel')
+                ? 'VD: Xin lỗi quý khách, quán đã hết món hoặc đang quá tải...'
+                : 'VD: Cảm ơn quý khách! Hôm nay quán có ưu đãi...'
+            "
+          ></textarea>
+        </div>
+
         <div class="confirm-actions">
           <button class="c-btn c-cancel" @click="closeConfirm">Hủy bỏ</button>
           <button 
@@ -1219,7 +1260,29 @@ const confirmModal = ref({
   title: '',
   message: '',
   data: null,
+  messageInput: '',
+  closeDetailOnSuccess: false,
 })
+
+const CONFIRM_COMPLETE_PRESETS = [
+  'Cảm ơn quý khách đã ủng hộ quán!',
+  'Đơn đã hoàn thành, chúc bạn ngon miệng!',
+  'Quán đang có ưu đãi mới, mời bạn ghé xem menu nhé!',
+]
+
+const CONFIRM_CANCEL_PRESETS = [
+  'Xin lỗi quý khách, quán hiện đã hết món.',
+  'Quán đang quá tải, mong quý khách thông cảm.',
+  'Ngoài khu vực giao hàng hoặc chưa liên hệ được khách.',
+]
+
+const confirmModalHasMessageBox = computed(() =>
+  ['complete', 'cancel', 'bulk-complete', 'bulk-cancel'].includes(confirmModal.value.type),
+)
+
+const confirmMessagePresets = computed(() =>
+  confirmModal.value.type.includes('cancel') ? CONFIRM_CANCEL_PRESETS : CONFIRM_COMPLETE_PRESETS,
+)
 
 // RESULT MODAL STATE
 const resultModal = ref({
@@ -2389,8 +2452,16 @@ function resetFilter() {
   currentPage.value = 1
 }
 
-function openConfirm(type, data, title, message) {
-  confirmModal.value = { show: true, type, data, title, message }
+function openConfirm(type, data, title, message, opts = {}) {
+  confirmModal.value = {
+    show: true,
+    type,
+    data,
+    title,
+    message,
+    messageInput: String(opts.defaultMessage || ''),
+    closeDetailOnSuccess: Boolean(opts.closeDetailOnSuccess),
+  }
 }
 
 function closeConfirm() {
@@ -2406,7 +2477,8 @@ function closeResult() {
 }
 
 async function handleConfirm() {
-  const { type, data } = confirmModal.value
+  const { type, data, messageInput, closeDetailOnSuccess } = confirmModal.value
+  const adminMessage = String(messageInput || '').trim()
   closeConfirm()
 
   if (type === 'approve') {
@@ -2414,17 +2486,29 @@ async function handleConfirm() {
   } else if (type === 'ship') {
     await shipDonHangAction(data, { skipConfirm: true })
   } else if (type === 'complete') {
-    await hoanThanhDonHang(data, { skipConfirm: true })
+    if (closeDetailOnSuccess) modalLoadingAction.value = 'complete'
+    try {
+      const ok = await hoanThanhDonHang(data, { skipConfirm: true, adminMessage })
+      if (ok && closeDetailOnSuccess) showModal.value = false
+    } finally {
+      if (closeDetailOnSuccess) modalLoadingAction.value = ''
+    }
   } else if (type === 'cancel') {
-    await huyDonHang(data, { skipConfirm: true })
+    if (closeDetailOnSuccess) modalLoadingAction.value = 'cancel'
+    try {
+      const ok = await huyDonHang(data, { skipConfirm: true, adminMessage })
+      if (ok && closeDetailOnSuccess) showModal.value = false
+    } finally {
+      if (closeDetailOnSuccess) modalLoadingAction.value = ''
+    }
   } else if (type === 'bulk-approve') {
     await runBulkApprove(data)
   } else if (type === 'bulk-ship') {
     await runBulkShip(data)
   } else if (type === 'bulk-complete') {
-    await runBulkComplete(data)
+    await runBulkComplete(data, adminMessage)
   } else if (type === 'bulk-cancel') {
-    await runBulkCancel(data)
+    await runBulkCancel(data, adminMessage)
   }
 }
 
@@ -2602,6 +2686,7 @@ async function hoanThanhDonHang(dh, opts = {}) {
     const res = await dispatchAction({
       action: 'hoanThanhTrangThaiDon',
       Ma_hoa_don: dh.Ma_hoa_don,
+      Admin_message: String(opts.adminMessage || '').trim(),
     })
 
     if (res.success) {
@@ -2656,6 +2741,7 @@ async function huyDonHang(dh, opts = {}) {
     const res = await dispatchAction({
       action: 'huyDonHang',
       Ma_hoa_don: dh.Ma_hoa_don,
+      Admin_message: String(opts.adminMessage || '').trim(),
     })
 
     if (res.success) {
@@ -2687,15 +2773,15 @@ async function huyDonHang(dh, opts = {}) {
   }
 }
 
-async function onModalCancel() {
+function onModalCancel() {
   if (!activeOrder.value) return
-  modalLoadingAction.value = 'cancel'
-  try {
-    const ok = await huyDonHang(activeOrder.value, { skipConfirm: true })
-    if (ok) showModal.value = false
-  } finally {
-    modalLoadingAction.value = ''
-  }
+  openConfirm(
+    'cancel',
+    activeOrder.value,
+    'Xác nhận HỦY đơn?',
+    `Đơn hàng #${activeOrder.value.Ma_hoa_don} sẽ bị hủy và đóng link giỏ hàng của khách. Hành động này không thể hoàn tác!`,
+    { closeDetailOnSuccess: true },
+  )
 }
 
 async function onModalApprove() {
@@ -2720,15 +2806,15 @@ async function onModalShip() {
   }
 }
 
-async function onModalComplete() {
+function onModalComplete() {
   if (!activeOrder.value) return
-  modalLoadingAction.value = 'complete'
-  try {
-    const ok = await hoanThanhDonHang(activeOrder.value, { skipConfirm: true })
-    if (ok) showModal.value = false
-  } finally {
-    modalLoadingAction.value = ''
-  }
+  openConfirm(
+    'complete',
+    activeOrder.value,
+    'Xác nhận hoàn thành?',
+    `Bạn có chắc chắn muốn hoàn thành đơn hàng #${activeOrder.value.Ma_hoa_don}? (Giỏ live của khách sẽ được đóng sạch)`,
+    { closeDetailOnSuccess: true },
+  )
 }
 
 async function onCardCancel(dh) {
@@ -2952,7 +3038,7 @@ async function bulkComplete() {
   )
 }
 
-async function runBulkComplete(orders) {
+async function runBulkComplete(orders, adminMessage = '') {
   bulkLoading.value = true
   bulkAction.value = 'complete'
   bulkProgress.value = { done: 0, total: orders.length }
@@ -2961,7 +3047,7 @@ async function runBulkComplete(orders) {
     for (const dh of orders) {
       loadingId.value = dh.Ma_hoa_don
       cardLoadingAction.value = 'complete'
-      await hoanThanhDonHang(dh, { skipConfirm: true, silent: true })
+      await hoanThanhDonHang(dh, { skipConfirm: true, silent: true, adminMessage })
       bulkProgress.value.done++
       loadingId.value = null
       cardLoadingAction.value = ''
@@ -2994,7 +3080,7 @@ async function bulkCancel() {
   )
 }
 
-async function runBulkCancel(orders) {
+async function runBulkCancel(orders, adminMessage = '') {
   bulkLoading.value = true
   bulkAction.value = 'cancel'
   bulkProgress.value = { done: 0, total: orders.length }
@@ -3003,7 +3089,7 @@ async function runBulkCancel(orders) {
     for (const dh of orders) {
       loadingId.value = dh.Ma_hoa_don
       cardLoadingAction.value = 'cancel'
-      await huyDonHang(dh, { skipConfirm: true, silent: true })
+      await huyDonHang(dh, { skipConfirm: true, silent: true, adminMessage })
       bulkProgress.value.done++
       loadingId.value = null
       cardLoadingAction.value = ''
@@ -4949,6 +5035,106 @@ watch(
   align-items: center;
   gap: 16px;
   animation: zoomIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.confirm-box.has-msg-box {
+  max-width: 460px;
+  padding: 26px 24px;
+}
+
+.confirm-msg-wrap {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.confirm-msg-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.confirm-msg-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.confirm-msg-label i {
+  color: #34d399;
+}
+
+.confirm-msg-clear {
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.confirm-msg-clear:hover {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.confirm-msg-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.confirm-msg-chip {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.45);
+  color: #cbd5e1;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.16s ease;
+}
+.confirm-msg-chip:hover {
+  border-color: rgba(52, 211, 153, 0.55);
+  color: #f8fafc;
+}
+.confirm-msg-chip.active {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: #10b981;
+  color: #6ee7b7;
+}
+
+.confirm-msg-input {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.65);
+  color: #f8fafc;
+  padding: 10px 12px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  resize: vertical;
+  min-height: 76px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.confirm-msg-input::placeholder {
+  color: #64748b;
+}
+.confirm-msg-input:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.16);
 }
 
 .confirm-icon {

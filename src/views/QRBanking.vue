@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { getOneSheet, dispatchAction } from '@/config/api'
-import { uploadImageToImgBB } from '@/utils/imageUpload.js'
+import { uploadImageToCloudinary } from '@/utils/imageUpload.js'
 /* ================= CONFIG ================= */
 
 
@@ -82,11 +82,12 @@ function genId() {
   )
 }
 
-async function uploadImgBB(file) {
-  return uploadImageToImgBB(file, {
+async function uploadQrImage(file) {
+  return uploadImageToCloudinary(file, {
     targetKB: 100,
     maxWidth: 1000,
     maxHeight: 1000,
+    folder: 'sakitchen/qr-banking',
   })
 }
 
@@ -126,7 +127,7 @@ async function addQR() {
 
   loading.value = true
   try {
-    const url = await uploadImgBB(file.value)
+    const url = await uploadQrImage(file.value)
 
     await dispatchAction({
       action: 'addThongTinChuyenKhoan',
@@ -173,7 +174,7 @@ async function saveEdit() {
   try {
     let url = editing.value.QR_IMG
     if (file.value) {
-      url = await uploadImgBB(file.value)
+      url = await uploadQrImage(file.value)
     }
 
     await dispatchAction({

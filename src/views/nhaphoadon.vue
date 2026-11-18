@@ -20,8 +20,21 @@
         class="mobile-entry-backdrop"
         @click="showMobileEntryMenu = false"
       ></div>
-      <div v-if="isMobile" class="mobile-tabs-header">
-        <div class="m-tab-item-wrapper" style="position: relative; flex: 1;">
+      <div v-if="isMobile" class="mobile-tabs-header" :class="{ 'is-dock-down': isAdminDockHidden }">
+        <button
+          class="m-tab-item"
+          :class="{ active: activeMobileTab === 'tabs' }"
+          @click="setMobileTab('tabs')"
+        >
+          <i class="ri-stack-line"></i>
+          <span class="m-tab-label">Tab</span>
+          <span
+            v-if="totalBellNotificationCount > 0 || invoiceTabs.length > 1"
+            class="m-badge"
+            :class="{ 'is-count': totalBellNotificationCount === 0 }"
+          >{{ totalBellNotificationCount > 0 ? totalBellNotificationCount : invoiceTabs.length }}</span>
+        </button>
+        <div class="m-tab-item-wrapper" style="position: relative; flex: 1; min-width: 0;">
           <button 
             class="m-tab-item" 
             :class="{ active: activeMobileTab === 'entry' }"
@@ -885,7 +898,7 @@
         <span class="pc-resizer-grip"></span>
       </div>
 
-      <div class="center-stack" v-show="!isMobile || activeMobileTab === 'order'">
+      <div class="center-stack" v-show="!isMobile || activeMobileTab === 'order' || activeMobileTab === 'tabs'">
         <button
           v-if="!isMobile && pcCollapsed.center"
           type="button"
@@ -898,12 +911,13 @@
           <span v-if="totalItemQty > 0" class="pc-rail-badge">{{ totalItemQty }}</span>
         </button>
 
-        <!-- MULTI-ORDER TABS RAIL (PC: CỘT DỌC GIỮA KHO HÀNG & BẢNG ĐƠN | MOBILE: THANH NGANG) -->
+        <!-- MULTI-ORDER TABS RAIL (PC: CỘT DỌC GIỮA KHO HÀNG & BẢNG ĐƠN | MOBILE: TAB CHỌN ĐƠN RIÊNG) -->
         <div
-          v-show="isMobile ? activeMobileTab === 'order' : !pcCollapsed.center"
+          v-show="isMobile ? activeMobileTab === 'tabs' : !pcCollapsed.center"
           class="invoice-tabs-bar"
           :class="{
             'is-pc-vertical': !isMobile,
+            'is-mobile-tabs-panel': isMobile,
             'is-rail-collapsed': !isMobile && pcTabRailCollapsed,
           }"
           :style="!isMobile && !pcTabRailCollapsed && pcColWidths.tabRail ? { width: pcColWidths.tabRail + 'px' } : undefined"
@@ -991,7 +1005,7 @@
                 getTabLiveStatus(entry.tab) ? getTabStatusClass(getTabLiveStatus(entry.tab)) : '',
               ]"
               :title="getTabDisplayTitle(entry.tab, entry.idx)"
-              @click="switchInvoiceTab(entry.tab.id)"
+              @click="handleInvoiceTabSelect(entry.tab.id)"
             >
               <span v-if="!isMobile && pcTabRailCollapsed" class="itp-compact-idx">
                 {{ entry.idx + 1 }}
@@ -1056,6 +1070,10 @@
             </button>
           </div>
           <div class="itb-actions">
+            <span v-if="isMobile" class="itb-mobile-title">
+              <i class="ri-stack-line"></i>
+              <span>Tab đơn hàng ({{ invoiceTabs.length }})</span>
+            </span>
             <button
               v-if="!isMobile"
               type="button"
@@ -2101,49 +2119,7 @@
           >
             <div class="payment-scroll">
               <div class="summary-stack">
-                <!-- CARD 1: TÓM TẮT ĐƠN -->
-                <div class="box summary-card summary-card--order">
-                  <h3 class="card-title">
-                    <span class="pc-card-title-left"><i class="ri-receipt-line"></i> TÓM TẮT ĐƠN</span>
-                  </h3>
-
-                  <div class="sum-grid">
-                    <div class="sum-row">
-                      <span class="sum-label">Hàng tạm tính</span>
-                      <span class="sum-value font-mono sum-val-base">{{ formatWithCurrency(tamTinh, donViTienTeChung) }}</span>
-                    </div>
-                    
-                    <div class="sum-row" :class="{ 'has-value': tongGiamGia > 0 }">
-                      <span class="sum-label">Giảm giá</span>
-                      <div class="sum-right-group">
-                        <button class="btn-limit-red" @click="openDiscountModal('money')">Giảm thêm</button>
-                        <span class="sum-value font-mono sum-val-disc">-{{ formatWithCurrency(tongGiamGia, donViTienTeChung) }}</span>
-                      </div>
-                    </div>
-                    
-                    <div class="sum-row" :class="{ 'has-value': tongTienChietKhau > 0 }">
-                      <span class="sum-label">Chiết khấu</span>
-                      <div class="sum-right-group">
-                        <button class="btn-limit-red" @click="openDiscountModal('percent')">Giảm thêm</button>
-                        <span class="sum-value font-mono sum-val-disc">-{{ formatWithCurrency(tongTienChietKhau, donViTienTeChung) }}</span>
-                      </div>
-                    </div>
-
-                    <div class="sum-divider"></div>
-
-                    <div class="sum-row">
-                      <span class="sum-label" style="font-weight: 700; color: #e2e8f0;">Tiền hàng (sau giảm)</span>
-                      <span class="sum-value font-mono" style="color: #86efac; font-weight: 800;">{{ formatWithCurrency(tongCong, donViTienTeChung) }}</span>
-                    </div>
-
-                    <div class="sum-row sub-info">
-                      <span class="sum-label">Lợi nhuận dự kiến</span>
-                      <span class="sum-value font-mono sum-val-profit">+{{ formatWithCurrency(tongLoiNhuan, donViTienTeChung) }}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- CARD 2: THANH TOÁN -->
+                <!-- CARD 1: THANH TOÁN -->
                 <div class="box summary-card summary-card--payment">
                   <h3 class="card-title">
                     <span class="pc-card-title-left"><i class="ri-wallet-line"></i> THANH TOÁN</span>
@@ -2226,33 +2202,65 @@
                       <i class="ri-information-line"></i>
                       <span>Chỉ cộng khi xuất bill (Giá bán) &amp; hiển thị đơn web</span>
                     </div>
+                  </div>
+                </div>
 
-                    <template v-if="isMobile">
-                      <div class="sum-divider"></div>
+                <!-- CARD 2: TÓM TẮT ĐƠN -->
+                <div class="box summary-card summary-card--order">
+                  <h3 class="card-title">
+                    <span class="pc-card-title-left"><i class="ri-receipt-line"></i> TÓM TẮT ĐƠN</span>
+                  </h3>
 
-                      <template v-if="normalizedPhiShip > 0">
-                        <div class="sum-row">
-                          <span class="sum-label">Tiền hàng</span>
-                          <span class="sum-value font-mono">{{ formatWithCurrency(tongCong, donViTienTeChung) }}</span>
-                        </div>
-                        <div class="sum-row">
-                          <span class="sum-label" style="color: #38bdf8;">Tiền ship</span>
-                          <span class="sum-value font-mono" style="color: #38bdf8;">+{{ formatWithCurrency(normalizedPhiShip, donViTienTeChung) }}</span>
-                        </div>
-                      </template>
-
-                      <!-- Tổng cộng -->
-                      <div class="sum-row total-row">
-                        <span class="sum-label total-label">TỔNG CỘNG</span>
-                        <span class="sum-value total-value text-primary font-mono">{{ formatWithCurrency(tongCong + normalizedPhiShip, donViTienTeChung) }}</span>
+                  <div class="sum-grid">
+                    <div class="sum-row">
+                      <span class="sum-label">Hàng tạm tính</span>
+                      <span class="sum-value font-mono sum-val-base">{{ formatWithCurrency(tamTinh, donViTienTeChung) }}</span>
+                    </div>
+                    
+                    <div class="sum-row" :class="{ 'has-value': tongGiamGia > 0 }">
+                      <span class="sum-label">Giảm giá</span>
+                      <div class="sum-right-group">
+                        <button class="btn-limit-red" @click="openDiscountModal('money')">Giảm thêm</button>
+                        <span class="sum-value font-mono sum-val-disc">-{{ formatWithCurrency(tongGiamGia, donViTienTeChung) }}</span>
                       </div>
-
-                      <!-- Chuyển khoản (chỉ hiện khi chọn Chuyển khoản) -->
-                      <div class="sum-row transfer-row" v-if="hinhThucThanhToan === 'CHUYEN_KHOAN'">
-                        <span class="sum-label transfer-label">CHUYỂN KHOẢN (x{{ tiGia || 1 }})</span>
-                        <span class="sum-value transfer-value font-mono">{{ formatWithCurrency((tongCong + normalizedPhiShip) * Number(tiGia || 1), donViTienTeCK) }}</span>
+                    </div>
+                    
+                    <div class="sum-row" :class="{ 'has-value': tongTienChietKhau > 0 }">
+                      <span class="sum-label">Chiết khấu</span>
+                      <div class="sum-right-group">
+                        <button class="btn-limit-red" @click="openDiscountModal('percent')">Giảm thêm</button>
+                        <span class="sum-value font-mono sum-val-disc">-{{ formatWithCurrency(tongTienChietKhau, donViTienTeChung) }}</span>
                       </div>
-                    </template>
+                    </div>
+
+                    <div class="sum-divider"></div>
+
+                    <div class="sum-row">
+                      <span class="sum-label">Tiền hàng</span>
+                      <span class="sum-value font-mono sum-val-base">{{ formatWithCurrency(tongCong, donViTienTeChung) }}</span>
+                    </div>
+
+                    <div v-if="normalizedPhiShip > 0" class="sum-row is-ship">
+                      <span class="sum-label">Phí ship</span>
+                      <span class="sum-value font-mono">+{{ formatWithCurrency(normalizedPhiShip, donViTienTeChung) }}</span>
+                    </div>
+
+                    <!-- Tổng cộng -->
+                    <div class="sum-row total-row">
+                      <span class="sum-label total-label">TỔNG CỘNG</span>
+                      <span class="sum-value total-value text-primary font-mono">{{ formatWithCurrency(tongCong + normalizedPhiShip, donViTienTeChung) }}</span>
+                    </div>
+
+                    <!-- Chuyển khoản (chỉ hiện khi chọn Chuyển khoản) -->
+                    <div class="sum-row transfer-row" v-if="hinhThucThanhToan === 'CHUYEN_KHOAN'">
+                      <span class="sum-label transfer-label">CHUYỂN KHOẢN (x{{ tiGia || 1 }})</span>
+                      <span class="sum-value transfer-value font-mono">{{ formatWithCurrency((tongCong + normalizedPhiShip) * Number(tiGia || 1), donViTienTeCK) }}</span>
+                    </div>
+
+                    <div class="sum-row sub-info">
+                      <span class="sum-label">Lợi nhuận dự kiến</span>
+                      <span class="sum-value font-mono sum-val-profit">+{{ formatWithCurrency(tongLoiNhuan, donViTienTeChung) }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2262,65 +2270,33 @@
 
         <!-- STICKY CHECKOUT FOOTER (Always visible on PC unless right column collapsed; inside Payment tab on Mobile) -->
         <div class="pc-checkout-footer" v-show="isMobile ? activeMobileTab === 'payment' : !pcCollapsed.right">
-          <div v-if="!isMobile" class="pc-footer-total-bar">
-            <div v-if="normalizedPhiShip > 0" class="pc-ft-breakdown-rows">
-              <div class="pc-ft-sub-row">
-                <span class="pc-ft-sub-label">Tiền hàng</span>
-                <strong class="pc-ft-sub-val font-mono">{{ formatWithCurrency(tongCong, donViTienTeChung) }}</strong>
-              </div>
-              <div class="pc-ft-sub-row is-ship">
-                <span class="pc-ft-sub-label">Tiền ship</span>
-                <strong class="pc-ft-sub-val font-mono">+{{ formatWithCurrency(normalizedPhiShip, donViTienTeChung) }}</strong>
-              </div>
-            </div>
-            <div class="pc-ft-row">
-              <div class="pc-ft-left">
-                <span class="pc-ft-label">TỔNG CỘNG</span>
-                <span
-                  class="pc-ft-pay-chip"
-                  :class="{ 'is-transfer': hinhThucThanhToan === 'CHUYEN_KHOAN' }"
-                >
-                  <i :class="hinhThucThanhToan === 'CHUYEN_KHOAN' ? 'ri-bank-card-line' : 'ri-money-dollar-circle-line'"></i>
-                  <span>{{ tenHinhThucThanhToan }}</span>
-                </span>
-              </div>
-              <span class="pc-ft-value font-mono">{{ formatWithCurrency(tongCong + normalizedPhiShip, donViTienTeChung) }}</span>
-            </div>
-            <div v-if="hinhThucThanhToan === 'CHUYEN_KHOAN'" class="pc-ft-transfer">
-              <span>CHUYỂN KHOẢN (x{{ tiGia || 1 }})</span>
-              <strong class="font-mono">{{ formatWithCurrency((tongCong + normalizedPhiShip) * Number(tiGia || 1), donViTienTeCK) }}</strong>
-            </div>
-          </div>
-
-          <!-- PHẦN 1: XUẤT HÓA ĐƠN -->
-          <div class="footer-action-block footer-export-block">
-            <div class="fab-header">
-              <span class="fab-title">
-                <i class="ri-share-forward-line"></i>
-                <span>Xuất hóa đơn</span>
-              </span>
-            </div>
-
-            <div class="footer-export-actions" :class="{ 'is-mobile-export': isMobile }">
-              <button class="btn btn-preview" :disabled="isPreviewing" @click="previewHoaDon" title="Xuất ảnh hóa đơn">
-                <span v-if="isPreviewing" class="btn-spinner" aria-hidden="true"></span>
-                <i v-else class="app-ico ri-image-line"></i> 
-                <span>{{ isPreviewing ? 'ĐANG XUẤT...' : (isMobile ? 'XUẤT ẢNH HÓA ĐƠN' : 'XUẤT ẢNH') }}</span>
-              </button>
-              <button class="btn btn-text" @click="openTextInvoice" title="Xuất hóa đơn (chữ)">
-                <i class="app-ico ri-file-text-line"></i> 
-                <span>{{ isMobile ? 'XUẤT HÓA ĐƠN (CHỮ)' : 'XUẤT CHỮ' }}</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- PHẦN 2: THAO TÁC ĐƠN -->
+          <!-- THAO TÁC ĐƠN (GỒM TIẾN TRÌNH + NÚT THAO TÁC + XUẤT HÓA ĐƠN) -->
           <div class="footer-action-block footer-order-block">
             <div class="fab-header">
-              <span class="fab-title">
-                <i class="ri-file-check-line"></i>
-                <span>Thao tác đơn</span>
-              </span>
+              <div class="fab-title-group">
+                <span class="fab-title">
+                  <i class="ri-file-check-line"></i>
+                  <span>Thao tác đơn</span>
+                </span>
+                <button
+                  v-if="isLinkedOnlineOrder && activeOrderStatus !== 'Đã hủy'"
+                  type="button"
+                  class="fab-chat-toggle-btn"
+                  :class="{
+                    'is-open': showWebAdminMsgBox,
+                    'has-draft': Boolean(webAdminMessageInput.trim()),
+                  }"
+                  title="Gửi lời nhắn tới khách đơn web"
+                  aria-label="Mở khung gửi lời nhắn khách web"
+                  @click="toggleWebAdminMsgBox"
+                >
+                  <i :class="showWebAdminMsgBox ? 'ri-chat-3-fill' : 'ri-chat-3-line'"></i>
+                  <span
+                    v-if="webAdminMessageInput.trim() && !showWebAdminMsgBox"
+                    class="fab-chat-dot"
+                  ></span>
+                </button>
+              </div>
               <span
                 v-if="isLinkedOnlineOrder || isSubmittedAdminOrder"
                 class="fab-sync-pill"
@@ -2444,6 +2420,66 @@
                   <span>ĐÓNG TAB</span>
                 </button>
               </template>
+            </div>
+
+            <!-- XUẤT ẢNH / XUẤT CHỮ (GỘP TRONG THAO TÁC ĐƠN) -->
+            <div class="footer-export-actions" :class="{ 'is-mobile-export': isMobile }">
+              <button class="btn btn-preview" :disabled="isPreviewing" @click="previewHoaDon" title="Xuất ảnh hóa đơn">
+                <span v-if="isPreviewing" class="btn-spinner" aria-hidden="true"></span>
+                <i v-else class="app-ico ri-image-line"></i> 
+                <span>{{ isPreviewing ? 'ĐANG XUẤT...' : (isMobile ? 'XUẤT ẢNH HÓA ĐƠN' : 'XUẤT ẢNH') }}</span>
+              </button>
+              <button class="btn btn-text" @click="openTextInvoice" title="Xuất hóa đơn (chữ)">
+                <i class="app-ico ri-file-text-line"></i> 
+                <span>{{ isMobile ? 'XUẤT HÓA ĐƠN (CHỮ)' : 'XUẤT CHỮ' }}</span>
+              </button>
+            </div>
+
+            <!-- Ô GỬI LỜI NHẮN TRỰC TIẾP TỚI KHÁCH CỦA ĐƠN WEB -->
+            <div
+              v-if="isLinkedOnlineOrder && activeOrderStatus !== 'Đã hủy' && showWebAdminMsgBox"
+              class="web-admin-msg-box"
+            >
+              <div class="wamb-head">
+                <span class="wamb-title">
+                  <i class="ri-message-3-line"></i>
+                  <span>Gửi lời nhắn tới khách đơn web</span>
+                </span>
+                <div class="wamb-head-right">
+                  <span v-if="webAdminMessageLastSent" class="wamb-last-sent" :title="webAdminMessageLastSent">
+                    Đã gửi: {{ webAdminMessageLastSent }}
+                  </span>
+                  <button
+                    type="button"
+                    class="wamb-close-btn"
+                    title="Đóng khung lời nhắn"
+                    @click="showWebAdminMsgBox = false"
+                  >
+                    <i class="ri-close-line"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="wamb-row">
+                <textarea
+                  ref="webAdminMsgTextareaRef"
+                  v-model="webAdminMessageInput"
+                  class="wamb-input"
+                  rows="2"
+                  maxlength="400"
+                  placeholder="Nhập lời nhắn / thông báo gửi tới mọi người trong đơn này..."
+                  @keydown.ctrl.enter.prevent="sendWebOrderMessageNow"
+                ></textarea>
+                <button
+                  type="button"
+                  class="wamb-send-btn"
+                  :disabled="isSendingWebMessage || !webAdminMessageInput.trim()"
+                  @click="sendWebOrderMessageNow"
+                >
+                  <span v-if="isSendingWebMessage" class="btn-spinner" aria-hidden="true"></span>
+                  <i v-else class="ri-send-plane-2-fill"></i>
+                  <span>{{ isSendingWebMessage ? 'Đang gửi' : 'Gửi tin' }}</span>
+                </button>
+              </div>
             </div>
 
             <!-- KHỐI XÁC NHẬN & CHI TIẾT KHÁCH UPDATE -->
@@ -3231,6 +3267,95 @@
         <p class="vip-message">{{ successMessage }}</p>
         <button class="vip-btn-ok" @click="confirmSuccessReload">OK</button>
      </div>
+  </div>
+
+  <!-- MODAL XÁC NHẬN HOÀN THÀNH / HỦY ĐƠN KÈM LỜI NHẮN -->
+  <div
+    v-if="orderActionConfirmModal.show"
+    class="modal modal-overlay-blur grab-modal-overlay oac-overlay"
+    @click.self="closeOrderActionConfirm"
+  >
+    <div class="modal-box premium-modal-v4 grab-sheet oac-modal-box">
+      <div class="grab-sheet-handle" @click="closeOrderActionConfirm"></div>
+      <div class="pmv4-header">
+        <div class="pmv4-header-info">
+          <div class="pmv4-icon-box" :class="{ 'is-danger': orderActionConfirmModal.action === 'cancel' }">
+            <i :class="orderActionConfirmModal.action === 'cancel' ? 'ri-close-circle-fill' : 'ri-checkbox-circle-fill'"></i>
+          </div>
+          <div>
+            <h3 class="pmv4-title">{{ orderActionConfirmModal.title }}</h3>
+            <p class="pmv4-subtitle">Đơn #{{ maHoaDon }}</p>
+          </div>
+        </div>
+        <button type="button" class="pmv4-close" @click="closeOrderActionConfirm">
+          <i class="ri-close-line"></i>
+        </button>
+      </div>
+
+      <div class="pmv4-body oac-body">
+        <p class="oac-desc">{{ orderActionConfirmModal.description }}</p>
+
+        <div v-if="orderActionConfirmModal.showMessageBox" class="oac-msg-wrap">
+          <div class="oac-msg-head">
+            <span class="oac-msg-label">
+              <i class="ri-notification-3-line"></i>
+              Gửi thông báo tới khách của đơn (tùy chọn)
+            </span>
+            <button
+              v-if="orderActionConfirmModal.messageInput"
+              type="button"
+              class="oac-msg-clear"
+              @click="orderActionConfirmModal.messageInput = ''"
+            >
+              Xóa
+            </button>
+          </div>
+          <div class="oac-msg-chips">
+            <button
+              v-for="preset in orderActionMessagePresets"
+              :key="preset"
+              type="button"
+              class="oac-msg-chip"
+              :class="{ active: orderActionConfirmModal.messageInput.trim() === preset }"
+              @click="orderActionConfirmModal.messageInput = preset"
+            >
+              {{ preset }}
+            </button>
+          </div>
+          <textarea
+            v-model="orderActionConfirmModal.messageInput"
+            class="oac-msg-input"
+            rows="3"
+            maxlength="400"
+            :placeholder="
+              orderActionConfirmModal.action === 'cancel'
+                ? 'VD: Xin lỗi quý khách, quán đã hết món hoặc đang quá tải...'
+                : 'VD: Cảm ơn quý khách! Hôm nay quán có ưu đãi...'
+            "
+          ></textarea>
+        </div>
+
+        <div class="oac-actions">
+          <button
+            type="button"
+            class="oac-btn is-cancel"
+            :disabled="isSubmitting || isOrderActionLoading"
+            @click="closeOrderActionConfirm"
+          >
+            Hủy bỏ
+          </button>
+          <button
+            type="button"
+            class="oac-btn"
+            :class="orderActionConfirmModal.action === 'cancel' ? 'is-danger' : 'is-success'"
+            :disabled="isSubmitting || isOrderActionLoading"
+            @click="confirmOrderActionModal"
+          >
+            {{ orderActionConfirmModal.confirmLabel }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div v-if="showDiscountModal" class="modal modal-overlay-blur grab-modal-overlay" @click.self="showDiscountModal = false">
@@ -4063,6 +4188,71 @@
       </div>
     </div>
   </div>
+
+  <!-- MODAL XÁC NHẬN TRÙNG SẢN PHẨM KHI LƯU VÀO DB -->
+  <div
+    v-if="manualDbConflictModal.open"
+    class="pmv4-overlay db-conflict-overlay"
+    @click.self="cancelManualDbConflict"
+  >
+    <div class="db-conflict-card">
+      <div class="db-conflict-head">
+        <div class="db-conflict-ico"><i class="ri-error-warning-fill"></i></div>
+        <div>
+          <h3>Đang có sản phẩm trùng trong kho</h3>
+          <p>Bạn muốn cập nhật vào sản phẩm cũ hay bỏ qua để tạo thành món mới?</p>
+        </div>
+      </div>
+
+      <div class="db-conflict-compare">
+        <div class="db-conflict-box is-old">
+          <div class="db-conflict-tag">Sản phẩm đang có trong DB</div>
+          <div class="db-conflict-name">{{ manualDbConflictModal.existingItem?.Ten_hang }}</div>
+          <div class="db-conflict-meta">
+            <span>Mã: <strong>#{{ manualDbConflictModal.existingItem?.Ma_hang }}</strong></span>
+            <span>Giá bán: <strong>{{ formatNumber(manualDbConflictModal.existingItem?.Gia_ban || 0) }} {{ manualDbConflictModal.existingItem?.Don_vi_tien_te || 'P' }}</strong></span>
+            <span>Giá gốc: <strong>{{ formatNumber(manualDbConflictModal.existingItem?.Gia_goc || 0) }} {{ manualDbConflictModal.existingItem?.Don_vi_tien_te || 'P' }}</strong></span>
+            <span v-if="manualDbConflictModal.existingItem?.Dvt">ĐVT: <strong>{{ manualDbConflictModal.existingItem?.Dvt }}</strong></span>
+          </div>
+        </div>
+
+        <div class="db-conflict-box is-new">
+          <div class="db-conflict-tag">Thông tin bạn vừa nhập</div>
+          <div class="db-conflict-name">{{ manualDbConflictModal.draft?.tenHangTrim }}</div>
+          <div class="db-conflict-meta">
+            <span>Nếu thêm mới → Mã: <strong>#{{ manualDbConflictModal.newMaHang }}</strong></span>
+            <span>Giá bán: <strong>{{ formatNumber(manualDbConflictModal.draft?.giaBan || 0) }} {{ manualDbConflictModal.draft?.currencyTrim || 'P' }}</strong></span>
+            <span>Giá gốc: <strong>{{ formatNumber(manualDbConflictModal.draft?.giaGoc || 0) }} {{ manualDbConflictModal.draft?.currencyTrim || 'P' }}</strong></span>
+            <span v-if="manualDbConflictModal.draft?.dvtTrim">ĐVT: <strong>{{ manualDbConflictModal.draft?.dvtTrim }}</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="db-conflict-actions">
+        <button
+          type="button"
+          class="db-conflict-btn is-update"
+          :disabled="isSavingManualToDb"
+          @click="confirmManualDbUpdateExisting"
+        >
+          <i class="ri-refresh-line"></i>
+          <span>Cập nhật vào #{{ manualDbConflictModal.existingItem?.Ma_hang }}</span>
+        </button>
+        <button
+          type="button"
+          class="db-conflict-btn is-create"
+          :disabled="isSavingManualToDb"
+          @click="confirmManualDbCreateNew"
+        >
+          <i class="ri-add-circle-line"></i>
+          <span>Bỏ qua &amp; Thêm mới (#{{ manualDbConflictModal.newMaHang }})</span>
+        </button>
+        <button type="button" class="db-conflict-btn is-cancel" @click="cancelManualDbConflict">
+          Hủy
+        </button>
+      </div>
+    </div>
+  </div>
 </template>
 
 
@@ -4074,6 +4264,7 @@ import {
   reactive,
   ref,
   computed,
+  inject,
   onMounted,
   onActivated,
   onUnmounted,
@@ -4090,8 +4281,8 @@ import {
   subscribeAllLiveOrders,
   getOrderForInvoice,
   adminSyncOrderItems,
+  sendAdminOrderMessage,
   dispatchAction,
-  IMGBB_KEY,
 } from '@/config/api'
 import {
   localizeProduct,
@@ -4110,6 +4301,12 @@ import {
   buildVietQrPayload,
   toAsciiClean,
 } from '@/utils/vietQr'
+import { buildOrderTextInvoice } from '@/utils/invoiceTextExport'
+import {
+  buildUniqueProductCode,
+  findDuplicateProductMatch,
+  normalizeProductNameKey,
+} from '@/utils/productCode'
 const router = useRouter() // Initialize router
 const route = useRoute()
 
@@ -4117,6 +4314,7 @@ const route = useRoute()
 
 /* ================= MOBILE & PC COLLAPSE STATE ================= */
 const isMobile = ref(false)
+const isAdminDockHidden = inject('isMobileDockHidden', ref(false))
 const activeMobileTab = ref('entry') // 'entry', 'order', 'customer', 'payment'
 const showMobileEntryMenu = ref(false)
 
@@ -4718,6 +4916,108 @@ const itemsPerPage = 16 // 4x4
 const toasts = ref([])
 const showSuccessModal = ref(false)
 const successMessage = ref('')
+const showWebAdminMsgBox = ref(false)
+const webAdminMsgTextareaRef = ref(null)
+const webAdminMessageInput = ref('')
+const webAdminMessageLastSent = ref('')
+const isSendingWebMessage = ref(false)
+const orderActionConfirmModal = ref({
+  show: false,
+  action: 'complete', // 'complete' | 'cancel'
+  mode: 'online', // 'online' | 'admin-submitted' | 'admin-new' | 'cancel'
+  title: '',
+  description: '',
+  confirmLabel: 'Đồng ý',
+  showMessageBox: true,
+  messageInput: '',
+})
+
+const ORDER_COMPLETE_PRESETS = [
+  'Cảm ơn quý khách đã ủng hộ quán!',
+  'Đơn đã hoàn thành, chúc bạn ngon miệng!',
+  'Quán đang có ưu đãi mới, mời bạn ghé xem menu nhé!',
+]
+
+const ORDER_CANCEL_PRESETS = [
+  'Xin lỗi quý khách, quán hiện đã hết món.',
+  'Quán đang quá tải, mong quý khách thông cảm.',
+  'Ngoài khu vực giao hàng hoặc chưa liên hệ được khách.',
+]
+
+const orderActionMessagePresets = computed(() =>
+  orderActionConfirmModal.value.action === 'cancel'
+    ? ORDER_CANCEL_PRESETS
+    : ORDER_COMPLETE_PRESETS,
+)
+
+function closeOrderActionConfirm() {
+  orderActionConfirmModal.value.show = false
+}
+
+function openOrderActionConfirm({
+  action,
+  mode,
+  title,
+  description,
+  confirmLabel = 'Đồng ý',
+  showMessageBox = true,
+}) {
+  orderActionConfirmModal.value = {
+    show: true,
+    action,
+    mode,
+    title,
+    description,
+    confirmLabel,
+    showMessageBox: Boolean(showMessageBox),
+    messageInput: showMessageBox ? String(webAdminMessageInput.value || '').trim() : '',
+  }
+}
+
+function toggleWebAdminMsgBox() {
+  showWebAdminMsgBox.value = !showWebAdminMsgBox.value
+  if (showWebAdminMsgBox.value) {
+    nextTick(() => {
+      webAdminMsgTextareaRef.value?.focus()
+    })
+  }
+}
+
+async function sendWebOrderMessageNow() {
+  if (!isLinkedOnlineOrder.value) return
+  const msg = String(webAdminMessageInput.value || '').trim()
+  if (!msg) {
+    toast('warn', 'Chưa nhập nội dung lời nhắn')
+    return
+  }
+  if (isSendingWebMessage.value) return
+  isSendingWebMessage.value = true
+  try {
+    const res = await sendAdminOrderMessage({
+      orderId: maHoaDon.value,
+      message: msg,
+    })
+    if (res?.success) {
+      webAdminMessageLastSent.value = msg
+      webAdminMessageInput.value = ''
+      showWebAdminMsgBox.value = false
+      const tab = activeTabObj.value
+      if (tab) {
+        tab.webAdminMessageInput = ''
+        tab.webAdminMessageLastSent = msg
+        saveTabsToStorage()
+      }
+      toast('success', '🔔 Đã gửi lời nhắn kèm chuông thông báo tới khách đơn web!')
+    } else {
+      toast('error', '❌ ' + (res?.message || 'Không gửi được lời nhắn'))
+    }
+  } catch (e) {
+    console.error(e)
+    toast('error', '❌ Lỗi kết nối Firebase khi gửi lời nhắn')
+  } finally {
+    isSendingWebMessage.value = false
+  }
+}
 const isPreviewing = ref(false) // State for preview button loading
 const exportPriceMode = ref('') // '' | 'giaBan' | 'giaGoc' (không mặc định sẵn)
 const exportGroupMode = ref('') // '' | 'grouped' | 'by_member' (không mặc định sẵn)
@@ -5734,6 +6034,8 @@ function captureCurrentEditorSnapshot(existingTab = {}) {
     globalGiamGia: Number(globalGiamGia.value || 0),
     globalChietKhauPercent: Number(globalChietKhauPercent.value || 0),
     phiShip: Math.max(0, Number(phiShip.value || 0)),
+    webAdminMessageInput: String(webAdminMessageInput.value || ''),
+    webAdminMessageLastSent: String(webAdminMessageLastSent.value || ''),
     items: JSON.parse(JSON.stringify(items.value || [])),
     customer: {
       maKhachHang: form.maKhachHang || '',
@@ -5779,6 +6081,9 @@ function applyTabToEditor(tab) {
   globalGiamGia.value = Number(tab.globalGiamGia || 0)
   globalChietKhauPercent.value = Number(tab.globalChietKhauPercent || 0)
   phiShip.value = Math.max(0, Number(tab.phiShip || 0))
+  showWebAdminMsgBox.value = false
+  webAdminMessageInput.value = String(tab.webAdminMessageInput || '')
+  webAdminMessageLastSent.value = String(tab.webAdminMessageLastSent || '')
   const loadedItems = Array.isArray(tab.items) ? JSON.parse(JSON.stringify(tab.items)) : []
   items.value = loadedItems
   customOrderMembers.value = Array.isArray(tab.customOrderMembers)
@@ -5829,6 +6134,16 @@ function switchInvoiceTab(tabId) {
   if (target) applyTabToEditor(target)
 }
 
+function handleInvoiceTabSelect(tabId) {
+  if (!tabId) return
+  if (tabId !== activeInvoiceTabId.value) {
+    switchInvoiceTab(tabId)
+  }
+  if (isMobile.value && activeMobileTab.value === 'tabs') {
+    setMobileTab('order')
+  }
+}
+
 function addNewInvoiceTab() {
   syncActiveTabSnapshot()
   if (tabSourceFilter.value === 'web') {
@@ -5837,6 +6152,9 @@ function addNewInvoiceTab() {
   const newTab = createBlankTabSnapshot()
   invoiceTabs.value.push(newTab)
   applyTabToEditor(newTab)
+  if (isMobile.value && activeMobileTab.value === 'tabs') {
+    setMobileTab('entry')
+  }
 }
 
 function closeInvoiceTab(tabId) {
@@ -6669,9 +6987,34 @@ function handleTenKhachChange(event) {
 watch(
   () => form.tenHang,
   () => {
-    const h = localizedHangHoaList.value.find((x) => x.Ten_hang === form.tenHang)
+    const targetKey = normalizeProductNameKey(form.tenHang)
+    const h = targetKey
+      ? localizedHangHoaList.value.find(
+          (x) => normalizeProductNameKey(x.Ten_hang) === targetKey,
+        ) ||
+        hangHoaList.value.find(
+          (x) => normalizeProductNameKey(x.Ten_hang) === targetKey,
+        )
+      : null
 
-    if (!h) return
+    if (!h) {
+      if (form.maHang) {
+        const currentLinked = hangHoaList.value.find(
+          (x) => String(x?.Ma_hang || '').trim() === String(form.maHang).trim(),
+        )
+        const linkedLocalized = localizedHangHoaList.value.find(
+          (x) => String(x?.Ma_hang || '').trim() === String(form.maHang).trim(),
+        )
+        const linkedNames = [
+          currentLinked?.Ten_hang,
+          linkedLocalized?.Ten_hang,
+        ].map(normalizeProductNameKey)
+        if (!linkedNames.includes(targetKey)) {
+          form.maHang = ''
+        }
+      }
+      return
+    }
 
     form.maHang = h.Ma_hang
     form.danhMuc = h.Danh_muc
@@ -7903,29 +8246,111 @@ const manualLinePreview = computed(() => {
   return Math.max(0, (price - disc) * qty)
 })
 
-function genManualUniqueMaHang(tenHang) {
-  const clean = String(tenHang || '').trim()
-  const ascii = clean
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/Đ/g, 'D')
-  const baseCode =
-    ascii
-      .split(/\s+/)
-      .map((w) => w.replace(/[^a-zA-Z0-9]/g, '')[0]?.toUpperCase())
-      .filter(Boolean)
-      .join('') || 'SP'
+const manualDbConflictModal = reactive({
+  open: false,
+  existingItem: null,
+  matchReason: 'name',
+  newMaHang: '',
+  draft: null,
+})
 
-  const existingSet = new Set(
-    (hangHoaList.value || []).map((h) => String(h?.Ma_hang || '').trim()).filter(Boolean),
-  )
-  if (!existingSet.has(baseCode)) return baseCode
-  let suffix = 1
-  while (existingSet.has(`${baseCode}_${suffix}`)) {
-    suffix += 1
+function buildManualDbDraftSnapshot() {
+  return {
+    tenHangTrim: (form.tenHang || '').trim(),
+    maHangInput: String(form.maHang || '').trim(),
+    langKey: form.lang === 'tl' ? 'fil' : form.lang || 'vi',
+    danhMucTrim: (form.danhMuc || '').trim(),
+    sizeTrim: (form.size || '').trim(),
+    dvtTrim: (form.dvt || '').trim(),
+    currencyTrim: (form.donViTienTe || 'P').trim() || 'P',
+    giaGoc: Number(form.giaGoc || 0),
+    giaBan: Number(form.giaBan || 0),
+    nccLoaiGiam: normalizeNccDiscountType(form.nccLoaiGiam),
+    nccGiaTriGiam: normalizeNccDiscountValue(form.nccGiaTriGiam),
+    trangThai: form.trangThai || 'Còn hàng',
   }
-  return `${baseCode}_${suffix}`
+}
+
+async function executeSaveManualProductToDb({
+  targetMaHang,
+  existingRow = null,
+  isUpdate = false,
+  forceCreateNew = false,
+  draft = buildManualDbDraftSnapshot(),
+}) {
+  if (isSavingManualToDb.value) return
+  const i18nSeed = existingRow?.i18n ? JSON.parse(JSON.stringify(existingRow.i18n)) : {}
+  i18nSeed[draft.langKey] = {
+    ...i18nSeed[draft.langKey],
+    Ten_hang: draft.tenHangTrim,
+    Danh_muc: draft.danhMucTrim,
+    Dvt: draft.dvtTrim,
+  }
+
+  const productPayload = syncProductWithI18n({
+    ...existingRow,
+    Ma_hang: targetMaHang,
+    Ten_hang: draft.langKey === 'vi' ? draft.tenHangTrim : existingRow?.Ten_hang || draft.tenHangTrim,
+    Danh_muc: draft.langKey === 'vi' ? draft.danhMucTrim : existingRow?.Danh_muc || draft.danhMucTrim,
+    Size: draft.sizeTrim,
+    Dvt: draft.langKey === 'vi' ? draft.dvtTrim : existingRow?.Dvt || draft.dvtTrim,
+    Gia_goc: draft.giaGoc,
+    Gia_ban: draft.giaBan,
+    Ncc_loai_giam: draft.nccLoaiGiam,
+    Ncc_gia_tri_giam: draft.nccGiaTriGiam,
+    Don_vi_tien_te: draft.currencyTrim,
+    Trang_thai: draft.trangThai || existingRow?.Trang_thai || 'Còn hàng',
+    i18n: i18nSeed,
+  })
+  if (!isUpdate) {
+    productPayload.Gia_Giam = ''
+  }
+
+  const dispatchPayload = forceCreateNew
+    ? { ...productPayload, _forceCreateNew: true }
+    : productPayload
+
+  isSavingManualToDb.value = true
+  try {
+    const res = await dispatchAction({
+      action: 'nhapHangHoa',
+      data: [dispatchPayload],
+    })
+    if (!res?.success) {
+      toast('error', '❌ ' + (res?.message || 'Không thể lưu sản phẩm vào DB'))
+      return
+    }
+
+    const idx = hangHoaList.value.findIndex(
+      (h) => String(h?.Ma_hang || '').trim() === targetMaHang,
+    )
+    if (idx > -1) {
+      hangHoaList.value[idx] = { ...hangHoaList.value[idx], ...productPayload }
+    } else {
+      hangHoaList.value.unshift(productPayload)
+      productQty[targetMaHang] = 1
+      productNotes[targetMaHang] = ''
+      notePopoverOpen[targetMaHang] = false
+      cardHighlight[targetMaHang] = false
+    }
+
+    form.maHang = targetMaHang
+    form.trangThai = productPayload.Trang_thai
+    showManualAddOptions.value = false
+    manualDbConflictModal.open = false
+    addItem()
+    toast(
+      'success',
+      isUpdate
+        ? `✅ Đã cập nhật DB (#${targetMaHang}) & thêm vào đơn!`
+        : `✅ Đã lưu vào DB (#${targetMaHang}) & thêm vào đơn!`,
+    )
+  } catch (e) {
+    console.error('Lỗi lưu sản phẩm thủ công vào DB:', e)
+    toast('error', '❌ Lỗi kết nối Firebase khi lưu sản phẩm vào DB')
+  } finally {
+    isSavingManualToDb.value = false
+  }
 }
 
 function handleManualAddClick() {
@@ -7955,86 +8380,75 @@ async function manualAddAndSaveToDb() {
     return
   }
 
-  const isExisting = isManualMatchedInDb.value
-  const targetMaHang = isExisting
-    ? String(form.maHang).trim()
-    : genManualUniqueMaHang(tenHangTrim)
-  const langKey = form.lang === 'tl' ? 'fil' : form.lang || 'vi'
-  const danhMucTrim = (form.danhMuc || '').trim()
-  const sizeTrim = (form.size || '').trim()
-  const dvtTrim = (form.dvt || '').trim()
-  const currencyTrim = (form.donViTienTe || 'P').trim() || 'P'
-  const existingRow = isExisting
-    ? hangHoaList.value.find((h) => String(h?.Ma_hang || '').trim() === targetMaHang)
-    : null
-
-  const i18nSeed = existingRow?.i18n ? JSON.parse(JSON.stringify(existingRow.i18n)) : {}
-  i18nSeed[langKey] = {
-    ...(i18nSeed[langKey] || {}),
-    Ten_hang: tenHangTrim,
-    Danh_muc: danhMucTrim,
-    Dvt: dvtTrim,
-  }
-
-  const productPayload = syncProductWithI18n({
-    ...(existingRow || {}),
-    Ma_hang: targetMaHang,
-    Ten_hang: langKey === 'vi' ? tenHangTrim : existingRow?.Ten_hang || tenHangTrim,
-    Danh_muc: langKey === 'vi' ? danhMucTrim : existingRow?.Danh_muc || danhMucTrim,
-    Size: sizeTrim,
-    Dvt: langKey === 'vi' ? dvtTrim : existingRow?.Dvt || dvtTrim,
-    Gia_goc: Number(form.giaGoc || 0),
-    Gia_ban: Number(form.giaBan || 0),
-    Ncc_loai_giam: normalizeNccDiscountType(form.nccLoaiGiam),
-    Ncc_gia_tri_giam: normalizeNccDiscountValue(form.nccGiaTriGiam),
-    Don_vi_tien_te: currencyTrim,
-    Trang_thai: form.trangThai || existingRow?.Trang_thai || 'Còn hàng',
-    i18n: i18nSeed,
+  const draft = buildManualDbDraftSnapshot()
+  const existingCodes = (hangHoaList.value || []).map((h) => String(h?.Ma_hang || '').trim())
+  const duplicate = findDuplicateProductMatch({
+    tenHang: draft.tenHangTrim,
+    maHang: draft.maHangInput,
+    catalog: hangHoaList.value,
   })
-  if (!isExisting) {
-    productPayload.Gia_Giam = ''
+
+  if (duplicate?.matched) {
+    const matchedCode = String(duplicate.matched.Ma_hang || '').trim()
+    manualDbConflictModal.existingItem = duplicate.matched
+    manualDbConflictModal.matchReason = duplicate.matchReason
+    manualDbConflictModal.newMaHang = buildUniqueProductCode(
+      matchedCode || draft.tenHangTrim,
+      existingCodes,
+      { treatInputAsBase: Boolean(matchedCode) },
+    )
+    manualDbConflictModal.draft = draft
+    manualDbConflictModal.open = true
+    return
   }
 
-  isSavingManualToDb.value = true
-  try {
-    const res = await dispatchAction({
-      action: 'nhapHangHoa',
-      data: [productPayload],
-    })
-    if (!res?.success) {
-      toast('error', '❌ ' + (res?.message || 'Không thể lưu sản phẩm vào DB'))
-      return
-    }
+  const uniqueNewCode = buildUniqueProductCode(draft.tenHangTrim, existingCodes)
+  await executeSaveManualProductToDb({
+    targetMaHang: uniqueNewCode,
+    existingRow: null,
+    isUpdate: false,
+    forceCreateNew: true,
+    draft,
+  })
+}
 
-    const idx = hangHoaList.value.findIndex(
-      (h) => String(h?.Ma_hang || '').trim() === targetMaHang,
-    )
-    if (idx > -1) {
-      hangHoaList.value[idx] = { ...hangHoaList.value[idx], ...productPayload }
-    } else {
-      hangHoaList.value.unshift(productPayload)
-      productQty[targetMaHang] = 1
-      productNotes[targetMaHang] = ''
-      notePopoverOpen[targetMaHang] = false
-      cardHighlight[targetMaHang] = false
-    }
-
-    form.maHang = targetMaHang
-    form.trangThai = productPayload.Trang_thai
-    showManualAddOptions.value = false
-    addItem()
-    toast(
-      'success',
-      isExisting
-        ? `✅ Đã cập nhật DB (#${targetMaHang}) & thêm vào đơn!`
-        : `✅ Đã lưu vào DB (#${targetMaHang}) & thêm vào đơn!`,
-    )
-  } catch (e) {
-    console.error('Lỗi lưu sản phẩm thủ công vào DB:', e)
-    toast('error', '❌ Lỗi kết nối Firebase khi lưu sản phẩm vào DB')
-  } finally {
-    isSavingManualToDb.value = false
+async function confirmManualDbUpdateExisting() {
+  const existing = manualDbConflictModal.existingItem
+  const draft = manualDbConflictModal.draft
+  if (!existing || !draft) {
+    manualDbConflictModal.open = false
+    return
   }
+  const targetCode = String(existing.Ma_hang || '').trim()
+  manualDbConflictModal.open = false
+  await executeSaveManualProductToDb({
+    targetMaHang: targetCode,
+    existingRow: existing,
+    isUpdate: true,
+    forceCreateNew: false,
+    draft,
+  })
+}
+
+async function confirmManualDbCreateNew() {
+  const newCode = manualDbConflictModal.newMaHang
+  const draft = manualDbConflictModal.draft
+  if (!newCode || !draft) {
+    manualDbConflictModal.open = false
+    return
+  }
+  manualDbConflictModal.open = false
+  await executeSaveManualProductToDb({
+    targetMaHang: newCode,
+    existingRow: null,
+    isUpdate: false,
+    forceCreateNew: true,
+    draft,
+  })
+}
+
+function cancelManualDbConflict() {
+  manualDbConflictModal.open = false
 }
 
 /* ================= THANH TOÁN ================= */
@@ -8494,9 +8908,11 @@ watch(
   }
 )
 
-function buildInvoicePayload(targetStatus = '') {
+function buildInvoicePayload(targetStatus = '', adminMessage = '') {
+  const cleanAdminMsg = String(adminMessage || '').trim()
   return {
     action: 'hoanThanhDon',
+    ...(cleanAdminMsg ? { Admin_message: cleanAdminMsg } : {}),
     hoa_don: {
       Ma_hoa_don: maHoaDon.value,
       So_hoa_don: soHoaDon.value,
@@ -8571,7 +8987,7 @@ function updateActiveTabAdminStatus(nextStatus, seenInDonHang = null) {
   saveTabsToStorage()
 }
 
-async function hoanThanhDon(targetStatus = 'Đang xử lý', openModalOnDone = false) {
+async function hoanThanhDon(targetStatus = 'Đang xử lý', openModalOnDone = false, adminMessage = '') {
   if (!items.value.length) {
     toast('warn', 'Chưa có hàng trong đơn')
     return
@@ -8585,7 +9001,7 @@ async function hoanThanhDon(targetStatus = 'Đang xử lý', openModalOnDone = f
   isSubmitting.value = true
 
   try {
-    const json = await dispatchAction(buildInvoicePayload(nextStatus))
+    const json = await dispatchAction(buildInvoicePayload(nextStatus, adminMessage))
 
     if (json.success) {
       const dh = donHangList.value.find(
@@ -8718,8 +9134,15 @@ function handleAdminProgressStepClick(targetStatus) {
       return hoanThanhDon('Đang ship', false)
     }
     if (targetStatus === 'Hoàn thành') {
-      if (!confirm(`Xác nhận chốt và Hoàn thành đơn #${maHoaDon.value} ngay?`)) return
-      return hoanThanhDon('Hoàn thành', true)
+      openOrderActionConfirm({
+        action: 'complete',
+        mode: 'admin-new',
+        title: 'Hoàn thành đơn hàng',
+        description: `Xác nhận chốt và Hoàn thành đơn #${maHoaDon.value} ngay?`,
+        confirmLabel: 'Hoàn thành',
+        showMessageBox: false,
+      })
+      return
     }
     return
   }
@@ -8746,16 +9169,19 @@ function handleAdminProgressStepClick(targetStatus) {
     )
   }
   if (targetStatus === 'Hoàn thành') {
-    return runAdminOrderTransition(
-      'Hoàn thành',
-      `Xác nhận hoàn thành đơn #${maHoaDon.value}?`,
-      '✅ Hoàn thành đơn hàng thành công!',
-      true,
-    )
+    openOrderActionConfirm({
+      action: 'complete',
+      mode: 'admin-submitted',
+      title: 'Hoàn thành đơn hàng',
+      description: `Xác nhận hoàn thành đơn #${maHoaDon.value}?`,
+      confirmLabel: 'Hoàn thành',
+      showMessageBox: false,
+    })
+    return
   }
 }
 
-async function runAdminOrderTransition(targetStatus, confirmText, successText, openModalOnDone = false) {
+async function runAdminOrderTransition(targetStatus, confirmText, successText, openModalOnDone = false, adminMessage = '') {
   if (!items.value.length) {
     toast('warn', 'Chưa có hàng trong đơn')
     return
@@ -8765,7 +9191,7 @@ async function runAdminOrderTransition(targetStatus, confirmText, successText, o
 
   isOrderActionLoading.value = true
   try {
-    const res = await dispatchAction(buildInvoicePayload(targetStatus))
+    const res = await dispatchAction(buildInvoicePayload(targetStatus, adminMessage))
     if (res?.success) {
       const dh = donHangList.value.find(
         (d) => String(d?.Ma_hoa_don || '').trim() === String(maHoaDon.value).trim(),
@@ -8845,7 +9271,13 @@ async function saveOrderDraftFromInvoice() {
   }
 }
 
-async function runOnlineOrderTransition(targetStatus, confirmText, successText, openModalOnDone = false) {
+async function runOnlineOrderTransition(
+  targetStatus,
+  confirmText,
+  successText,
+  openModalOnDone = false,
+  adminMessage = '',
+) {
   if (!items.value.length) {
     toast('warn', 'Chưa có hàng trong đơn')
     return
@@ -8855,7 +9287,7 @@ async function runOnlineOrderTransition(targetStatus, confirmText, successText, 
 
   isOrderActionLoading.value = true
   try {
-    const res = await dispatchAction(buildInvoicePayload(targetStatus))
+    const res = await dispatchAction(buildInvoicePayload(targetStatus, adminMessage))
     if (res?.success) {
       updateActiveTabSourceStatus(targetStatus)
       markOrderSyncedWithWeb()
@@ -8905,28 +9337,91 @@ function shipOrderFromInvoice() {
 }
 
 function completeOrderFromInvoice() {
-  return runOnlineOrderTransition(
-    'Hoàn thành',
-    `Xác nhận hoàn thành đơn #${maHoaDon.value}? (Giỏ live của khách sẽ được đóng sạch)`,
-    '✅ Hoàn thành đơn hàng thành công!',
-    true,
-  )
+  if (!items.value.length) {
+    toast('warn', 'Chưa có hàng trong đơn')
+    return
+  }
+  if (isOrderActionLoading.value || isSubmitting.value) return
+  openOrderActionConfirm({
+    action: 'complete',
+    mode: 'online',
+    title: 'Hoàn thành đơn hàng',
+    description: `Xác nhận hoàn thành đơn #${maHoaDon.value}? (Giỏ live của khách sẽ được đóng sạch)`,
+    confirmLabel: 'Hoàn thành',
+    showMessageBox: true,
+  })
 }
 
-async function cancelOrderFromInvoice() {
+function cancelOrderFromInvoice() {
   if (isOrderActionLoading.value || isSubmitting.value) return
   const confirmMsg = isLinkedOnlineOrder.value
     ? `Xác nhận HỦY đơn #${maHoaDon.value}? Đơn sẽ bị hủy đồng bộ cả ở trang Đơn hàng và phía khách!`
     : `Xác nhận HỦY đơn #${maHoaDon.value}? Đơn sẽ bị hủy khỏi danh sách Đơn hàng!`
-  if (!confirm(confirmMsg)) {
+  openOrderActionConfirm({
+    action: 'cancel',
+    mode: 'cancel',
+    title: 'Xác nhận HỦY đơn',
+    description: confirmMsg,
+    confirmLabel: 'Hủy đơn',
+    showMessageBox: isLinkedOnlineOrder.value,
+  })
+}
+
+async function confirmOrderActionModal() {
+  const { mode, messageInput } = orderActionConfirmModal.value
+  const cleanMsg = String(messageInput || '').trim()
+  closeOrderActionConfirm()
+  if (cleanMsg) {
+    webAdminMessageInput.value = ''
+    webAdminMessageLastSent.value = cleanMsg
+    const tab = activeTabObj.value
+    if (tab) {
+      tab.webAdminMessageInput = ''
+      tab.webAdminMessageLastSent = cleanMsg
+      saveTabsToStorage()
+    }
+  }
+
+  if (mode === 'online') {
+    await runOnlineOrderTransition(
+      'Hoàn thành',
+      '',
+      '✅ Hoàn thành đơn hàng thành công!',
+      true,
+      cleanMsg,
+    )
     return
   }
 
+  if (mode === 'admin-new') {
+    await hoanThanhDon('Hoàn thành', true, cleanMsg)
+    return
+  }
+
+  if (mode === 'admin-submitted') {
+    await runAdminOrderTransition(
+      'Hoàn thành',
+      '',
+      '✅ Hoàn thành đơn hàng thành công!',
+      true,
+      cleanMsg,
+    )
+    return
+  }
+
+  if (mode === 'cancel') {
+    await executeCancelOrderFromInvoice(cleanMsg)
+  }
+}
+
+async function executeCancelOrderFromInvoice(adminMessage = '') {
+  if (isOrderActionLoading.value || isSubmitting.value) return
   isOrderActionLoading.value = true
   try {
     const res = await dispatchAction({
       action: 'huyDonHang',
       Ma_hoa_don: maHoaDon.value,
+      Admin_message: String(adminMessage || '').trim(),
     })
     if (res?.success) {
       if (isLinkedOnlineOrder.value) {
@@ -9671,53 +10166,27 @@ const showTextInvoice = ref(false)
 const textInvoiceRef = ref(null)
 const isTextCopied = ref(false)
 
-const textInvoice = computed(() => {
-  let bodyText = ''
-
-  if (isExportByMember.value) {
-    bodyText = exportMemberSections.value
-      .map((sec) => {
-        const roleLabel = sec.badge ? ` (${sec.badge})` : ''
-        const header = `【${sec.name}${roleLabel} — ${formatWithCurrency(sec.sectionTotal, donViTienTeChung.value)}】`
-        const itemLines = sec.rows.map((i) => {
-          const ghiChu = i.ghiChuHang ? ` (${i.ghiChuHang})` : ''
-          return `- ${i.soLuong} ${i.tenHang} : ${formatWithCurrency(i.unitPrice, i.donViTienTe)}${ghiChu}`
-        })
-        return [header, ...itemLines].join('\n')
-      })
-      .join('\n\n')
-  } else {
-    bodyText = exportGroupedRows.value
-      .map((i) => {
-        const ghiChu = i.ghiChuHang ? ` (${i.ghiChuHang})` : ''
-        return `${i.soLuong} ${i.tenHang} : ${formatWithCurrency(i.unitPrice, i.donViTienTe)}${ghiChu}`
-      })
-      .join('\n')
-  }
-
-  const isCostTextMode = isExportCostMode.value
-  const isTransferPay = hinhThucThanhToan.value === 'CHUYEN_KHOAN'
-  const summaryLine = isCostTextMode
-    ? (isTransferPay
-        ? (ckBaoGomShip.value ? 'Khách CK tiền hàng + ship' : 'Khách CK tiền hàng')
-        : `Thu cod: ${formatWithCurrency(tongCong.value, donViTienTeChung.value)}`)
-    : exportShippingFee.value > 0
-      ? `Tổng cộng : ${formatWithCurrency(tongCong.value, donViTienTeChung.value)} + ${formatWithCurrency(exportShippingFee.value, donViTienTeChung.value)} ship`
-      : `Tổng cộng : ${formatWithCurrency(exportTongCong.value, donViTienTeChung.value)}`
-  const promoLine = khuyenMaiText.value ? `\nƯu đãi : ${khuyenMaiText.value}` : ''
-  const nextPromoLine = nextMilestoneHintText.value ? `\n${nextMilestoneHintText.value}` : ''
-  const trimmedOrderNote = String(form.ghiChuDonHang || '').trim()
-  const orderNoteLine = trimmedOrderNote ? `\nGhi chú đơn hàng : ${trimmedOrderNote}` : ''
-
-  return `
-${bodyText}
-
-Địa chỉ: ${form.diaChi}
-SĐT: ${form.soDienThoai}
-Thời gian nhận: ${formatDateTimeVN(new Date(thoiGianNhanHang.value))}
-${summaryLine}${promoLine}${nextPromoLine}${orderNoteLine}
-`.trim()
-})
+const textInvoice = computed(() =>
+  buildOrderTextInvoice({
+    items: items.value,
+    tenKhachHang: form.tenKhachHang,
+    diaChi: form.diaChi,
+    soDienThoai: form.soDienThoai,
+    thoiGianNhanHang: formatDateTimeVN(new Date(thoiGianNhanHang.value)),
+    hinhThucThanhToan: hinhThucThanhToan.value,
+    tongCong: tongCong.value,
+    phiShip: normalizedPhiShip.value,
+    ckBaoGomShip: ckBaoGomShip.value,
+    ghiChuDonHang: form.ghiChuDonHang,
+    khuyenMaiText: khuyenMaiText.value,
+    nextMilestoneHintText: nextMilestoneHintText.value,
+    donViTienTe: donViTienTeChung.value,
+    groupMode: exportGroupMode.value,
+    priceMode: exportPriceMode.value,
+    hangHoaByMaMap: hangHoaByMaMap.value,
+    customOrderMembers: customOrderMembers.value,
+  }),
+)
 
 function openTextInvoice() {
   if (!items.value.length) {
@@ -13827,6 +14296,145 @@ textarea:focus {
 
 .pmv4-close:hover {
   color: #ef4444;
+}
+
+/* Order Action Confirm Modal */
+.oac-modal-box {
+  max-width: 460px;
+  width: 92vw;
+}
+.pmv4-icon-box.is-danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+.oac-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.oac-desc {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #cbd5e1;
+}
+.oac-msg-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.oac-msg-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.oac-msg-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+.oac-msg-label i {
+  color: #34d399;
+}
+.oac-msg-clear {
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.oac-msg-clear:hover {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.12);
+}
+.oac-msg-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.oac-msg-chip {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.45);
+  color: #cbd5e1;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.16s ease;
+}
+.oac-msg-chip:hover {
+  border-color: rgba(52, 211, 153, 0.55);
+  color: #f8fafc;
+}
+.oac-msg-chip.active {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: #10b981;
+  color: #6ee7b7;
+}
+.oac-msg-input {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.6);
+  color: #f8fafc;
+  padding: 10px 12px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  resize: vertical;
+  min-height: 76px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.oac-msg-input::placeholder {
+  color: #64748b;
+}
+.oac-msg-input:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.16);
+}
+.oac-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+.oac-btn {
+  flex: 1;
+  height: 44px;
+  border-radius: 12px;
+  border: none;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.oac-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.oac-btn.is-cancel {
+  background: rgba(148, 163, 184, 0.15);
+  color: #e2e8f0;
+}
+.oac-btn.is-cancel:hover:not(:disabled) {
+  background: rgba(148, 163, 184, 0.25);
+}
+.oac-btn.is-success {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+}
+.oac-btn.is-danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #ffffff;
 }
 
 /* Body */
@@ -18056,6 +18664,17 @@ textarea:focus {
   color: #ffffff !important;
 }
 
+.summary-card .sum-row.is-ship .sum-label,
+.summary-card .sum-row.is-ship .sum-value {
+  color: #38bdf8 !important;
+}
+
+.summary-card .sum-row.sub-info {
+  margin-top: 6px !important;
+  padding-top: 8px !important;
+  border-top: 1px dashed rgba(148, 163, 184, 0.16);
+}
+
 .summary-card .sum-divider {
   height: 1px !important;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent) !important;
@@ -20003,12 +20622,58 @@ textarea:focus {
 }
 
 /* Responsive */
-@media (max-width: 768px) {
-  .mv4-row-2, .mv4-row-3, .mv4-row-4 { grid-template-columns: 1fr; gap: 8px; }
-  .mv4-row-qty { flex-direction: column; align-items: stretch; gap: 10px; padding-top: 8px; } 
-  .mv4-qty-section { justify-content: space-between; }
-  .mv4-stock-badge { justify-content: center; }
-  .mv4-field label { text-align: left; width: 80px; }
+@media (max-width: 1024px) {
+  .mv4-meta-grid,
+  .mv4-pair-grid,
+  .mv4-price-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 10px;
+  }
+
+  .mv4-price-grid .mv4-field.highlight {
+    grid-column: auto;
+  }
+
+  .mv4-row-qty-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding-top: 4px;
+  }
+
+  .mv4-qty-section {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .mv4-stock-badge {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .mv4-field label {
+    text-align: left;
+    width: 100%;
+    font-size: 11px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .mv4-field input,
+  .mv4-field select,
+  .mv4-input-price,
+  .ncc-inline-input {
+    height: 42px;
+  }
+
+  .mv4-input-price input {
+    height: 100%;
+  }
+
+  .mv4-input-hero input {
+    height: 44px;
+  }
 }
 /* ================= SKELETON LOADING ================= */
 .skeleton-card {
@@ -20115,14 +20780,21 @@ textarea:focus {
 
 @media (max-width: 768px) {
   .mobile-tabs-header {
-    bottom: 78px;
+    bottom: calc(80px + env(safe-area-inset-bottom));
     left: 10px;
     right: 10px;
+    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+  }
+
+  .mobile-tabs-header.is-dock-down {
+    transform: translateY(70px);
   }
 }
 
 .m-tab-item {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -20133,10 +20805,10 @@ textarea:focus {
   color: #94a3b8;
   padding: 7px 2px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.1px;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
@@ -20174,7 +20846,7 @@ textarea:focus {
 .m-badge {
   position: absolute;
   top: 3px;
-  right: 18%;
+  right: 12%;
   background: #ef4444;
   color: white;
   font-size: 9px;
@@ -20182,6 +20854,11 @@ textarea:focus {
   border-radius: 10px;
   line-height: 1;
   border: 1px solid #0f172a;
+}
+
+.m-badge.is-count {
+  background: #059669;
+  color: #ecfdf5;
 }
 
 /* Shared Grab-sheet helpers (hidden on desktop) */
@@ -20385,7 +21062,7 @@ textarea:focus {
 
   /* Single-flow Customer / Delivery Tab */
   .info-row-2col {
-    display: block !important;
+    display: block;
   }
 
   .customer-scroll-container {
@@ -20402,10 +21079,10 @@ textarea:focus {
 
   /* Single-flow Payment Tab (Option 1B: 1 luồng cuộn) */
   .bottom-row {
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 14px !important;
-    padding: 12px !important;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 12px;
   }
 
   .payment-scroll {
@@ -20601,11 +21278,11 @@ textarea:focus {
     max-height: none !important;
     height: auto !important;
     overflow: visible !important;
-    padding: 12px 10px 16px !important;
+    padding: 8px !important;
     display: block;
-    background: rgba(15, 23, 42, 0.4);
-    border-radius: 16px;
-    margin: 8px;
+    background: transparent;
+    border-radius: 0;
+    margin: 0;
   }
 
   .manual-content {
@@ -20615,6 +21292,12 @@ textarea:focus {
 
   .mv4-card {
     margin-bottom: 8px;
+    gap: 12px;
+  }
+
+  .mv4-section {
+    gap: 10px;
+    padding: 12px;
   }
 
   /* ================= GRAB-STYLE MOBILE BOTTOM SHEET MODALS ================= */
@@ -22215,7 +22898,7 @@ textarea:focus {
   }
 
   .right-stack .delivery-box,
-  .right-stack .summary-card--payment {
+  .right-stack .summary-card--order {
     padding-top: 12px !important;
     border-top: 1px solid rgba(148, 163, 184, 0.14) !important;
   }
@@ -22229,7 +22912,7 @@ textarea:focus {
   }
 
   .right-stack .delivery-box:hover,
-  .right-stack .summary-card--payment:hover {
+  .right-stack .summary-card--order:hover {
     border-top-color: rgba(148, 163, 184, 0.14) !important;
   }
 
@@ -22432,6 +23115,59 @@ textarea:focus {
 
   .right-stack .summary-card .sum-val-profit {
     color: #4ade80 !important;
+  }
+
+  .right-stack .summary-card .sum-row.is-ship .sum-label,
+  .right-stack .summary-card .sum-row.is-ship .sum-value {
+    color: #38bdf8 !important;
+  }
+
+  .right-stack .summary-card .sum-row.total-row {
+    margin-top: 4px !important;
+    padding: 7px 10px !important;
+    border-radius: 8px !important;
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(2, 6, 23, 0.65)) !important;
+    border: 1px solid rgba(34, 197, 94, 0.42) !important;
+  }
+
+  .right-stack .summary-card .sum-label.total-label {
+    font-size: 11px !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.7px !important;
+    color: #e2e8f0 !important;
+  }
+
+  .right-stack .summary-card .sum-value.total-value {
+    font-size: clamp(16px, 1.35vw, 19px) !important;
+    font-weight: 950 !important;
+    color: #4ade80 !important;
+    text-shadow: 0 0 16px rgba(34, 197, 94, 0.45) !important;
+  }
+
+  .right-stack .summary-card .sum-row.transfer-row {
+    margin-top: 4px !important;
+    padding: 5px 10px !important;
+    border-radius: 999px !important;
+    background: rgba(59, 130, 246, 0.16) !important;
+    border: 1px solid rgba(59, 130, 246, 0.34) !important;
+  }
+
+  .right-stack .summary-card .sum-label.transfer-label {
+    font-size: 10.5px !important;
+    font-weight: 800 !important;
+    color: #e2e8f0 !important;
+  }
+
+  .right-stack .summary-card .sum-value.transfer-value {
+    font-size: 13px !important;
+    font-weight: 900 !important;
+    color: #93c5fd !important;
+  }
+
+  .right-stack .summary-card .sum-row.sub-info {
+    margin-top: 4px !important;
+    padding-top: 6px !important;
+    border-top: 1px dashed rgba(148, 163, 184, 0.16);
   }
 
   .right-stack .payment-toggle-section {
@@ -23023,11 +23759,6 @@ textarea:focus {
   min-width: 0;
 }
 
-.footer-export-block {
-  background: rgba(15, 23, 42, 0.72);
-  border: 1px solid rgba(148, 163, 184, 0.22);
-}
-
 .footer-order-block {
   background: rgba(15, 23, 42, 0.86);
   border: 1px solid rgba(34, 197, 94, 0.26);
@@ -23039,6 +23770,55 @@ textarea:focus {
   justify-content: space-between;
   gap: 6px;
   min-width: 0;
+}
+
+.fab-title-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fab-chat-toggle-btn {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 7px;
+  border: 1px solid rgba(52, 211, 153, 0.72);
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  font-size: 13.5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+  transition: all 0.16s ease;
+}
+
+.fab-chat-toggle-btn:hover {
+  filter: brightness(1.08);
+  color: #ffffff;
+}
+
+.fab-chat-toggle-btn.is-open,
+.fab-chat-toggle-btn.has-draft {
+  border-color: #a7f3d0;
+  background: linear-gradient(135deg, #059669, #047857);
+  color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.28);
+}
+
+.fab-chat-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #fbbf24;
+  box-shadow: 0 0 0 1.5px #0f172a;
 }
 
 .fab-title {
@@ -24520,16 +25300,172 @@ textarea:focus {
 }
 
 @media (max-width: 1024px) {
-  .invoice-tabs-bar {
-    flex-wrap: wrap;
+  .invoice-tabs-bar.is-mobile-tabs-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    width: 100%;
+    padding: 12px;
+    margin: 0;
+    border-radius: 0;
+    border: none;
+    background: transparent;
   }
-  .itb-source-filter {
-    order: 3;
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .itb-actions {
+    order: -3;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .itb-mobile-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-right: auto;
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.45px;
+    color: #e2e8f0;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .itb-mobile-title i {
+    color: #34d399;
+    font-size: 16px;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .invoice-tab-add-btn,
+  .invoice-tabs-bar.is-mobile-tabs-panel .invoice-tab-bell-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .itb-source-filter {
+    order: -2;
     width: 100%;
   }
-  .itb-search-wrap {
-    order: 4;
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .itb-filter-btn {
+    min-height: 34px;
+    font-size: 11px;
+    padding: 5px 6px;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .itb-search-wrap {
+    order: -1;
     width: 100%;
+    height: 38px;
+    padding: 0 10px;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .itb-search-input {
+    font-size: 13px;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .invoice-tabs-scroll {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    overflow-x: hidden;
+    overflow-y: visible;
+    padding: 0;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .invoice-tab-pill {
+    width: 100%;
+    max-width: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    padding: 11px 12px;
+    border-radius: 12px;
+    white-space: normal;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .itp-dot {
+    display: none;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .itp-top-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .itp-top-line::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #64748b;
+    flex-shrink: 0;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .invoice-tab-pill.active .itp-top-line::before {
+    background: #34d399;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .invoice-tab-pill.is-approved .itp-top-line::before {
+    background: #38bdf8;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .invoice-tab-pill.status-waiting .itp-top-line::before {
+    background: #fbbf24;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .invoice-tab-pill.status-processing .itp-top-line::before {
+    background: #22d3ee;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .invoice-tab-pill.status-shipping .itp-top-line::before {
+    background: #818cf8;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .invoice-tab-pill.status-done .itp-top-line::before {
+    background: #34d399;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .invoice-tab-pill.status-cancelled .itp-top-line::before {
+    background: #f87171;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .itp-title {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    font-size: 13.5px;
+    line-height: 1.3;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .itp-close {
+    width: 26px;
+    height: 26px;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .itp-sub-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    width: 100%;
+    padding-left: 16px;
+  }
+
+  .invoice-tabs-bar.is-mobile-tabs-panel .itp-search-match-sub {
+    padding-left: 16px;
+    font-size: 11.5px;
   }
 }
 
@@ -24890,6 +25826,136 @@ textarea:focus {
   background: rgba(56, 189, 248, 0.24);
   color: #7dd3fc;
   border: 1px solid rgba(56, 189, 248, 0.55);
+}
+
+.web-admin-msg-box {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(52, 211, 153, 0.32);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wamb-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wamb-head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wamb-close-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: rgba(148, 163, 184, 0.14);
+  color: #94a3b8;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.wamb-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.wamb-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #6ee7b7;
+}
+
+.wamb-title i {
+  font-size: 14px;
+  color: #34d399;
+}
+
+.wamb-last-sent {
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wamb-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.wamb-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  max-height: 110px;
+  resize: vertical;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.72);
+  color: #f8fafc;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.wamb-input::placeholder {
+  color: #64748b;
+}
+
+.wamb-input:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.18);
+}
+
+.wamb-send-btn {
+  flex-shrink: 0;
+  min-width: 86px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(52, 211, 153, 0.6);
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  font-size: 12.5px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: opacity 0.16s ease, transform 0.14s ease;
+}
+
+.wamb-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wamb-send-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
 }
 
 .web-update-action-box {
@@ -25424,5 +26490,146 @@ textarea:focus {
 .qr-action-btn:disabled {
   opacity: 0.6;
   cursor: wait;
+}
+
+.db-conflict-overlay {
+  z-index: 99999;
+}
+
+.db-conflict-card {
+  width: 100%;
+  max-width: 500px;
+  background: #0f172a;
+  color: #f8fafc;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.db-conflict-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.db-conflict-ico {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.db-conflict-head h3 {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 800;
+  color: #fef3c7;
+}
+
+.db-conflict-head p {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+
+.db-conflict-compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 520px) {
+  .db-conflict-compare {
+    grid-template-columns: 1fr;
+  }
+}
+
+.db-conflict-box {
+  background: rgba(30, 41, 59, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.db-conflict-box.is-old {
+  border-color: rgba(245, 158, 11, 0.45);
+}
+
+.db-conflict-box.is-new {
+  border-color: rgba(34, 197, 94, 0.45);
+}
+
+.db-conflict-tag {
+  font-size: 11px;
+  font-weight: 800;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.db-conflict-name {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.db-conflict-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.db-conflict-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.db-conflict-btn {
+  flex: 1;
+  min-width: 140px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: none;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.db-conflict-btn.is-update {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+}
+
+.db-conflict-btn.is-create {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+}
+
+.db-conflict-btn.is-cancel {
+  flex: 0 0 auto;
+  min-width: 72px;
+  background: rgba(148, 163, 184, 0.16);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.25);
 }
 </style>

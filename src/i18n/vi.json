@@ -7,7 +7,11 @@
     "detail": "Xem chi tiết",
     "detailNote": "Xem chi tiết/ Ghi chú",
     "add": "THÊM",
-    "note": "Ghi chú món (cho quán)"
+    "note": "Ghi chú món (cho quán)",
+    "notePlaceholder": "VD: ít cay, không hành, thêm sốt...",
+    "relatedItems": "Món cùng danh mục",
+    "chooseVariant": "Phân loại",
+    "noticeLabel": "THÔNG BÁO"
   },
   "contact": {
     "sendOrder": "Liên hệ gửi đơn",
@@ -184,6 +188,7 @@
   },
   "mobile": {
     "category": "Danh mục",
+    "menu": "Menu",
     "contact": "Liên hệ",
     "cart": "Giỏ hàng",
     "progress": "Tiến trình",
@@ -242,6 +247,11 @@
     "completedNotice": "Đơn hàng đã hoàn thành. Cảm ơn bạn đã ủng hộ quán! Bấm Tạo đơn mới nếu muốn đặt tiếp.",
     "cancelledNotice": "Quán đã hủy đơn hàng này. Vui lòng liên hệ quán nếu cần hỗ trợ hoặc bấm Tạo đơn mới.",
     "completedToast": "Đơn hàng #{code} đã hoàn thành!",
-    "cancelledToast": "Quán đã hủy đơn hàng #{code}."
+    "cancelledToast": "Quán đã hủy đơn hàng #{code}.",
+    "shopMessageLabel": "Thông báo từ quán",
+    "finalCompletedTitle": "Đơn #{code} đã hoàn thành",
+    "finalCancelledTitle": "Đơn #{code} đã bị hủy",
+    "finalNewOrderBtn": "Đặt đơn mới",
+    "finalCloseBtn": "Đóng"
   }
 }

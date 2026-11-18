@@ -27,6 +27,10 @@ function formatPaymentLabel(method) {
 
 function buildOrderMessage(payload = {}, adminUrl = DEFAULT_ADMIN_ORDERS_URL) {
   const orderId = String(payload.orderId || '').trim() || 'WEB'
+  const isUpdate = Boolean(payload.isUpdate)
+  const rawChanges = Array.isArray(payload.updateChanges)
+    ? payload.updateChanges.map((c) => String(c || '').trim()).filter(Boolean)
+    : []
   const tenKhach = String(payload.tenKhach || 'Khách lẻ').trim() || 'Khách lẻ'
   const sdt = String(payload.sdt || '').trim()
   const diaChi = String(payload.diaChi || '').trim()
@@ -39,13 +43,28 @@ function buildOrderMessage(payload = {}, adminUrl = DEFAULT_ADMIN_ORDERS_URL) {
   const totalQty = items.reduce((sum, it) => sum + Math.max(0, Number(it?.So_luong || 0)), 0)
 
   const headerLines = [
-    `🔔 <b>CÓ ĐƠN HÀNG MỚI #<code>${escapeHtml(orderId)}</code></b>`,
+    isUpdate
+      ? `🔄 <b>KHÁCH CẬP NHẬT ĐƠN #<code>${escapeHtml(orderId)}</code></b>`
+      : `🔔 <b>CÓ ĐƠN HÀNG MỚI #<code>${escapeHtml(orderId)}</code></b>`,
     `👤 Khách: <b>${escapeHtml(tenKhach)}</b>`,
   ]
   if (sdt) headerLines.push(`📞 SĐT / Telegram: <code>${escapeHtml(sdt)}</code>`)
   if (diaChi) headerLines.push(`📍 Địa chỉ: ${escapeHtml(diaChi)}`)
   if (thoiGian) headerLines.push(`⏰ Nhận hàng: ${escapeHtml(thoiGian)}`)
   headerLines.push(`💳 Thanh toán: ${escapeHtml(hinhThucTT)}`)
+
+  const changeSectionLines = []
+  if (isUpdate && rawChanges.length > 0) {
+    const maxChanges = 12
+    const shownChanges = rawChanges.slice(0, maxChanges)
+    changeSectionLines.push('', '✏️ <b>Thay đổi mới:</b>')
+    for (const ch of shownChanges) {
+      changeSectionLines.push(`• ${escapeHtml(ch)}`)
+    }
+    if (rawChanges.length > maxChanges) {
+      changeSectionLines.push(`• ... và ${rawChanges.length - maxChanges} thay đổi khác`)
+    }
+  }
 
   const footerLines = []
   if (khuyenMai) footerLines.push(`🎁 Khuyến mãi: ${escapeHtml(khuyenMai)}`)
@@ -54,6 +73,10 @@ function buildOrderMessage(payload = {}, adminUrl = DEFAULT_ADMIN_ORDERS_URL) {
     `💰 Tổng cộng: <b>${escapeHtml(formatAmount(payload.tongCong, donViTienTe))}</b>`,
     `🔗 Quản lý đơn: <a href="${escapeHtml(adminUrl)}">${escapeHtml(adminUrl)}</a>`,
   )
+
+  const detailTitle = isUpdate
+    ? `🛒 <b>Chi tiết sau cập nhật (${totalQty} phần):</b>`
+    : `🛒 <b>Chi tiết (${totalQty} phần):</b>`
 
   const itemLines = []
   for (let idx = 0; idx < items.length; idx += 1) {
@@ -75,8 +98,9 @@ function buildOrderMessage(payload = {}, adminUrl = DEFAULT_ADMIN_ORDERS_URL) {
 
     const previewText = [
       ...headerLines,
+      ...changeSectionLines,
       '',
-      `🛒 <b>Chi tiết (${totalQty} phần):</b>`,
+      detailTitle,
       ...itemLines,
       nextLine,
       '',
@@ -92,8 +116,9 @@ function buildOrderMessage(payload = {}, adminUrl = DEFAULT_ADMIN_ORDERS_URL) {
 
   return [
     ...headerLines,
+    ...changeSectionLines,
     '',
-    `🛒 <b>Chi tiết (${totalQty} phần):</b>`,
+    detailTitle,
     ...itemLines,
     '',
     ...footerLines,

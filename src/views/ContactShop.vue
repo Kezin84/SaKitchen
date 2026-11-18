@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { getOneSheet, dispatchAction } from '@/config/api'
-import { uploadImageToImgBB } from '@/utils/imageUpload.js'
+import { uploadImageToCloudinary } from '@/utils/imageUpload.js'
 
 /* ================= CONFIG ================= */
 
@@ -58,11 +58,12 @@ function genId() {
   )
 }
 
-async function uploadImgBB(file) {
-  return uploadImageToImgBB(file, {
+async function uploadContactImage(file) {
+  return uploadImageToCloudinary(file, {
     targetKB: 100,
     maxWidth: 1000,
     maxHeight: 1000,
+    folder: 'sakitchen/contact',
   })
 }
 
@@ -123,7 +124,7 @@ async function addContact() {
 
   loading.value = true
   try {
-    const img = await uploadImgBB(form.value.file)
+    const img = await uploadContactImage(form.value.file)
 
     await dispatchAction({
       action: 'addShopContact',
@@ -194,7 +195,7 @@ async function saveEdit() {
   try {
     let img = editing.value.URL_img
     if (editing.value.file) {
-      img = await uploadImgBB(editing.value.file)
+      img = await uploadContactImage(editing.value.file)
     }
 
     await dispatchAction({

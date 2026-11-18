@@ -7,7 +7,11 @@
     "detail": "상세 보기",
     "detailNote": "상세 보기/메모",
     "add": "추가",
-    "note": "메모 (가게용)"
+    "note": "메모 (가게용)",
+    "notePlaceholder": "예: 덜 맵게, 양파 빼주세요, 소스 추가...",
+    "relatedItems": "같은 카테고리 메뉴",
+    "chooseVariant": "옵션 선택",
+    "noticeLabel": "공지"
   },
   "contact": {
     "sendOrder": "주문 문의",
@@ -184,6 +188,7 @@
   },
   "mobile": {
     "category": "카테고리",
+    "menu": "메뉴",
     "contact": "문의",
     "cart": "장바구니",
     "progress": "진행",
@@ -242,6 +247,11 @@
     "completedNotice": "주문이 완료되었습니다. 감사합니다! 추가 주문 시 새 주문 만들기를 눌러주세요.",
     "cancelledNotice": "매장에서 이 주문을 취소했습니다. 문의하거나 새 주문을 만들어 주세요.",
     "completedToast": "주문 #{code} 완료되었습니다!",
-    "cancelledToast": "매장에서 주문 #{code}을(를) 취소했습니다."
+    "cancelledToast": "매장에서 주문 #{code}을(를) 취소했습니다.",
+    "shopMessageLabel": "매장 안내",
+    "finalCompletedTitle": "주문 #{code} 완료",
+    "finalCancelledTitle": "주문 #{code} 취소됨",
+    "finalNewOrderBtn": "새 주문 시작",
+    "finalCloseBtn": "닫기"
   }
 }

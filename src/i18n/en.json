@@ -11,7 +11,8 @@
     "notePlaceholder": "Ex: less spicy, no onion, extra sauce...",
     "relatedItems": "More in this category",
     "chooseVariant": "Options",
-    "noticeLabel": "NOTICE"
+    "noticeLabel": "NOTICE",
+    "inCartLabel": "In cart"
   },
   "contact": {
     "sendOrder": "Contact to send order",

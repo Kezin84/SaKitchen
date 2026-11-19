@@ -11,7 +11,8 @@
     "notePlaceholder": "Hal: bawasan ang anghang, walang sibuyas...",
     "relatedItems": "Mga katulad na pagkain",
     "chooseVariant": "Mga opsyon",
-    "noticeLabel": "PAUNAWA"
+    "noticeLabel": "PAUNAWA",
+    "inCartLabel": "Nasa cart"
   },
   "contact": {
     "sendOrder": "Makipag-ugnayan para mag-order",

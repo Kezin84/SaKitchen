@@ -662,6 +662,17 @@
                 <label class="form-label">Hình ảnh sản phẩm</label>
                 <div class="image-upload-area">
                   <div class="image-preview-container">
+                    <button
+                      v-if="edit.Main_img"
+                      type="button"
+                      class="main-image-delete-badge"
+                      aria-label="Xóa ảnh chính"
+                      title="Xóa ảnh chính"
+                      :disabled="mainImageUploading"
+                      @click.stop="removeMainImage"
+                    >
+                      <i class="ri-close-fill"></i>
+                    </button>
                     <img
                       v-if="edit.Main_img"
                       :src="edit.Main_img"
@@ -680,14 +691,27 @@
                       accept="image/*"
                       style="display: none"
                     />
-                  <button 
-                    class="btn-upload-image" 
-                    @click="$refs.fileInput.click()" 
-                    :disabled="mainImageUploading"
-                  >
-                    <span v-if="mainImageUploading"> Đang tải...</span>
-                    <span v-else><i class="ri-chat-upload-fill"></i>Upload ảnh</span>
-                  </button>
+                  <div class="main-image-actions">
+                    <button
+                      type="button"
+                      class="btn-upload-image"
+                      @click="$refs.fileInput.click()"
+                      :disabled="mainImageUploading"
+                    >
+                      <span v-if="mainImageUploading"> Đang tải...</span>
+                      <span v-else><i class="ri-chat-upload-fill"></i>{{ edit.Main_img ? 'Đổi ảnh' : 'Upload ảnh' }}</span>
+                    </button>
+                    <button
+                      v-if="edit.Main_img"
+                      type="button"
+                      class="btn-remove-image"
+                      @click="removeMainImage"
+                      :disabled="mainImageUploading"
+                    >
+                      <i class="ri-delete-bin-line"></i>
+                      <span>Xóa ảnh</span>
+                    </button>
+                  </div>
                   <div class="upload-size-hint">
                     Kích thước chuẩn: <strong>800 × 800 px – 1200 × 1200 px</strong> (vuông 1:1) · Tự nén ≤ 100KB
                   </div>
@@ -1027,6 +1051,17 @@
                   <div class="form-group main-image-group">
                     <div class="image-upload-area">
                       <div class="image-preview-container">
+                        <button
+                          v-if="edit.Main_img"
+                          type="button"
+                          class="main-image-delete-badge"
+                          aria-label="Xóa ảnh chính"
+                          title="Xóa ảnh chính"
+                          :disabled="mainImageUploading"
+                          @click.stop="removeMainImage"
+                        >
+                          <i class="ri-close-fill"></i>
+                        </button>
                         <img
                           v-if="edit.Main_img"
                           :src="edit.Main_img"
@@ -1044,13 +1079,26 @@
                         accept="image/*"
                         style="display: none"
                       />
-                      <button 
-                        class="btn-upload-image" 
-                        @click="$refs.fileInputModal.click()" 
-                        :disabled="mainImageUploading"
-                      >
-                        {{ mainImageUploading ? 'Đang tải lên...' : 'Đổi ảnh' }}
-                      </button>
+                      <div class="main-image-actions">
+                        <button
+                          type="button"
+                          class="btn-upload-image"
+                          @click="$refs.fileInputModal.click()"
+                          :disabled="mainImageUploading"
+                        >
+                          {{ mainImageUploading ? 'Đang tải lên...' : (edit.Main_img ? 'Đổi ảnh' : 'Thêm ảnh') }}
+                        </button>
+                        <button
+                          v-if="edit.Main_img"
+                          type="button"
+                          class="btn-remove-image"
+                          @click="removeMainImage"
+                          :disabled="mainImageUploading"
+                        >
+                          <i class="ri-delete-bin-line"></i>
+                          <span>Xóa ảnh</span>
+                        </button>
+                      </div>
                       <div class="upload-size-hint">
                         Kích thước chuẩn: <strong>800 × 800 px – 1200 × 1200 px</strong> (vuông 1:1) · Tự nén ≤ 100KB
                       </div>
@@ -3763,6 +3811,14 @@ function openSidebarSupplementaryUpload(index) {
   }
 }
 
+function removeMainImage() {
+  if (!edit.value?.Main_img) return
+  edit.value.Main_img = ''
+  if (fileInput.value) fileInput.value.value = ''
+  if (fileInputModal.value) fileInputModal.value.value = ''
+  markAsEdited()
+}
+
 function removeSupplementaryImage(key) {
   if (!key) return
   edit.value[key] = ''
@@ -6368,12 +6424,42 @@ function onMoneyInput(e, key) {
 }
 
 .image-preview-container {
+  position: relative;
   width: 100%;
   aspect-ratio: 1;
   border-radius: 12px;
   overflow: hidden;
   background: rgba(30, 41, 59, 0.5);
   border: 2px dashed rgba(148, 163, 184, 0.2);
+}
+
+.main-image-delete-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(15, 23, 42, 0.78);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.18s ease, transform 0.15s ease;
+}
+
+.main-image-delete-badge:hover:not(:disabled) {
+  background: #ef4444;
+  transform: scale(1.06);
+}
+
+.main-image-delete-badge:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .image-preview {
@@ -6458,6 +6544,48 @@ function onMoneyInput(e, key) {
 .empty-text {
   font-size: 12px;
   color: #64748b;
+}
+
+.main-image-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.main-image-actions .btn-upload-image {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+
+.btn-remove-image {
+  height: 44px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(239, 68, 68, 0.14);
+  border: 2px solid rgba(239, 68, 68, 0.34);
+  border-radius: 10px;
+  color: #ef4444;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.btn-remove-image:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.24);
+  border-color: #ef4444;
+}
+
+.btn-remove-image:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-upload-image {

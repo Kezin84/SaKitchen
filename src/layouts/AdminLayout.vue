@@ -568,6 +568,11 @@ onUnmounted(() => {
           <span>Sắp xếp hiển thị</span>
         </RouterLink>
 
+        <RouterLink :to="{ name: 'admin-cau-hinh-hien-thi' }" class="menu-item">
+          <i class="ri-palette-fill"></i>
+          <span>Giao diện & Màu sắc</span>
+        </RouterLink>
+
         <RouterLink to="/admin/thong-bao" class="menu-item">
           <i class="ri-alert-fill"></i>
           <span>Thông báo</span>
@@ -796,6 +801,11 @@ onUnmounted(() => {
         <RouterLink :to="{ name: 'admin-sap-xep-hien-thi' }" class="mobile-menu-item" @click="closeMobileSidebar">
           <i class="ri-arrow-up-down-line"></i>
           <span>Sắp xếp hiển thị</span>
+        </RouterLink>
+
+        <RouterLink :to="{ name: 'admin-cau-hinh-hien-thi' }" class="mobile-menu-item" @click="closeMobileSidebar">
+          <i class="ri-palette-fill"></i>
+          <span>Giao diện & Màu sắc</span>
         </RouterLink>
 
         <RouterLink to="/admin/thong-bao" class="mobile-menu-item" @click="closeMobileSidebar">

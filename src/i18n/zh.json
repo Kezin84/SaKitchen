@@ -11,7 +11,8 @@
     "notePlaceholder": "例如：少辣、不要葱、多加酱...",
     "relatedItems": "同分类推荐",
     "chooseVariant": "规格分类",
-    "noticeLabel": "公告"
+    "noticeLabel": "公告",
+    "inCartLabel": "已加购"
   },
   "contact": {
     "sendOrder": "联系商家下单",

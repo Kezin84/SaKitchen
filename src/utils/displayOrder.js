@@ -1,4 +1,5 @@
 // Shared helpers for Display Order (categories + products + MenuOnline modes)
+import { normalizeThemeConfig } from './storefrontTheme'
 
 export const DISPLAY_MODE_FLAT = 'flat' // Kiểu A: Top lên đầu -> theo thứ tự từng món
 export const DISPLAY_MODE_BY_CATEGORY = 'by_category' // Kiểu B: Gom nhóm theo thứ tự Danh mục
@@ -75,6 +76,7 @@ export function normalizeDisplayConfig(rows) {
     mainRow.productSortMode === DISPLAY_MODE_BY_CATEGORY
       ? DISPLAY_MODE_BY_CATEGORY
       : DISPLAY_MODE_FLAT
+  const themeConfig = normalizeThemeConfig(mainRow.themeConfig)
 
   return {
     categoryOrder,
@@ -82,6 +84,7 @@ export function normalizeDisplayConfig(rows) {
     parentI18n,
     productGroups,
     productSortMode,
+    themeConfig,
   }
 }
 

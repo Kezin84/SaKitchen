@@ -11,7 +11,8 @@
     "notePlaceholder": "예: 덜 맵게, 양파 빼주세요, 소스 추가...",
     "relatedItems": "같은 카테고리 메뉴",
     "chooseVariant": "옵션 선택",
-    "noticeLabel": "공지"
+    "noticeLabel": "공지",
+    "inCartLabel": "장바구니"
   },
   "contact": {
     "sendOrder": "주문 문의",

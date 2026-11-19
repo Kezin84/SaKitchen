@@ -16,6 +16,7 @@ import {
   calcOrderLineProfit,
 } from '../utils/nccDiscount'
 import { buildUniqueProductCode } from '../utils/productCode'
+import { normalizeThemeConfig } from '../utils/storefrontTheme'
 
 export const CLOUDINARY_CLOUD_NAME = 'dsmtq5rbh'
 export const CLOUDINARY_SIGN_ENDPOINT = '/api/cloudinary-sign'
@@ -794,10 +795,12 @@ function resolveCanonicalViItem(item, hangHoaMap) {
     s(hh?.Danh_muc).trim() ||
     s(item?._danhMucVi || item?.Danh_muc_vi || item?.Danh_muc || item?.danhMuc).trim()
 
-  const dvtVi =
-    hhI18n?.vi?.Dvt ||
-    s(hh?.Dvt).trim() ||
-    s(item?._dvtVi || item?.Dvt_vi || item?.Dvt || item?.dvt).trim()
+  const hasCustomDvt = Boolean(item?.Dvt_custom || item?._dvtCustom)
+  const dvtVi = hasCustomDvt
+    ? s(item?.Dvt ?? item?.dvt).trim()
+    : hhI18n?.vi?.Dvt ||
+      s(hh?.Dvt).trim() ||
+      s(item?._dvtVi || item?.Dvt_vi || item?.Dvt || item?.dvt).trim()
 
   const defaultSellPrice = hh
     ? hh.Gia_Giam !== '' && hh.Gia_Giam !== null && hh.Gia_Giam !== undefined && n(hh.Gia_Giam) > 0
@@ -834,6 +837,7 @@ function resolveCanonicalViItem(item, hangHoaMap) {
     Ten_hang: tenVi,
     Danh_muc: danhMucVi,
     Dvt: dvtVi,
+    ...(hasCustomDvt ? { Dvt_custom: true } : {}),
     Size: s(item?.Size || hh?.Size),
     Main_img: s(item?.Main_img || hh?.Main_img),
     Don_vi_tien_te: donViTienTe,
@@ -1793,6 +1797,9 @@ export async function submitCustomerOrder(body = {}) {
         {
           ...rawIt,
           Gia_ban: existingLine?.Gia_ban !== undefined ? existingLine.Gia_ban : rawIt.Gia_ban,
+          ...(existingLine?.Dvt_custom
+            ? { Dvt: existingLine.Dvt ?? '', Dvt_custom: true }
+            : {}),
           Added_at: existingLine?.Added_at || rawIt.Added_at || Date.now(),
         },
         hhMap,
@@ -3626,6 +3633,13 @@ async function saveDisplayConfig(body = {}) {
         ? 'by_category'
         : 'flat'
 
+  const nextThemeConfig =
+    d.themeConfig !== undefined
+      ? normalizeThemeConfig({ ...d.themeConfig, updatedAt: Date.now() })
+      : existingRow.themeConfig
+        ? normalizeThemeConfig(existingRow.themeConfig)
+        : normalizeThemeConfig(null)
+
   const payload = sanitizeRow({
     ID: 'main',
     categoryOrder: nextCategoryOrder,
@@ -3633,6 +3647,7 @@ async function saveDisplayConfig(body = {}) {
     parentI18n: nextParentI18n,
     productGroups: nextProductGroups,
     productSortMode: nextProductSortMode,
+    themeConfig: nextThemeConfig,
     updatedAt: Date.now(),
   })
 

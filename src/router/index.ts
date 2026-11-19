@@ -11,6 +11,7 @@ import Khuyenmai from '@/views/Khuyenmai.vue'
 import OpenTime from '@/views/OpenTime.vue'
 import ContactShop from '@/views/ContactShop.vue'
 import SapXepHienThi from '@/views/SapXepHienThi.vue'
+import CauHinhHienThi from '@/views/CauHinhHienThi.vue'
 import Login from '@/views/Login.vue'
 import NhapHoaDon from '@/views/nhaphoadon.vue'
 import DonHang from '@/views/donhang.vue'
@@ -89,6 +90,7 @@ const router = createRouter({
         },
         { path: 'banner', name: 'admin-banner', component: Banner },
         { path: 'sap-xep-hien-thi', name: 'admin-sap-xep-hien-thi', component: SapXepHienThi },
+        { path: 'cau-hinh-hien-thi', name: 'admin-cau-hinh-hien-thi', component: CauHinhHienThi },
         { path: 'thong-bao', name: 'admin-thong-bao', component: Thongbao },
         { path: 'logo', name: 'admin-logo', component: Logo },
         { path: 'khuyen-mai', name: 'admin-khuyen-mai', component: Khuyenmai },

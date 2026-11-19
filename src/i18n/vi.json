@@ -11,7 +11,8 @@
     "notePlaceholder": "VD: ít cay, không hành, thêm sốt...",
     "relatedItems": "Món cùng danh mục",
     "chooseVariant": "Phân loại",
-    "noticeLabel": "THÔNG BÁO"
+    "noticeLabel": "THÔNG BÁO",
+    "inCartLabel": "Trong giỏ"
   },
   "contact": {
     "sendOrder": "Liên hệ gửi đơn",

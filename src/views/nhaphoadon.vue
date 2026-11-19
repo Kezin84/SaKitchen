@@ -3166,6 +3166,23 @@
             </div>
           </div>
 
+          <!-- Row 1b: Unit (ĐVT) -->
+          <div class="pmv4-field-group span-full">
+            <label class="pmv4-label">Đơn vị tính (ĐVT)</label>
+            <div class="pmv4-input-wrap">
+              <input
+                type="text"
+                v-model="editItem.dvt"
+                list="ds-edit-dvt"
+                placeholder="VD: Phần, Ly, Kg, Hộp..."
+                class="pmv4-input"
+              />
+              <datalist id="ds-edit-dvt">
+                <option v-for="u in uniqueDvts" :key="u" :value="u">{{ u }}</option>
+              </datalist>
+            </div>
+          </div>
+
           <!-- Row 2: Pricing -->
           <div class="pmv4-field-group">
             <label class="pmv4-label">Giá bán</label>
@@ -6338,6 +6355,7 @@ function mapServerOrderItemToPosRow(raw, maHD, soHD, ngayTaoStr) {
     Danh_muc: raw?.Danh_muc || '',
     Size: raw?.Size || '',
     Dvt: raw?.Dvt || '',
+    ...(raw?.Dvt_custom ? { Dvt_custom: true } : {}),
     Don_vi_tien_te: currency,
     donViTienTe: currency,
     So_luong: qty,
@@ -8942,7 +8960,8 @@ function buildInvoicePayload(targetStatus = '', adminMessage = '') {
       Ma_hang: it.Ma_hang || it.maHang || '',
       Ten_hang: it.Ten_hang || it.tenHang || '',
       Size: it.Size || it.size || '',
-      Dvt: it.Dvt || it.dvt || '',
+      Dvt: it.Dvt ?? it.dvt ?? '',
+      ...(it.Dvt_custom ? { Dvt_custom: true } : {}),
       Don_vi_tien_te: it.Don_vi_tien_te || it.donViTienTe || donViTienTeChung.value,
       So_luong: Number(it.soLuong ?? it.So_luong ?? 1),
       Gia_goc: Number(it.giaGoc ?? it.Gia_goc ?? 0),
@@ -9239,7 +9258,8 @@ async function saveOrderDraftFromInvoice() {
         Ma_hang: it.Ma_hang || it.maHang || '',
         Ten_hang: it.Ten_hang || it.tenHang || '',
         Size: it.Size || it.size || '',
-        Dvt: it.Dvt || it.dvt || '',
+        Dvt: it.Dvt ?? it.dvt ?? '',
+        ...(it.Dvt_custom ? { Dvt_custom: true } : {}),
         So_luong: Number(it.So_luong ?? it.soLuong ?? 1),
         Gia_goc: Number(it.Gia_goc ?? it.giaGoc ?? 0),
         Gia_ban: Number(it.Gia_ban ?? it.giaBan ?? 0),
@@ -10211,6 +10231,9 @@ function openEditItem(item, idx, siblingEntries = []) {
   editIndex.value = idx
   const cloned = JSON.parse(JSON.stringify(item))
   cloned.giaGoc = getOrderItemGiaGoc(cloned)
+  cloned.dvt = String(cloned.dvt ?? cloned.Dvt ?? '').trim()
+  cloned.Dvt = cloned.dvt
+  cloned.Dvt_custom = Boolean(cloned.Dvt_custom)
   cloned.nccLoaiGiam = normalizeNccDiscountType(cloned.Ncc_loai_giam ?? cloned.nccLoaiGiam)
   cloned.nccGiaTriGiam = normalizeNccDiscountValue(cloned.Ncc_gia_tri_giam ?? cloned.nccGiaTriGiam)
   Object.assign(editItem, cloned)
@@ -10227,6 +10250,9 @@ function switchEditModalSibling(sib) {
   editIndex.value = sib.idx
   const cloned = JSON.parse(JSON.stringify(liveItem))
   cloned.giaGoc = getOrderItemGiaGoc(cloned)
+  cloned.dvt = String(cloned.dvt ?? cloned.Dvt ?? '').trim()
+  cloned.Dvt = cloned.dvt
+  cloned.Dvt_custom = Boolean(cloned.Dvt_custom)
   cloned.nccLoaiGiam = normalizeNccDiscountType(cloned.Ncc_loai_giam ?? cloned.nccLoaiGiam)
   cloned.nccGiaTriGiam = normalizeNccDiscountValue(cloned.Ncc_gia_tri_giam ?? cloned.nccGiaTriGiam)
   Object.assign(editItem, cloned)
@@ -10283,6 +10309,13 @@ function saveEditItem() {
   i.Gia_ban = i.giaBan
   i.Giam_gia = i.giamGia
   i.Ghi_chu = i.ghiChuHang || '' // ✅ CẬP NHẬT GHI CHÚ HÀNG
+  const prevDvt = String(items.value[editIndex.value]?.dvt ?? items.value[editIndex.value]?.Dvt ?? '').trim()
+  const nextDvt = String(i.dvt ?? '').trim()
+  i.dvt = nextDvt
+  i.Dvt = nextDvt
+  if (nextDvt !== prevDvt || items.value[editIndex.value]?.Dvt_custom) {
+    i.Dvt_custom = true
+  }
 
   if (showMemberTargetBar.value && editItemMemberKey.value) {
     const chosenMember = invoiceOrderMembers.value.find(

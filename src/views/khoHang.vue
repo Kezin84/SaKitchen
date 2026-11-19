@@ -216,6 +216,18 @@
   </button>
 
   <button
+    type="button"
+    class="btn-manage-toppings"
+    @click="openToppingGroupModal()"
+  >
+    <span class="btn-icon"><i class="ri-add-box-line"></i></span>
+    <span class="btn-text">Link Topping</span>
+    <span v-if="toppingGroupsList.length" class="filter-badge">
+      {{ toppingGroupsList.length }}
+    </span>
+  </button>
+
+  <button
     v-if="hasActiveFilters"
     class="btn-clear-filters"
     @click="clearAllFilters"
@@ -869,6 +881,38 @@
                       <span>{{ editLinkDraft.items.length >= 2 ? 'Sửa link' : 'Chọn hàng link' }}</span>
                     </button>
                   </div>
+                  <div v-if="edit.Ma_hang" class="edit-link-trigger-card is-topping-card">
+                    <div class="elt-left">
+                      <div class="elt-title-row">
+                        <i class="ri-add-box-line"></i>
+                        <span>Topping gọi thêm</span>
+                        <span class="ils-badge" :class="{ active: editProductToppingsPreview.length > 0 }">
+                          {{
+                            editProductToppingsPreview.length > 0
+                              ? `${editProductToppingsPreview.length} topping`
+                              : 'Chưa gắn'
+                          }}
+                        </span>
+                      </div>
+                      <div v-if="editProductToppingsPreview.length" class="elt-preview-chips">
+                        <span
+                          v-for="tp in editProductToppingsPreview"
+                          :key="'mob-tp-chip-' + tp.maHang"
+                          class="elt-chip is-topping-chip"
+                        >
+                          + {{ tp.item.Ten_hang }}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      class="btn-link-group-inline is-topping-btn"
+                      @click="openToppingGroupModalForProduct(edit)"
+                    >
+                      <i class="ri-add-box-line"></i>
+                      <span>Quản lý Topping</span>
+                    </button>
+                  </div>
                 </div>
                   <div class="form-group">
                     <label class="form-label">Danh mục cha ({{ getLangShort(activeEditLang) }})</label>
@@ -1412,6 +1456,38 @@
                         >
                           <i class="ri-links-line"></i>
                           <span>{{ editLinkDraft.items.length >= 2 ? 'Sửa link' : 'Chọn hàng link' }}</span>
+                        </button>
+                      </div>
+                      <div v-if="edit.Ma_hang" class="edit-link-trigger-card is-topping-card">
+                        <div class="elt-left">
+                          <div class="elt-title-row">
+                            <i class="ri-add-box-line"></i>
+                            <span>Topping gọi thêm</span>
+                            <span class="ils-badge" :class="{ active: editProductToppingsPreview.length > 0 }">
+                              {{
+                                editProductToppingsPreview.length > 0
+                                  ? `${editProductToppingsPreview.length} topping`
+                                  : 'Chưa gắn'
+                              }}
+                            </span>
+                          </div>
+                          <div v-if="editProductToppingsPreview.length" class="elt-preview-chips">
+                            <span
+                              v-for="tp in editProductToppingsPreview"
+                              :key="'pc-tp-chip-' + tp.maHang"
+                              class="elt-chip is-topping-chip"
+                            >
+                              + {{ tp.item.Ten_hang }}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          class="btn-link-group-inline is-topping-btn"
+                          @click="openToppingGroupModalForProduct(edit)"
+                        >
+                          <i class="ri-add-box-line"></i>
+                          <span>Quản lý Topping</span>
                         </button>
                       </div>
                     </div>
@@ -2560,6 +2636,396 @@
       </div>
     </transition>
 
+    <!-- ===== MODAL QUẢN LÝ LINK TOPPING / GỌI THÊM (100% FULLSCREEN) ===== -->
+    <transition name="fade">
+      <div
+        v-if="showToppingGroupModal"
+        class="bulk-modal-overlay fullscreen-link-overlay tgm-fullscreen-overlay"
+        @click.self="closeToppingGroupModal"
+      >
+        <div class="bulk-modal-card fullscreen-link-card tgm-fullscreen-card" @click.stop>
+          <div class="bulk-modal-header flc-header">
+            <div class="flc-header-inner">
+              <div>
+                <h3 class="bulk-modal-title tgm-title">
+                  <i class="ri-add-box-line"></i>
+                  Link Topping / Gọi Thêm
+                </h3>
+                <p class="bulk-modal-subtitle">
+                  Chọn món làm Topping (VD: Trứng ốp la, Chả, Cơm thêm...) rồi gắn vào Danh mục hoặc Món cụ thể để khách tick gọi thêm ngay trong modal chi tiết.
+                </p>
+              </div>
+              <button
+                type="button"
+                class="bulk-close-btn"
+                :disabled="toppingGroupSaving"
+                @click="closeToppingGroupModal"
+              >
+                <i class="ri-close-line"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="flc-top-tabs-bar">
+            <div class="flc-container flc-top-tabs-inner">
+              <span class="pcm-section-label">Nhóm Topping:</span>
+              <div class="pcm-parent-pills">
+                <button
+                  type="button"
+                  class="pcm-parent-pill is-new"
+                  :class="{ active: toppingGroupState.isCreatingNew }"
+                  @click="selectNewToppingGroupInModal"
+                >
+                  <i class="ri-add-circle-line"></i>
+                  <span>+ Tạo nhóm mới</span>
+                </button>
+                <button
+                  v-for="(grp, gIdx) in toppingGroupsList"
+                  :key="'tgm-grp-' + grp.id"
+                  type="button"
+                  class="pcm-parent-pill"
+                  :class="{ active: !toppingGroupState.isCreatingNew && toppingGroupState.editingGroupId === grp.id }"
+                  @click="selectExistingToppingGroupInModal(grp.id)"
+                >
+                  <i class="ri-add-box-line"></i>
+                  <span>{{ grp.name || `Topping #${gIdx + 1}` }}</span>
+                  <span class="pcm-pill-count">{{ grp.toppings.length }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flc-workspace-body">
+            <div class="flc-container link-workspace-grid">
+              <!-- CỘT TRÁI: TÊN NHÓM, DANH SÁCH TOPPING & PHẠM VI ÁP DỤNG -->
+              <div class="link-pane is-left">
+                <div class="pcm-field flc-group-name-field">
+                  <label>Tên nhóm Topping (tùy chọn)</label>
+                  <input
+                    v-model="toppingGroupState.name"
+                    type="text"
+                    class="form-control"
+                    placeholder="VD: Topping Cơm, Topping Mì/Bún, Đồ ăn kèm..."
+                  />
+                </div>
+
+                <!-- 1. TOPPINGS SELECTED -->
+                <div class="link-pane-head" style="margin-top: 4px;">
+                  <span class="link-pane-title">
+                    <i class="ri-restaurant-2-line"></i>
+                    <span>Món làm Topping ({{ toppingGroupState.toppings.length }})</span>
+                  </span>
+                  <button
+                    type="button"
+                    class="tgm-jump-btn"
+                    :class="{ active: toppingGroupState.pickerTab === 'toppings' }"
+                    @click="toppingGroupState.pickerTab = 'toppings'"
+                  >
+                    + Chọn Topping
+                  </button>
+                </div>
+
+                <div v-if="!toppingGroupState.toppings.length" class="tgm-mini-empty">
+                  Chưa chọn món topping nào. Tick chọn ở cột bên phải (Tab 1).
+                </div>
+                <div v-else class="tgm-selected-list">
+                  <div
+                    v-for="(code, tIdx) in toppingGroupState.toppings"
+                    :key="'tgm-tp-' + code"
+                    class="pgm-selected-row flc-selected-card"
+                  >
+                    <div class="pgm-move-col">
+                      <button
+                        type="button"
+                        class="pgm-move-btn"
+                        :disabled="tIdx === 0"
+                        title="Lên"
+                        @click="moveToppingInDraft(tIdx, -1)"
+                      >
+                        <i class="ri-arrow-up-s-line"></i>
+                      </button>
+                      <button
+                        type="button"
+                        class="pgm-move-btn"
+                        :disabled="tIdx === toppingGroupState.toppings.length - 1"
+                        title="Xuống"
+                        @click="moveToppingInDraft(tIdx, 1)"
+                      >
+                        <i class="ri-arrow-down-s-line"></i>
+                      </button>
+                    </div>
+                    <img
+                      v-if="getProductImageByCode(code)"
+                      :src="getProductImageByCode(code)"
+                      class="link-item-thumb"
+                      alt=""
+                    />
+                    <div v-else class="link-item-thumb is-empty">
+                      <i class="ri-image-line"></i>
+                    </div>
+                    <div class="pgm-sel-info">
+                      <div class="pgm-sel-name">{{ getProductNameByCode(code) }}</div>
+                      <div class="pgm-sel-meta">
+                        <span>{{ code }}</span>
+                        <span v-if="getProductPriceByCode(code)">
+                          • +{{ getProductPriceByCode(code) }}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      class="pgm-remove-btn"
+                      title="Gỡ topping"
+                      @click="toggleToppingInDraft(code)"
+                    >
+                      <i class="ri-close-line"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 2. TARGETS SUMMARY -->
+                <div class="link-pane-head" style="margin-top: 14px;">
+                  <span class="link-pane-title">
+                    <i class="ri-focus-3-line"></i>
+                    <span>
+                      Áp dụng cho ({{ toppingGroupState.targetCategories.length }} danh mục,
+                      {{ toppingGroupState.targetProducts.length }} món lẻ)
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    class="tgm-jump-btn"
+                    :class="{ active: toppingGroupState.pickerTab === 'targets' }"
+                    @click="toppingGroupState.pickerTab = 'targets'"
+                  >
+                    + Chọn món áp dụng
+                  </button>
+                </div>
+
+                <div
+                  v-if="!toppingGroupState.targetCategories.length && !toppingGroupState.targetProducts.length"
+                  class="tgm-mini-empty"
+                >
+                  Chưa chọn danh mục hoặc món áp dụng. Chuyển sang Tab 2 ở cột bên phải để chọn.
+                </div>
+                <div v-else class="tgm-target-chips-wrap">
+                  <span
+                    v-for="cat in toppingGroupState.targetCategories"
+                    :key="'tgm-tcat-' + cat"
+                    class="tgm-chip is-cat"
+                  >
+                    <i class="ri-folder-3-line"></i>
+                    <span>{{ cat }}</span>
+                    <button type="button" @click="toggleTargetCategoryInDraft(cat)">
+                      <i class="ri-close-line"></i>
+                    </button>
+                  </span>
+                  <span
+                    v-for="code in toppingGroupState.targetProducts"
+                    :key="'tgm-tprod-' + code"
+                    class="tgm-chip is-prod"
+                  >
+                    <i class="ri-restaurant-line"></i>
+                    <span>{{ getProductNameByCode(code) }}</span>
+                    <button type="button" @click="toggleTargetProductInDraft(code)">
+                      <i class="ri-close-line"></i>
+                    </button>
+                  </span>
+                </div>
+              </div>
+
+              <!-- CỘT PHẢI: 2 TAB CHỌN TOPPING / CHỌN PHẠM VI ÁP DỤNG -->
+              <div class="link-pane is-right">
+                <div class="tgm-picker-tabs">
+                  <button
+                    type="button"
+                    class="tgm-picker-tab"
+                    :class="{ active: toppingGroupState.pickerTab === 'toppings' }"
+                    @click="toppingGroupState.pickerTab = 'toppings'"
+                  >
+                    <span class="tgm-step-num">1</span>
+                    <span>Chọn món làm Topping</span>
+                    <span class="tgm-tab-badge">{{ toppingGroupState.toppings.length }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="tgm-picker-tab"
+                    :class="{ active: toppingGroupState.pickerTab === 'targets' }"
+                    @click="toppingGroupState.pickerTab = 'targets'"
+                  >
+                    <span class="tgm-step-num">2</span>
+                    <span>Áp dụng cho Danh mục / Món</span>
+                    <span class="tgm-tab-badge">
+                      {{ toppingGroupState.targetCategories.length + toppingGroupState.targetProducts.length }}
+                    </span>
+                  </button>
+                </div>
+
+                <!-- TAB 2 QUICK CATEGORY PICKER -->
+                <div v-if="toppingGroupState.pickerTab === 'targets'" class="tgm-cat-box">
+                  <div class="tgm-cat-box-label">
+                    <i class="ri-folder-check-line"></i>
+                    <span>Gắn nhanh cho cả Danh mục (1 click áp dụng toàn bộ món trong danh mục):</span>
+                  </div>
+                  <div class="tgm-cat-pills">
+                    <button
+                      v-for="cat in categories"
+                      :key="'tgm-cat-pick-' + cat.name"
+                      type="button"
+                      class="tgm-cat-pill"
+                      :class="{ active: toppingGroupState.targetCategories.includes(cat.name) }"
+                      @click="toggleTargetCategoryInDraft(cat.name)"
+                    >
+                      <i
+                        :class="
+                          toppingGroupState.targetCategories.includes(cat.name)
+                            ? 'ri-checkbox-fill'
+                            : 'ri-checkbox-blank-line'
+                        "
+                      ></i>
+                      <span>{{ cat.name }}</span>
+                      <span class="tgm-cat-cnt">{{ cat.count }}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="link-pane-head" style="margin-top: 4px;">
+                  <span class="link-pane-title">
+                    <i class="ri-archive-line"></i>
+                    <span>
+                      {{
+                        toppingGroupState.pickerTab === 'toppings'
+                          ? `Chọn món làm Topping (${filteredKhoProductsForTopping.length})`
+                          : `Hoặc chọn thêm từng món lẻ (${filteredKhoProductsForTopping.length})`
+                      }}
+                    </span>
+                  </span>
+                  <div class="link-filter-tools">
+                    <select v-model="toppingGroupState.categoryFilter" class="form-control flc-cat-select">
+                      <option value="">Tất cả danh mục</option>
+                      <option v-for="cat in categories" :key="'tgm-cat-' + cat.name" :value="cat.name">
+                        {{ cat.name }} ({{ cat.count }})
+                      </option>
+                    </select>
+                  </div>
+                </div>
+
+                <input
+                  v-model="toppingGroupState.search"
+                  type="text"
+                  class="form-control flc-search-input"
+                  placeholder="Tìm theo tên món, mã hàng, danh mục..."
+                />
+
+                <div v-if="!filteredKhoProductsForTopping.length" class="link-pane-empty">
+                  <i class="ri-search-line"></i>
+                  <span>Không tìm thấy sản phẩm phù hợp.</span>
+                </div>
+                <div v-else class="link-picker-scroll">
+                  <div class="link-picker-cards">
+                    <label
+                      v-for="prod in filteredKhoProductsForTopping"
+                      :key="'tgm-pick-' + toppingGroupState.pickerTab + '-' + prod.Ma_hang"
+                      class="pcm-sub-item flc-pick-card"
+                      :class="{
+                        checked:
+                          toppingGroupState.pickerTab === 'toppings'
+                            ? toppingGroupState.toppings.includes(prod.Ma_hang)
+                            : toppingGroupState.targetProducts.includes(prod.Ma_hang) ||
+                              toppingGroupState.targetCategories.includes(String(prod.Danh_muc || '').trim()),
+                      }"
+                    >
+                      <input
+                        type="checkbox"
+                        :checked="
+                          toppingGroupState.pickerTab === 'toppings'
+                            ? toppingGroupState.toppings.includes(prod.Ma_hang)
+                            : toppingGroupState.targetProducts.includes(prod.Ma_hang)
+                        "
+                        @change="
+                          toppingGroupState.pickerTab === 'toppings'
+                            ? toggleToppingInDraft(prod.Ma_hang)
+                            : toggleTargetProductInDraft(prod.Ma_hang)
+                        "
+                      />
+                      <img
+                        v-if="prod.Main_img"
+                        :src="prod.Main_img"
+                        class="link-item-thumb"
+                        alt=""
+                      />
+                      <div v-else class="link-item-thumb is-empty">
+                        <i class="ri-image-line"></i>
+                      </div>
+                      <div class="pcm-sub-info">
+                        <div class="pcm-sub-name">{{ prod.Ten_hang }}</div>
+                        <div class="pcm-sub-meta">
+                          <span>{{ prod.Ma_hang }}</span>
+                          <span v-if="prod.Danh_muc"> • {{ prod.Danh_muc }}</span>
+                          <span v-if="getProductPriceByCode(prod.Ma_hang)" class="flc-pick-price">
+                            • {{ getProductPriceByCode(prod.Ma_hang) }}
+                          </span>
+                          <span
+                            v-if="
+                              toppingGroupState.pickerTab === 'targets' &&
+                              toppingGroupState.targetCategories.includes(String(prod.Danh_muc || '').trim())
+                            "
+                            class="pcm-other-badge"
+                          >
+                            • Đã gồm trong danh mục
+                          </span>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bulk-modal-footer flc-footer">
+            <div class="flc-footer-inner">
+              <button
+                v-if="!toppingGroupState.isCreatingNew && toppingGroupState.editingGroupId"
+                type="button"
+                class="btn-modal btn-danger"
+                :disabled="toppingGroupSaving"
+                @click="deleteToppingGroupModal"
+              >
+                <i class="ri-delete-bin-line"></i>
+                <span>Xóa nhóm</span>
+              </button>
+              <div v-else></div>
+
+              <div class="bulk-footer-right">
+                <button
+                  type="button"
+                  class="btn-modal btn-secondary"
+                  :disabled="toppingGroupSaving"
+                  @click="closeToppingGroupModal"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="button"
+                  class="btn-modal btn-primary"
+                  :disabled="
+                    toppingGroupSaving ||
+                    !toppingGroupState.toppings.length ||
+                    (!toppingGroupState.targetCategories.length && !toppingGroupState.targetProducts.length)
+                  "
+                  @click="saveToppingGroupModal"
+                >
+                  <span v-if="toppingGroupSaving" class="btn-spinner"></span>
+                  <span>{{ toppingGroupSaving ? 'Đang lưu...' : 'Lưu nhóm Topping' }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
+
   </div>
 </template>
 
@@ -2576,7 +3042,7 @@ import {
   getProductTranslatedLangs,
   productMatchesKeyword,
 } from '@/utils/i18nData'
-import { normalizeDisplayConfig } from '@/utils/displayOrder'
+import { normalizeDisplayConfig, getLinkedProductToppings } from '@/utils/displayOrder'
 import {
   normalizeNccDiscountType,
   normalizeNccDiscountValue,
@@ -2616,6 +3082,7 @@ const displayConfigState = ref({
   parentMap: {},
   parentI18n: {},
   productGroups: [],
+  toppingGroups: [],
   productSortMode: 'flat',
 })
 const showParentCategoryModal = ref(false)
@@ -2904,6 +3371,228 @@ const productGroupState = ref({
 const productGroupsList = computed(() =>
   Array.isArray(displayConfigState.value.productGroups) ? displayConfigState.value.productGroups : [],
 )
+
+/* ===== TOPPING LINK GROUPS MANAGER STATE ===== */
+const showToppingGroupModal = ref(false)
+const toppingGroupSaving = ref(false)
+const toppingGroupState = ref({
+  isCreatingNew: true,
+  editingGroupId: '',
+  name: '',
+  toppings: [],
+  targetCategories: [],
+  targetProducts: [],
+  pickerTab: 'toppings', // 'toppings' | 'targets'
+  search: '',
+  categoryFilter: '',
+})
+
+const toppingGroupsList = computed(() =>
+  Array.isArray(displayConfigState.value.toppingGroups) ? displayConfigState.value.toppingGroups : [],
+)
+
+const editProductToppingsPreview = computed(() => {
+  if (!edit.value?.Ma_hang) return []
+  return getLinkedProductToppings(edit.value, toppingGroupsList.value, list.value || [])
+})
+
+const filteredKhoProductsForTopping = computed(() => {
+  const kw = String(toppingGroupState.value.search || '').trim().toLowerCase()
+  const catFilter = String(toppingGroupState.value.categoryFilter || '').trim()
+  const items = list.value || []
+  const filtered = items.filter((it) => {
+    if (catFilter && String(it?.Danh_muc || '').trim() !== catFilter) return false
+    if (!kw) return true
+    const name = String(it?.Ten_hang || '').toLowerCase()
+    const code = String(it?.Ma_hang || '').toLowerCase()
+    const cat = String(it?.Danh_muc || '').toLowerCase()
+    return name.includes(kw) || code.includes(kw) || cat.includes(kw) || productMatchesKeyword(it, kw)
+  })
+  return filtered.slice(0, 120)
+})
+
+function selectNewToppingGroupInModal(presetTargetCode = '') {
+  const cleanCode = String(presetTargetCode || '').trim()
+  toppingGroupState.value = {
+    isCreatingNew: true,
+    editingGroupId: '',
+    name: '',
+    toppings: [],
+    targetCategories: [],
+    targetProducts: cleanCode ? [cleanCode] : [],
+    pickerTab: 'toppings',
+    search: '',
+    categoryFilter: '',
+  }
+}
+
+function selectExistingToppingGroupInModal(groupId) {
+  const found = toppingGroupsList.value.find((g) => g.id === groupId)
+  if (!found) {
+    selectNewToppingGroupInModal()
+    return
+  }
+  toppingGroupState.value = {
+    isCreatingNew: false,
+    editingGroupId: found.id,
+    name: found.name || '',
+    toppings: [...(found.toppings || [])],
+    targetCategories: [...(found.targetCategories || [])],
+    targetProducts: [...(found.targetProducts || [])],
+    pickerTab: 'toppings',
+    search: '',
+    categoryFilter: '',
+  }
+}
+
+function openToppingGroupModal(preferredGroupId = '') {
+  if (preferredGroupId) {
+    selectExistingToppingGroupInModal(preferredGroupId)
+  } else {
+    const first = toppingGroupsList.value[0]
+    if (first) selectExistingToppingGroupInModal(first.id)
+    else selectNewToppingGroupInModal()
+  }
+  showToppingGroupModal.value = true
+}
+
+function openToppingGroupModalForProduct(prod) {
+  const code = String(prod?.Ma_hang || '').trim()
+  const catVi = String(prod?.i18n?.vi?.Danh_muc || prod?.Danh_muc || '').trim()
+  const matched = toppingGroupsList.value.find(
+    (g) =>
+      (code && (g.targetProducts || []).includes(code)) ||
+      (catVi && (g.targetCategories || []).includes(catVi)),
+  )
+  if (matched) {
+    selectExistingToppingGroupInModal(matched.id)
+  } else {
+    selectNewToppingGroupInModal(code)
+  }
+  showToppingGroupModal.value = true
+}
+
+function closeToppingGroupModal() {
+  if (toppingGroupSaving.value) return
+  showToppingGroupModal.value = false
+}
+
+function toggleToppingInDraft(maHang) {
+  const code = String(maHang || '').trim()
+  if (!code) return
+  const arr = toppingGroupState.value.toppings
+  const idx = arr.indexOf(code)
+  if (idx >= 0) arr.splice(idx, 1)
+  else arr.push(code)
+}
+
+function moveToppingInDraft(index, delta) {
+  const arr = toppingGroupState.value.toppings
+  const target = index + delta
+  if (target < 0 || target >= arr.length) return
+  const [moved] = arr.splice(index, 1)
+  arr.splice(target, 0, moved)
+}
+
+function toggleTargetCategoryInDraft(catName) {
+  const clean = String(catName || '').trim()
+  if (!clean) return
+  const arr = toppingGroupState.value.targetCategories
+  const idx = arr.indexOf(clean)
+  if (idx >= 0) arr.splice(idx, 1)
+  else arr.push(clean)
+}
+
+function toggleTargetProductInDraft(maHang) {
+  const code = String(maHang || '').trim()
+  if (!code) return
+  const arr = toppingGroupState.value.targetProducts
+  const idx = arr.indexOf(code)
+  if (idx >= 0) arr.splice(idx, 1)
+  else arr.push(code)
+}
+
+async function saveToppingGroupModal() {
+  if (toppingGroupSaving.value) return
+  const st = toppingGroupState.value
+  if (!st.toppings.length) {
+    showAlert('Vui lòng chọn ít nhất 1 món làm Topping', 'error')
+    return
+  }
+  if (!st.targetCategories.length && !st.targetProducts.length) {
+    showAlert('Vui lòng chọn ít nhất 1 danh mục hoặc món áp dụng', 'error')
+    return
+  }
+
+  toppingGroupSaving.value = true
+  try {
+    const groupId = st.isCreatingNew
+      ? `tg_${Date.now().toString(36)}`
+      : st.editingGroupId || `tg_${Date.now().toString(36)}`
+    const newEntry = {
+      id: groupId,
+      name: String(st.name || '').trim(),
+      toppings: [...st.toppings],
+      targetCategories: [...st.targetCategories],
+      targetProducts: [...st.targetProducts],
+    }
+
+    const nextGroups = st.isCreatingNew
+      ? [...toppingGroupsList.value, newEntry]
+      : toppingGroupsList.value.map((g) => (g.id === groupId ? newEntry : g))
+
+    const res = await dispatchAction({
+      action: 'saveDisplayConfig',
+      data: { toppingGroups: nextGroups },
+    })
+    if (!res?.success) {
+      throw new Error(res?.message || 'Lưu nhóm Topping thất bại')
+    }
+    displayConfigState.value = {
+      ...displayConfigState.value,
+      toppingGroups: nextGroups,
+    }
+    selectExistingToppingGroupInModal(groupId)
+    showAlert('Đã lưu nhóm Topping thành công!', 'success')
+  } catch (err) {
+    console.error('saveToppingGroupModal error:', err)
+    showAlert(err?.message || 'Không lưu được nhóm Topping', 'error')
+  } finally {
+    toppingGroupSaving.value = false
+  }
+}
+
+async function deleteToppingGroupModal() {
+  if (toppingGroupSaving.value || toppingGroupState.value.isCreatingNew) return
+  const targetId = toppingGroupState.value.editingGroupId
+  if (!targetId) return
+  if (!confirm('Xóa nhóm Topping này? Các món ăn vẫn được giữ nguyên trong kho.')) return
+
+  toppingGroupSaving.value = true
+  try {
+    const nextGroups = toppingGroupsList.value.filter((g) => g.id !== targetId)
+    const res = await dispatchAction({
+      action: 'saveDisplayConfig',
+      data: { toppingGroups: nextGroups },
+    })
+    if (!res?.success) {
+      throw new Error(res?.message || 'Xóa nhóm Topping thất bại')
+    }
+    displayConfigState.value = {
+      ...displayConfigState.value,
+      toppingGroups: nextGroups,
+    }
+    const first = nextGroups[0]
+    if (first) selectExistingToppingGroupInModal(first.id)
+    else selectNewToppingGroupInModal()
+    showAlert('Đã xóa nhóm Topping!', 'success')
+  } catch (err) {
+    console.error('deleteToppingGroupModal error:', err)
+    showAlert(err?.message || 'Không xóa được nhóm Topping', 'error')
+  } finally {
+    toppingGroupSaving.value = false
+  }
+}
 
 const filteredKhoProductsForGroup = computed(() => {
   const kw = String(productGroupState.value.search || '').trim().toLowerCase()
@@ -7239,6 +7928,274 @@ function onMoneyInput(e, key) {
 .btn-manage-product-groups:hover {
   background: linear-gradient(135deg, #0ea5e9, #2563eb);
   color: #ffffff;
+}
+
+.btn-manage-toppings {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(251, 191, 36, 0.65);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(234, 88, 12, 0.26));
+  color: #fcd34d;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.btn-manage-toppings:hover {
+  background: linear-gradient(135deg, #f59e0b, #ea580c);
+  color: #ffffff;
+}
+
+.tgm-title {
+  color: #fcd34d;
+}
+
+.tgm-fullscreen-overlay {
+  z-index: 12000;
+}
+
+.tgm-fullscreen-card {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  border-radius: 0 !important;
+}
+
+.tgm-fullscreen-card .flc-header-inner,
+.tgm-fullscreen-card .flc-container,
+.tgm-fullscreen-card .flc-footer-inner {
+  max-width: 100% !important;
+}
+
+.tgm-fullscreen-card .link-pane.is-left {
+  overflow-y: auto;
+}
+
+.tgm-fullscreen-card .link-pane.is-right {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tgm-fullscreen-card .tgm-picker-tabs,
+.tgm-fullscreen-card .tgm-cat-box {
+  flex-shrink: 0;
+}
+
+.edit-link-trigger-card.is-topping-card {
+  margin-top: 8px;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.elt-chip.is-topping-chip {
+  background: rgba(245, 158, 11, 0.16);
+  border-color: rgba(245, 158, 11, 0.38);
+  color: #fbbf24;
+}
+
+.btn-link-group-inline.is-topping-btn {
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+}
+
+.btn-link-group-inline.is-topping-btn:hover {
+  background: #f59e0b;
+  color: #0f172a;
+}
+
+.tgm-picker-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.tgm-picker-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.45);
+  color: #cbd5e1;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.tgm-picker-tab.active {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.18);
+  color: #fef3c7;
+}
+
+.tgm-step-num {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.tgm-picker-tab.active .tgm-step-num {
+  background: #f59e0b;
+  color: #0f172a;
+}
+
+.tgm-tab-badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 11px;
+  line-height: 20px;
+  text-align: center;
+}
+
+.tgm-jump-btn {
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.12);
+  color: #fcd34d;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.tgm-jump-btn.active {
+  background: #f59e0b;
+  color: #0f172a;
+}
+
+.tgm-mini-empty {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px dashed rgba(148, 163, 184, 0.3);
+  color: #94a3b8;
+  font-size: 12.5px;
+  text-align: center;
+}
+
+.tgm-selected-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.tgm-target-chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.tgm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tgm-chip.is-cat {
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #fde68a;
+}
+
+.tgm-chip.is-prod {
+  background: rgba(56, 189, 248, 0.16);
+  border: 1px solid rgba(56, 189, 248, 0.42);
+  color: #bae6fd;
+}
+
+.tgm-chip button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  font-size: 14px;
+  opacity: 0.78;
+}
+
+.tgm-chip button:hover {
+  opacity: 1;
+}
+
+.tgm-cat-box {
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.tgm-cat-box-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fcd34d;
+  margin-bottom: 8px;
+}
+
+.tgm-cat-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 112px;
+  overflow-y: auto;
+}
+
+.tgm-cat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(30, 41, 59, 0.7);
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.tgm-cat-pill.active {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.22);
+  color: #fef3c7;
+}
+
+.tgm-cat-cnt {
+  font-size: 10.5px;
+  opacity: 0.72;
 }
 
 .pgm-title {

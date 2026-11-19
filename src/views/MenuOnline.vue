@@ -1181,6 +1181,71 @@
           </div>
         </div>
 
+        <!-- TOPPING / GỌI THÊM (MOBILE) -->
+        <div v-if="selectedProductToppings.length" class="dp-topping-group">
+          <div class="dp-topping-head">
+            <span class="dp-variant-label">{{ $t('menu.toppingsTitle') }}</span>
+            <span v-if="selectedDetailToppingsCount > 0" class="dp-topping-sel-pill">
+              {{ $t('menu.toppingsSelected') }}: {{ selectedDetailToppingsCount }}
+            </span>
+          </div>
+          <div class="dp-topping-list">
+            <div
+              v-for="tp in selectedProductToppings"
+              :key="'mob-tp-' + tp.maHang"
+              class="dp-topping-item"
+              :class="{
+                active: getDetailToppingQty(tp.maHang) > 0,
+                'is-out': tp.item.Trang_thai === 'Hết hàng',
+              }"
+              role="checkbox"
+              :aria-checked="getDetailToppingQty(tp.maHang) > 0"
+              @click="toggleDetailTopping(tp)"
+            >
+              <span class="dpt-check">
+                <i
+                  :class="
+                    getDetailToppingQty(tp.maHang) > 0
+                      ? 'ri-checkbox-fill'
+                      : 'ri-checkbox-blank-line'
+                  "
+                ></i>
+              </span>
+              <img
+                v-if="tp.item.Main_img"
+                :src="tp.item.Main_img"
+                :alt="tp.item.Ten_hang"
+                class="dpt-thumb"
+                loading="lazy"
+              />
+              <div class="dpt-info">
+                <div class="dpt-name">{{ tp.item.Ten_hang }}</div>
+                <div class="dpt-price">
+                  <template v-if="tp.item.Trang_thai === 'Hết hàng'">
+                    <span class="dpt-out-txt">{{ $t('status.outOfStock') }}</span>
+                  </template>
+                  <template v-else>
+                    +{{ formatPrice(finalPrice(tp.item), tp.item.Don_vi_tien_te) }}
+                  </template>
+                </div>
+              </div>
+              <div
+                v-if="getDetailToppingQty(tp.maHang) > 0 && tp.item.Trang_thai !== 'Hết hàng'"
+                class="dpt-stepper"
+                @click.stop
+              >
+                <button type="button" class="dpt-step-btn" @click="stepDetailTopping(tp, -1)">
+                  <i class="ri-subtract-line"></i>
+                </button>
+                <span class="dpt-step-val">{{ getDetailToppingQty(tp.maHang) }}</span>
+                <button type="button" class="dpt-step-btn" @click="stepDetailTopping(tp, 1)">
+                  <i class="ri-add-line"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <p v-if="String(selectedItem.Mo_ta || '').trim()" class="dp-desc-text">
           {{ selectedItem.Mo_ta }}
         </p>
@@ -2120,6 +2185,71 @@
             </div>
           </div>
 
+          <!-- TOPPING / GỌI THÊM (DESKTOP) -->
+          <div v-if="selectedProductToppings.length" class="dp-topping-group">
+            <div class="dp-topping-head">
+              <span class="dp-variant-label">{{ $t('menu.toppingsTitle') }}</span>
+              <span v-if="selectedDetailToppingsCount > 0" class="dp-topping-sel-pill">
+                {{ $t('menu.toppingsSelected') }}: {{ selectedDetailToppingsCount }}
+              </span>
+            </div>
+            <div class="dp-topping-list">
+              <div
+                v-for="tp in selectedProductToppings"
+                :key="'pc-tp-' + tp.maHang"
+                class="dp-topping-item"
+                :class="{
+                  active: getDetailToppingQty(tp.maHang) > 0,
+                  'is-out': tp.item.Trang_thai === 'Hết hàng',
+                }"
+                role="checkbox"
+                :aria-checked="getDetailToppingQty(tp.maHang) > 0"
+                @click="toggleDetailTopping(tp)"
+              >
+                <span class="dpt-check">
+                  <i
+                    :class="
+                      getDetailToppingQty(tp.maHang) > 0
+                        ? 'ri-checkbox-fill'
+                        : 'ri-checkbox-blank-line'
+                    "
+                  ></i>
+                </span>
+                <img
+                  v-if="tp.item.Main_img"
+                  :src="tp.item.Main_img"
+                  :alt="tp.item.Ten_hang"
+                  class="dpt-thumb"
+                  loading="lazy"
+                />
+                <div class="dpt-info">
+                  <div class="dpt-name">{{ tp.item.Ten_hang }}</div>
+                  <div class="dpt-price">
+                    <template v-if="tp.item.Trang_thai === 'Hết hàng'">
+                      <span class="dpt-out-txt">{{ $t('status.outOfStock') }}</span>
+                    </template>
+                    <template v-else>
+                      +{{ formatPrice(finalPrice(tp.item), tp.item.Don_vi_tien_te) }}
+                    </template>
+                  </div>
+                </div>
+                <div
+                  v-if="getDetailToppingQty(tp.maHang) > 0 && tp.item.Trang_thai !== 'Hết hàng'"
+                  class="dpt-stepper"
+                  @click.stop
+                >
+                  <button type="button" class="dpt-step-btn" @click="stepDetailTopping(tp, -1)">
+                    <i class="ri-subtract-line"></i>
+                  </button>
+                  <span class="dpt-step-val">{{ getDetailToppingQty(tp.maHang) }}</span>
+                  <button type="button" class="dpt-step-btn" @click="stepDetailTopping(tp, 1)">
+                    <i class="ri-add-line"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <p v-if="String(selectedItem.Mo_ta || '').trim()" class="dp-desc-text">
             {{ selectedItem.Mo_ta }}
           </p>
@@ -2158,7 +2288,7 @@
               class="dp-cta-btn"
               :class="{ added: addedMap[selectedItem.Ma_hang] }"
               :disabled="selectedItem.Trang_thai === 'Hết hàng'"
-              @click.stop="addToCartFromModal(selectedItem)"
+              @click.stop="addToCartFromModal(selectedItem, $event)"
             >
               <template v-if="addedMap[selectedItem.Ma_hang]">
                 <i class="ri-checkbox-circle-fill"></i>
@@ -5041,6 +5171,7 @@ import {
   getEffectiveParentCategory,
   getSubCategoriesForParent,
   getLinkedProductVariants,
+  getLinkedProductToppings,
   sortProductsByCategoryOrder,
   DISPLAY_MODE_BY_CATEGORY,
 } from '@/utils/displayOrder'
@@ -7283,12 +7414,12 @@ function ensureTempQty(m) {
     tempQty.value[m.Ma_hang] = 1
   }
 }
-function addToCartFromModal(m) {
+function addToCartFromModal(m, evt = null) {
   if (isOrderLocked.value && !isOrderTerminal.value) {
     openLockedOrderContactPrompt()
     return
   }
-  addToCart(m) // dùng lại logic cũ
+  addDetailWithToppings(m, evt)
 
   // chạy animation đóng
   closingModal.value = true
@@ -8656,7 +8787,7 @@ function triggerAddToCartEffects(item, qty, evt) {
   }
 }
 
-async function addToCart(m, evt = null) {
+async function addToCart(m, evt = null, opts = null) {
   if (isOrderTerminal.value) {
     resetClosedOrStaleOrder(false, { autoCreateNew: false })
   } else if (isOrderLocked.value) {
@@ -8664,8 +8795,13 @@ async function addToCart(m, evt = null) {
     return
   }
 
-  const qty = Math.max(1, Number(tempQty.value[m.Ma_hang] || 1))
-  triggerAddToCartEffects(m, qty, evt)
+  const hasOverrideQty = opts && Number(opts.overrideQty) > 0
+  const qty = hasOverrideQty
+    ? Math.max(1, Math.floor(Number(opts.overrideQty)))
+    : Math.max(1, Number(tempQty.value[m.Ma_hang] || 1))
+  if (!opts?.silentEffects) {
+    triggerAddToCartEffects(m, qty, evt)
+  }
 
   // Reset and re-trigger added spring state cleanly on rapid clicks
   const prevTimer = addedTimersByCode.get(m.Ma_hang)
@@ -8682,7 +8818,10 @@ async function addToCart(m, evt = null) {
     }, 520),
   )
 
-  const typedNote = String(itemNotes.value[m.Ma_hang] || '').trim()
+  const typedNote =
+    opts && opts.overrideNote !== undefined
+      ? String(opts.overrideNote || '').trim()
+      : String(itemNotes.value[m.Ma_hang] || '').trim()
   const authorName =
     memberName.value.trim() || tenKhach.value.trim() || t('group.guestDefault')
   const lineKey = makeLineId(m.Ma_hang, memberId)
@@ -8692,8 +8831,12 @@ async function addToCart(m, evt = null) {
     lastAdded.value = null
   }, 2000)
 
-  itemNotes.value[m.Ma_hang] = ''
-  tempQty.value[m.Ma_hang] = 1
+  if (!opts || opts.overrideNote === undefined) {
+    itemNotes.value[m.Ma_hang] = ''
+  }
+  if (!hasOverrideQty) {
+    tempQty.value[m.Ma_hang] = 1
+  }
 
   //  CHỈ DESKTOP MỚI AUTO MỞ GIỎ
   if (!isMobile.value) {
@@ -8816,6 +8959,93 @@ const selectedProductVariants = computed(() =>
   ),
 )
 
+/* ===== LINKED TOPPINGS IN DETAIL MODAL ===== */
+const selectedDetailToppings = ref({}) // { [maHang]: qty }
+
+const selectedProductToppings = computed(() =>
+  getLinkedProductToppings(
+    selectedItem.value,
+    displayConfig.value.toppingGroups,
+    menu.value,
+  ),
+)
+
+watch(
+  () => selectedItem.value?.Ma_hang,
+  () => {
+    selectedDetailToppings.value = {}
+  },
+)
+
+function getDetailToppingQty(maHang) {
+  return Math.max(0, Number(selectedDetailToppings.value[maHang] || 0))
+}
+
+function toggleDetailTopping(tp) {
+  if (!tp?.item || tp.item.Trang_thai === 'Hết hàng') return
+  const code = tp.maHang
+  const cur = getDetailToppingQty(code)
+  if (cur > 0) {
+    const next = { ...selectedDetailToppings.value }
+    delete next[code]
+    selectedDetailToppings.value = next
+  } else {
+    selectedDetailToppings.value = { ...selectedDetailToppings.value, [code]: 1 }
+  }
+}
+
+function stepDetailTopping(tp, delta) {
+  if (!tp?.item || tp.item.Trang_thai === 'Hết hàng') return
+  const code = tp.maHang
+  const nextQty = getDetailToppingQty(code) + delta
+  if (nextQty <= 0) {
+    const next = { ...selectedDetailToppings.value }
+    delete next[code]
+    selectedDetailToppings.value = next
+  } else {
+    selectedDetailToppings.value = { ...selectedDetailToppings.value, [code]: nextQty }
+  }
+}
+
+const selectedDetailToppingsList = computed(() => {
+  const out = []
+  for (const tp of selectedProductToppings.value) {
+    if (tp.item?.Trang_thai === 'Hết hàng') continue
+    const qty = getDetailToppingQty(tp.maHang)
+    if (qty > 0) out.push({ ...tp, qty })
+  }
+  return out
+})
+
+const selectedDetailToppingsCount = computed(() =>
+  selectedDetailToppingsList.value.reduce((sum, tp) => sum + tp.qty, 0),
+)
+
+const selectedDetailToppingsTotal = computed(() =>
+  selectedDetailToppingsList.value.reduce(
+    (sum, tp) => sum + finalPrice(tp.item) * tp.qty,
+    0,
+  ),
+)
+
+async function addDetailWithToppings(mainItem, evt = null) {
+  if (!mainItem) return
+  const pickedToppings = [...selectedDetailToppingsList.value]
+  selectedDetailToppings.value = {}
+  const mainViName = String(mainItem._tenVi || mainItem.Ten_hang || '').trim()
+
+  await addToCart(mainItem, evt)
+
+  for (const tp of pickedToppings) {
+    if (!tp?.item || tp.item.Trang_thai === 'Hết hàng') continue
+    await addToCart(tp.item, null, {
+      overrideQty: tp.qty,
+      overrideNote: mainViName ? `Kèm: ${mainViName}` : '',
+      silentEffects: true,
+    })
+  }
+}
+
 function switchDetailVariant(variantItem) {
   if (!variantItem || variantItem.Ma_hang === selectedItem.value?.Ma_hang) return
   ensureTempQty(variantItem)
@@ -8848,7 +9078,10 @@ function getDetailQty(item) {
 
 function getDetailCtaTotal(item) {
   if (!item) return ''
-  return formatPrice(finalPrice(item) * getDetailQty(item), item.Don_vi_tien_te)
+  const baseTotal = finalPrice(item) * getDetailQty(item)
+  const toppingTotal =
+    selectedItem.value?.Ma_hang === item.Ma_hang ? selectedDetailToppingsTotal.value : 0
+  return formatPrice(baseTotal + toppingTotal, item.Don_vi_tien_te)
 }
 
 // sidebar mới (mobile)
@@ -10271,15 +10504,15 @@ onUnmounted(() => {
     mainRef.value.removeEventListener('scroll', updateScrollTopVisibility)
   }
 })
-function addFromDetailSidebar() {
+function addFromDetailSidebar(evt = null) {
   if (!selectedItem.value) return
   if (isOrderLocked.value && !isOrderTerminal.value) {
     openLockedOrderContactPrompt()
     return
   }
 
-  // 1⃣ add vào giỏ (dùng lại logic cũ)
-  addToCart(selectedItem.value)
+  // 1⃣ add món chính + các topping đã chọn vào giỏ
+  addDetailWithToppings(selectedItem.value, evt)
 
   // 2⃣ kích hoạt animation đóng
   closingDetailSidebar.value = true
@@ -14997,6 +15230,152 @@ const hasSale = computed(() =>
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* ===== TOPPING / ADD-ON PICKER INSIDE DETAIL MODAL ===== */
+.dp-topping-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.dp-topping-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dp-topping-sel-pill {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--sa-primary-soft);
+  color: var(--sa-accent);
+  border: 1px solid var(--sa-border-green);
+}
+
+.dp-topping-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.dp-topping-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1.5px solid var(--sa-border, #e2e8f0);
+  background: var(--sa-surface-2, #f8fafc);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.16s ease, background 0.16s ease, transform 0.12s ease;
+}
+
+.dp-topping-item:active:not(.is-out) {
+  transform: scale(0.985);
+}
+
+.dp-topping-item.active {
+  border-color: var(--sa-accent);
+  background: var(--sa-primary-soft);
+}
+
+.dp-topping-item.is-out {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dpt-check {
+  font-size: 20px;
+  line-height: 1;
+  color: var(--sa-muted);
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.dp-topping-item.active .dpt-check {
+  color: var(--sa-accent);
+}
+
+.dpt-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--sa-border);
+  background: var(--sa-surface);
+}
+
+.dpt-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dpt-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--sa-heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dpt-price {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sa-price);
+}
+
+.dpt-out-txt {
+  color: var(--sa-sale);
+}
+
+.dpt-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  border-radius: 999px;
+  background: var(--sa-surface);
+  border: 1px solid var(--sa-border-green);
+  flex-shrink: 0;
+}
+
+.dpt-step-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background: var(--sa-primary-soft);
+  color: var(--sa-accent);
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.dpt-step-btn:hover {
+  background: var(--sa-accent);
+  color: var(--sa-on-primary, #ffffff);
+}
+
+.dpt-step-val {
+  min-width: 16px;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--sa-heading);
 }
 
 .dp-variant-label {

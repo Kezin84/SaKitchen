@@ -12,7 +12,9 @@
     "relatedItems": "Mga katulad na pagkain",
     "chooseVariant": "Mga opsyon",
     "noticeLabel": "PAUNAWA",
-    "inCartLabel": "Nasa cart"
+    "inCartLabel": "Nasa cart",
+    "toppingsTitle": "Mga Dagdag / Topping",
+    "toppingsSelected": "Napili"
   },
   "contact": {
     "sendOrder": "Makipag-ugnayan para mag-order",

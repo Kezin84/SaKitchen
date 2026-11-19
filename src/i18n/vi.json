@@ -12,7 +12,9 @@
     "relatedItems": "Món cùng danh mục",
     "chooseVariant": "Phân loại",
     "noticeLabel": "THÔNG BÁO",
-    "inCartLabel": "Trong giỏ"
+    "inCartLabel": "Trong giỏ",
+    "toppingsTitle": "Gọi thêm / Topping",
+    "toppingsSelected": "Đã chọn"
   },
   "contact": {
     "sendOrder": "Liên hệ gửi đơn",

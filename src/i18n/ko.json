@@ -12,7 +12,9 @@
     "relatedItems": "같은 카테고리 메뉴",
     "chooseVariant": "옵션 선택",
     "noticeLabel": "공지",
-    "inCartLabel": "장바구니"
+    "inCartLabel": "장바구니",
+    "toppingsTitle": "토핑 / 추가 메뉴",
+    "toppingsSelected": "선택됨"
   },
   "contact": {
     "sendOrder": "주문 문의",

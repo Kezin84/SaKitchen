@@ -63,6 +63,49 @@ export function normalizeProductGroupsList(rawGroups) {
   return out
 }
 
+export function normalizeToppingGroupsList(rawGroups) {
+  if (!Array.isArray(rawGroups)) return []
+  const out = []
+  const seenIds = new Set()
+  for (const raw of rawGroups) {
+    if (!raw || typeof raw !== 'object') continue
+    const rawToppings = Array.isArray(raw.toppings) ? raw.toppings : []
+    const toppings = [
+      ...new Set(
+        rawToppings
+          .map((t) => String(typeof t === 'string' ? t : t?.maHang || '').trim())
+          .filter(Boolean),
+      ),
+    ]
+    const targetCategories = [
+      ...new Set(
+        (Array.isArray(raw.targetCategories) ? raw.targetCategories : [])
+          .map((c) => String(c || '').trim())
+          .filter(Boolean),
+      ),
+    ]
+    const targetProducts = [
+      ...new Set(
+        (Array.isArray(raw.targetProducts) ? raw.targetProducts : [])
+          .map((p) => String(typeof p === 'string' ? p : p?.maHang || '').trim())
+          .filter(Boolean),
+      ),
+    ]
+    if (!toppings.length || (!targetCategories.length && !targetProducts.length)) continue
+    let id = String(raw.id || `tg_${out.length + 1}`).trim()
+    if (seenIds.has(id)) id = `${id}_${out.length + 1}`
+    seenIds.add(id)
+    out.push({
+      id,
+      name: String(raw.name || '').trim(),
+      toppings,
+      targetCategories,
+      targetProducts,
+    })
+  }
+  return out
+}
+
 export function normalizeDisplayConfig(rows) {
   const list = Array.isArray(rows) ? rows : rows && typeof rows === 'object' ? [rows] : []
   const mainRow = list.find((r) => String(r?.ID || '') === 'main') || list[0] || {}
@@ -72,6 +115,7 @@ export function normalizeDisplayConfig(rows) {
   const parentMap = normalizeParentMapObj(mainRow.parentMap)
   const parentI18n = normalizeParentI18nObj(mainRow.parentI18n)
   const productGroups = normalizeProductGroupsList(mainRow.productGroups)
+  const toppingGroups = normalizeToppingGroupsList(mainRow.toppingGroups)
   const productSortMode =
     mainRow.productSortMode === DISPLAY_MODE_BY_CATEGORY
       ? DISPLAY_MODE_BY_CATEGORY
@@ -83,9 +127,60 @@ export function normalizeDisplayConfig(rows) {
     parentMap,
     parentI18n,
     productGroups,
+    toppingGroups,
     productSortMode,
     themeConfig,
   }
+}
+
+export function getLinkedProductToppings(product, toppingGroups = [], menuItems = []) {
+  if (!product || !Array.isArray(toppingGroups) || !toppingGroups.length) return []
+  const prodCode = String(product?.Ma_hang || '').trim()
+  const prodCatVi = String(
+    product?._danhMucVi || product?.i18n?.vi?.Danh_muc || product?.Danh_muc || '',
+  ).trim()
+  if (!prodCode && !prodCatVi) return []
+
+  const itemByCode = new Map()
+  for (const item of menuItems || []) {
+    const code = String(item?.Ma_hang || '').trim()
+    if (code && !itemByCode.has(code)) {
+      itemByCode.set(code, item)
+    }
+  }
+
+  const resolved = []
+  const seenToppingCodes = new Set()
+
+  for (const grp of toppingGroups) {
+    if (!grp || typeof grp !== 'object') continue
+    const matchesProduct =
+      prodCode &&
+      Array.isArray(grp.targetProducts) &&
+      grp.targetProducts.some((c) => String(c || '').trim() === prodCode)
+    const matchesCategory =
+      prodCatVi &&
+      Array.isArray(grp.targetCategories) &&
+      grp.targetCategories.some((c) => String(c || '').trim() === prodCatVi)
+
+    if (!matchesProduct && !matchesCategory) continue
+
+    for (const rawCode of grp.toppings || []) {
+      const code = String(rawCode || '').trim()
+      if (!code || code === prodCode || seenToppingCodes.has(code)) continue
+      const item = itemByCode.get(code)
+      if (!item) continue
+      seenToppingCodes.add(code)
+      resolved.push({
+        maHang: code,
+        item,
+        groupId: grp.id || '',
+        groupName: grp.name || '',
+      })
+    }
+  }
+
+  return resolved
 }
 
 export function getLinkedProductVariants(productCode, productGroups = [], menuItems = []) {

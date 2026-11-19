@@ -3597,6 +3597,48 @@ function normalizeProductGroupsInput(rawGroups) {
   return out
 }
 
+function normalizeToppingGroupsInput(rawGroups) {
+  if (!Array.isArray(rawGroups)) return []
+  const out = []
+  const seenIds = new Set()
+  for (const raw of rawGroups) {
+    if (!raw || typeof raw !== 'object') continue
+    const toppings = [
+      ...new Set(
+        (Array.isArray(raw.toppings) ? raw.toppings : [])
+          .map((t) => s(typeof t === 'string' ? t : t?.maHang).trim())
+          .filter(Boolean),
+      ),
+    ]
+    const targetCategories = [
+      ...new Set(
+        (Array.isArray(raw.targetCategories) ? raw.targetCategories : [])
+          .map((c) => s(c).trim())
+          .filter(Boolean),
+      ),
+    ]
+    const targetProducts = [
+      ...new Set(
+        (Array.isArray(raw.targetProducts) ? raw.targetProducts : [])
+          .map((p) => s(typeof p === 'string' ? p : p?.maHang).trim())
+          .filter(Boolean),
+      ),
+    ]
+    if (!toppings.length || (!targetCategories.length && !targetProducts.length)) continue
+    let id = s(raw.id).trim() || `tg_${out.length + 1}`
+    if (seenIds.has(id)) id = `${id}_${out.length + 1}`
+    seenIds.add(id)
+    out.push({
+      id,
+      name: s(raw.name).trim(),
+      toppings,
+      targetCategories,
+      targetProducts,
+    })
+  }
+  return out
+}
+
 async function saveDisplayConfig(body = {}) {
   const d = body.data || {}
   const existingEntries = await readSheetEntries('display_config')
@@ -3624,6 +3666,11 @@ async function saveDisplayConfig(body = {}) {
       ? normalizeProductGroupsInput(d.productGroups)
       : normalizeProductGroupsInput(existingRow.productGroups)
 
+  const nextToppingGroups =
+    d.toppingGroups !== undefined
+      ? normalizeToppingGroupsInput(d.toppingGroups)
+      : normalizeToppingGroupsInput(existingRow.toppingGroups)
+
   const nextProductSortMode =
     d.productSortMode !== undefined
       ? s(d.productSortMode) === 'by_category'
@@ -3646,6 +3693,7 @@ async function saveDisplayConfig(body = {}) {
     parentMap: nextParentMap,
     parentI18n: nextParentI18n,
     productGroups: nextProductGroups,
+    toppingGroups: nextToppingGroups,
     productSortMode: nextProductSortMode,
     themeConfig: nextThemeConfig,
     updatedAt: Date.now(),

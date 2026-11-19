@@ -12,7 +12,9 @@
     "relatedItems": "同分类推荐",
     "chooseVariant": "规格分类",
     "noticeLabel": "公告",
-    "inCartLabel": "已加购"
+    "inCartLabel": "已加购",
+    "toppingsTitle": "加料 / 配菜",
+    "toppingsSelected": "已选"
   },
   "contact": {
     "sendOrder": "联系商家下单",

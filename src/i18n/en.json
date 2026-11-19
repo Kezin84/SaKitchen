@@ -12,7 +12,9 @@
     "relatedItems": "More in this category",
     "chooseVariant": "Options",
     "noticeLabel": "NOTICE",
-    "inCartLabel": "In cart"
+    "inCartLabel": "In cart",
+    "toppingsTitle": "Add-ons / Toppings",
+    "toppingsSelected": "Selected"
   },
   "contact": {
     "sendOrder": "Contact to send order",

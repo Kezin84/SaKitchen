@@ -21,9 +21,19 @@ import ChiPhiPhatSinh from '@/views/chiPhiPhatSinh.vue'
 
 import KhachHang from '@/views/khachHang.vue'
 
-import LandingPage from '@/views/LandingPage.vue'
-
 const SUPPORTED_LANGS = ['vi', 'en', 'zh-CN', 'fil', 'ko']
+
+function getSavedLang() {
+  try {
+    const saved = localStorage.getItem('APP_LANG')
+    if (saved && SUPPORTED_LANGS.includes(saved)) {
+      return saved
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return 'vi'
+}
 
 function menuLangGuard(to: {
   name?: string | symbol | null
@@ -51,12 +61,23 @@ const router = createRouter({
   routes: [
     {
       path: '/',
+      redirect: (to) => {
+        const { ncc: _ncc, ...cleanQuery } = to.query
+        return {
+          name: 'menu-online',
+          params: { lang: getSavedLang() },
+          query: cleanQuery,
+        }
+      },
+    },
+    {
+      path: '/welcome',
       name: 'landing',
-      component: LandingPage,
+      component: () => import('@/views/LandingPage.vue'),
       beforeEnter: (to) => {
         if ('ncc' in to.query) {
           const { ncc: _ncc, ...cleanQuery } = to.query
-          return { path: '/', query: cleanQuery, replace: true }
+          return { path: '/welcome', query: cleanQuery, replace: true }
         }
       },
     },

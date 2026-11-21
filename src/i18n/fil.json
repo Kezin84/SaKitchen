@@ -36,7 +36,12 @@
     "allowMessageBadge": "Mag-message"
   },
   "search": {
-    "placeholder": "Maghanap ng pagkain..."
+    "placeholder": "Hanapin ang ulam, sangkap, presyo...",
+    "fuzzyHint": "Ipinapakita ang malapit na tugma para sa",
+    "searchAllMenu": "Hanapin sa buong menu",
+    "clearSearch": "Burahin ang hanap",
+    "tryKeywords": "Mabilis na mungkahi:",
+    "quickTags": "Kanin,Pho,Noodle,Hotpot,Milk tea,Beer"
   },
   "filter": {
     "all": "Lahat",

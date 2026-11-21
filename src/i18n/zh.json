@@ -36,7 +36,12 @@
     "allowMessageBadge": "支持私信"
   },
   "search": {
-    "placeholder": "搜索菜品..."
+    "placeholder": "搜索菜品、简繁体、价格...",
+    "fuzzyHint": "为您显示相近结果：",
+    "searchAllMenu": "在全部菜单中搜索",
+    "clearSearch": "清除搜索",
+    "tryKeywords": "热门搜索：",
+    "quickTags": "米饭,粉,面,火锅,奶茶,啤酒"
   },
   "filter": {
     "all": "全部",

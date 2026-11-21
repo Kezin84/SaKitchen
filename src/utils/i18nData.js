@@ -1,4 +1,5 @@
 // src/utils/i18nData.js
+import { scoreProductMatch } from './searchUtils'
 
 export const SUPPORTED_DATA_LANGS = [
   {
@@ -183,24 +184,7 @@ export function getProductTranslatedLangs(item) {
 }
 
 export function productMatchesKeyword(item, rawKeyword) {
-  const kw = str(rawKeyword).toLowerCase()
-  if (!kw) return true
-  if (str(item?.Ma_hang).toLowerCase().includes(kw)) return true
-  if (str(item?.Ten_hang).toLowerCase().includes(kw)) return true
-  if (str(item?.Danh_muc_cha).toLowerCase().includes(kw)) return true
-  if (str(item?.Danh_muc).toLowerCase().includes(kw)) return true
-
-  const i18n = item?.i18n
-  if (i18n && typeof i18n === 'object') {
-    for (const code of DATA_LANG_CODES) {
-      const entry = i18n[code]
-      if (!entry) continue
-      if (str(entry.Ten_hang).toLowerCase().includes(kw)) return true
-      if (str(entry.Danh_muc_cha).toLowerCase().includes(kw)) return true
-      if (str(entry.Danh_muc).toLowerCase().includes(kw)) return true
-    }
-  }
-  return false
+  return scoreProductMatch(item, rawKeyword, { preferInStock: false }) > 0
 }
 
 const DEFAULT_SLUG_BY_LANG = {

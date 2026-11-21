@@ -149,7 +149,15 @@
                     <!-- Search -->
                     <div class="search-box-unified pc-search-full" :class="{ 'has-query': Boolean(searchProduct && searchProduct.trim()) }">
                       <i class="app-ico ri-search-line search-icon"></i>
-                      <input v-model="searchProduct" type="text" placeholder="Tìm kiếm..." class="search-input-unified" />
+                      <input
+                        ref="productSearchInputRef"
+                        v-model="searchProduct"
+                        type="text"
+                        placeholder="Tìm tên (không dấu), mã, viết tắt, giá... (Enter thêm nhanh, 2x món)"
+                        class="search-input-unified"
+                        @keydown.enter.prevent="handleProductSearchEnter"
+                        @keydown.esc="searchProduct = ''"
+                      />
                       <button v-if="searchProduct" class="search-clear" @click="searchProduct = ''"> <i class="app-ico ri-close-line"></i> </button>
                     </div>
 
@@ -201,7 +209,15 @@
                      <!-- Search Box (Fill space) -->
                      <div class="search-box-unified" :class="{ 'has-query': Boolean(searchProduct && searchProduct.trim()) }" style="flex: 1; min-width: 0;">
                         <i class="app-ico ri-search-line search-icon"></i>
-                        <input v-model="searchProduct" type="text" placeholder="Tìm kiếm..." class="search-input-unified" />
+                        <input
+                          ref="productSearchInputRef"
+                          v-model="searchProduct"
+                          type="text"
+                          placeholder="Tìm món không dấu, mã, giá..."
+                          class="search-input-unified"
+                          @keydown.enter.prevent="handleProductSearchEnter"
+                          @keydown.esc="searchProduct = ''"
+                        />
                         <button v-if="searchProduct" class="search-clear" @click="searchProduct = ''"> <i class="app-ico ri-close-line"></i> </button>
                      </div>
 
@@ -326,11 +342,27 @@
               <div v-if="!isLoadingProducts && searchProduct && searchProduct.trim()" class="search-result-banner">
                 <span class="srb-text">
                   <i class="ri-search-eye-line"></i>
-                  Tìm thấy <strong>{{ filteredProducts.length }}</strong> món cho "<em>{{ searchProduct.trim() }}</em>"
+                  Tìm thấy <strong>{{ filteredProducts.length }}</strong> món cho "<em>{{ parsedProductSearch.cleanQuery || searchProduct.trim() }}</em>"
+                  <span v-if="parsedProductSearch.qty" class="srb-badge is-qty">
+                    SL nhanh ×{{ parsedProductSearch.qty }} · Enter thêm
+                  </span>
+                  <span v-if="productSearchMeta.usedFuzzy" class="srb-badge is-fuzzy">
+                    Kết quả gần đúng
+                  </span>
                 </span>
-                <button type="button" class="srb-clear" @click="searchProduct = ''">
-                  <i class="ri-close-line"></i> Xóa tìm
-                </button>
+                <div class="srb-actions">
+                  <button
+                    v-if="globalProductSearchCount > filteredProducts.length"
+                    type="button"
+                    class="srb-global-btn"
+                    @click="clearCatalogNonSearchFilters"
+                  >
+                    <i class="ri-apps-2-line"></i> Tìm toàn kho ({{ globalProductSearchCount }} món)
+                  </button>
+                  <button type="button" class="srb-clear" @click="searchProduct = ''">
+                    <i class="ri-close-line"></i> Xóa tìm
+                  </button>
+                </div>
               </div>
 
               <div class="catalog-grid-section">
@@ -565,7 +597,20 @@
               </div>
 
               <div v-if="filteredProducts.length === 0" class="no-products">
-                Khong tim thay san pham nao
+                <div>Không tìm thấy sản phẩm phù hợp</div>
+                <div v-if="searchProduct && searchProduct.trim()" class="no-products-actions">
+                  <button
+                    v-if="globalProductSearchCount > 0"
+                    type="button"
+                    class="srb-global-btn"
+                    @click="clearCatalogNonSearchFilters"
+                  >
+                    <i class="ri-apps-2-line"></i> Tìm trên toàn bộ kho ({{ globalProductSearchCount }} món)
+                  </button>
+                  <button type="button" class="srb-clear" @click="searchProduct = ''">
+                    <i class="ri-close-line"></i> Xóa từ khóa
+                  </button>
+                </div>
               </div>
 
               <!-- View Toggle -->
@@ -968,7 +1013,7 @@
               v-model="tabSearchQuery"
               type="text"
               class="itb-search-input"
-              placeholder="Tìm tên, mã, SĐT..."
+              placeholder="Tìm tên, SĐT, địa chỉ, món, tiền..."
               aria-label="Tìm kiếm tab đơn hàng"
             />
             <button
@@ -1961,9 +2006,12 @@
                   <label>Tên khách hàng</label>
                   <div class="field-control">
                     <div style="position:relative">
-                      <input 
-                        v-model="form.tenKhachHang" 
-                        list="ds-kh-ten"
+                      <input
+                        v-model="form.tenKhachHang"
+                        placeholder="Nhập tên, SĐT/@tele hoặc địa chỉ khách quen..."
+                        autocomplete="off"
+                        @focus="showCustomerSuggest = true"
+                        @blur="closeCustomerSuggestDelayed"
                         @input="handleTenKhachChange"
                         style="padding-right: 70px"
                       />
@@ -1980,14 +2028,36 @@
                       >
                         XÓA
                       </button>
+
+                      <!-- Smart Customer Autocomplete Dropdown (Name / Phone / Address / Note) -->
+                      <div
+                        v-if="showCustomerSuggest && filteredCustomerSuggestions.length > 0"
+                        class="cust-suggest-dropdown"
+                      >
+                        <button
+                          v-for="kh in filteredCustomerSuggestions"
+                          :key="kh.Ma_khach_hang || kh.Ten_khach_hang"
+                          type="button"
+                          class="cust-suggest-item"
+                          @mousedown.prevent="selectCustomerSuggestion(kh)"
+                        >
+                          <div class="cust-suggest-name">
+                            <template v-for="(seg, sIdx) in getHighlightedSegments(kh.Ten_khach_hang, form.tenKhachHang)" :key="sIdx">
+                              <mark v-if="seg.match" class="search-hl-mark">{{ seg.text }}</mark>
+                              <template v-else>{{ seg.text }}</template>
+                            </template>
+                          </div>
+                          <div class="cust-suggest-meta">
+                            <span v-if="kh.So_dien_thoai">
+                              <i class="ri-phone-line"></i> {{ kh.So_dien_thoai }}
+                            </span>
+                            <span v-if="kh.Dia_chi">
+                              <i class="ri-map-pin-line"></i> {{ kh.Dia_chi }}
+                            </span>
+                          </div>
+                        </button>
+                      </div>
                     </div>
-                    <datalist id="ds-kh-ten">
-                      <option
-                        v-for="kh in khachHangList"
-                        :key="kh.Ma_khach_hang"
-                        :value="kh.Ten_khach_hang"
-                      />
-                    </datalist>
                   </div>
                 </div>
 
@@ -4308,6 +4378,15 @@ import {
   syncProductWithI18n,
 } from '@/utils/i18nData'
 import {
+  rankProductsWithMeta,
+  parseQuickQtyQuery,
+  getAccentInsensitiveHighlights,
+  matchesMultiTokenRecord,
+  normalizeSearchText,
+  getPhoneDigitVariants,
+  normalizeTelegramHandle,
+} from '@/utils/searchUtils'
+import {
   normalizeNccDiscountType,
   normalizeNccDiscountValue,
   calcOrderLineProfit,
@@ -4806,22 +4885,11 @@ function handleDocClickForColSettings(e) {
   }
 }
 
-/** Split text into matched/unmatched segments for safe search keyword highlighting. */
+/** Split text into matched/unmatched segments for safe accent-insensitive multi-token search highlighting. */
 function getHighlightedSegments(text, rawKeyword) {
-  const raw = String(text ?? '')
-  const kw = String(rawKeyword ?? '').trim()
-  if (!raw || !kw) return [{ text: raw, match: false }]
-
-  const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const regex = new RegExp(`(${escaped})`, 'gi')
-  const parts = raw.split(regex).filter(Boolean)
-  if (!parts.length) return [{ text: raw, match: false }]
-
-  const kwLower = kw.toLowerCase()
-  return parts.map((part) => ({
-    text: part,
-    match: part.toLowerCase() === kwLower,
-  }))
+  const parsed = parseQuickQtyQuery(rawKeyword)
+  const effectiveKw = parsed.cleanQuery || rawKeyword
+  return getAccentInsensitiveHighlights(text, effectiveKw)
 }
 
 function checkMobile() {
@@ -5117,42 +5185,89 @@ const adminInvoiceTabsCount = computed(
   () => invoiceTabs.value.filter((t) => !t?.sourceOrderId).length,
 )
 
-function getTabMatchedHint(tab, idx, kwLower) {
-  if (!kwLower) return ''
-  const title = getTabDisplayTitle(tab, idx).toLowerCase()
+function getTabMatchedHint(tab, idx, rawQuery) {
+  const q = String(rawQuery || '').trim()
+  if (!q) return ''
+  const titleRaw = getTabDisplayTitle(tab, idx)
   const isActive = tab?.id === activeInvoiceTabId.value
   const maHD = String(tab?.sourceOrderId || (isActive ? maHoaDon.value : tab?.maHoaDon) || '').trim()
   const phone = String(isActive ? form.soDienThoai : tab?.customer?.soDienThoai || '').trim()
   const custName = String(isActive ? form.tenKhachHang : tab?.customer?.tenKhachHang || '').trim()
+  const diaChi = String(isActive ? form.diaChi : tab?.customer?.diaChi || '').trim()
+  const ghiChu = String(isActive ? form.ghiChuDonHang : tab?.customer?.ghiChuDonHang || '').trim()
   const tabItems = isActive ? items.value : tab?.items || []
 
-  const titleMatches = title.includes(kwLower)
-  if (phone && phone.toLowerCase().includes(kwLower)) return `SĐT: ${phone}`
-  if (maHD && maHD.toLowerCase().includes(kwLower) && !titleMatches) return `Mã: ${maHD}`
-  if (custName && custName.toLowerCase().includes(kwLower) && !titleMatches) return custName
+  let tabTotal = isActive ? Number(tongCong.value || 0) : 0
+  const itemTexts = []
+  const itemHandles = []
+  for (const it of tabItems) {
+    const tenHang = String(it?.tenHang || it?.Ten_hang || '').trim()
+    const maHang = String(it?.maHang || it?.Ma_hang || '').trim()
+    const nguoiDat = String(it?.Nguoi_dat || '').trim()
+    const noteItem = String(it?.Ghi_chu || '').trim()
+    if (tenHang) itemTexts.push(tenHang)
+    if (maHang) itemTexts.push(maHang)
+    if (nguoiDat) {
+      itemTexts.push(nguoiDat)
+      itemHandles.push(nguoiDat)
+    }
+    if (noteItem) itemTexts.push(noteItem)
+    if (!isActive) {
+      const qty = Math.max(0, Number(it?.So_luong || 0))
+      const price = Number(it?.Gia_ban || it?.Don_gia || 0)
+      tabTotal += qty * price
+    }
+  }
+
+  const matched = matchesMultiTokenRecord(q, {
+    texts: [titleRaw, maHD, custName, diaChi, ghiChu, ...itemTexts],
+    phones: [phone],
+    handles: [custName, phone, ...itemHandles],
+    amounts: [tabTotal],
+  })
+  if (!matched) return null
+
+  const titleMatched = matchesMultiTokenRecord(q, { texts: [titleRaw], handles: [titleRaw] })
+  if (phone && matchesMultiTokenRecord(q, { texts: [phone], phones: [phone], handles: [phone] })) {
+    return `SĐT: ${phone}`
+  }
+  if (maHD && matchesMultiTokenRecord(q, { texts: [maHD] }) && !titleMatched) return `Mã: ${maHD}`
+  if (custName && matchesMultiTokenRecord(q, { texts: [custName], handles: [custName] }) && !titleMatched) {
+    return custName
+  }
+  if (diaChi && matchesMultiTokenRecord(q, { texts: [diaChi] })) return `Đ/c: ${diaChi}`
+  if (ghiChu && matchesMultiTokenRecord(q, { texts: [ghiChu] })) return `Ghi chú: ${ghiChu}`
 
   for (const it of tabItems) {
     const tenHang = String(it?.tenHang || it?.Ten_hang || '').trim()
     const maHang = String(it?.maHang || it?.Ma_hang || '').trim()
-    if (tenHang && tenHang.toLowerCase().includes(kwLower)) return `Món: ${tenHang}`
-    if (maHang && maHang.toLowerCase().includes(kwLower)) return `Mã món: ${maHang}`
+    const nguoiDat = String(it?.Nguoi_dat || '').trim()
+    if (tenHang && matchesMultiTokenRecord(q, { texts: [tenHang] })) return `Món: ${tenHang}`
+    if (maHang && matchesMultiTokenRecord(q, { texts: [maHang] })) return `Mã món: ${maHang}`
+    if (nguoiDat && matchesMultiTokenRecord(q, { texts: [nguoiDat], handles: [nguoiDat] })) {
+      return `Người đặt: ${nguoiDat}`
+    }
   }
 
-  return titleMatches ? '' : null
+  if (tabTotal > 0 && matchesMultiTokenRecord(q, { amounts: [tabTotal] })) {
+    return `Tổng: ${formatWithCurrency(tabTotal, donViTienTeChung.value)}`
+  }
+
+  return ''
 }
 
 const filteredInvoiceTabEntries = computed(() => {
   const mode = tabSourceFilter.value
-  const kwLower = String(tabSearchQuery.value || '').trim().toLowerCase()
+  const rawQ = String(tabSearchQuery.value || '').trim()
   const result = []
   invoiceTabs.value.forEach((tab, idx) => {
     if (mode === 'web' && !tab?.sourceOrderId) return
     if (mode === 'admin' && tab?.sourceOrderId) return
-    if (!kwLower) {
+    if (!rawQ) {
       result.push({ tab, idx, matchedHint: '' })
       return
     }
-    const hint = getTabMatchedHint(tab, idx, kwLower)
+    const hint = getTabMatchedHint(tab, idx, rawQ)
     if (hint !== null) {
       result.push({ tab, idx, matchedHint: hint })
     }
@@ -6662,6 +6777,7 @@ watch(
 onMounted(async () => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
+  window.addEventListener('keydown', handleGlobalSearchShortcut)
   document.addEventListener('click', handleDocClickForColSettings)
 
   isLoadingProducts.value = true
@@ -6748,6 +6864,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
+  window.removeEventListener('keydown', handleGlobalSearchShortcut)
   document.removeEventListener('click', handleDocClickForColSettings)
   stopPcColResize()
   stopOrderColResize()
@@ -6758,6 +6875,10 @@ onUnmounted(() => {
   if (pendingBellPulseTimer) {
     clearTimeout(pendingBellPulseTimer)
     pendingBellPulseTimer = null
+  }
+  if (customerSuggestBlurTimer) {
+    clearTimeout(customerSuggestBlurTimer)
+    customerSuggestBlurTimer = null
   }
   if (typeof unsubLiveOrdersRealtime === 'function') {
     unsubLiveOrdersRealtime()
@@ -6980,15 +7101,89 @@ function xoaHang() {
   form.ghiChuHang = ''
 }
 
-/* ================= AUTO FILL KHÁCH (CHỈ KHI CHỌN TỪ DATALIST) ================= */
+/* ================= SMART CUSTOMER AUTOCOMPLETE (TÊN / SĐT / ĐỊA CHỈ / GHI CHÚ) ================= */
 let lastCheckedName = ''
+const showCustomerSuggest = ref(false)
+let customerSuggestBlurTimer = null
+
+const filteredCustomerSuggestions = computed(() => {
+  const q = String(form.tenKhachHang || '').trim()
+  const list = khachHangList.value || []
+  if (!list.length) return []
+  if (!q) return list.slice(0, 8)
+
+  const qNorm = normalizeSearchText(q)
+  const matched = list.filter((kh) =>
+    matchesMultiTokenRecord(q, {
+      texts: [kh.Ten_khach_hang, kh.Dia_chi, kh.Ghi_chu, kh.Ma_khach_hang],
+      phones: [kh.So_dien_thoai],
+      handles: [kh.Ten_khach_hang, kh.So_dien_thoai],
+    }),
+  )
+
+  // Prioritize exact/startsWith name matches
+  matched.sort((a, b) => {
+    const aName = normalizeSearchText(a.Ten_khach_hang)
+    const bName = normalizeSearchText(b.Ten_khach_hang)
+    const aRank = aName === qNorm ? 3 : aName.startsWith(qNorm) ? 2 : 1
+    const bRank = bName === qNorm ? 3 : bName.startsWith(qNorm) ? 2 : 1
+    return bRank - aRank
+  })
+
+  return matched.slice(0, 10)
+})
+
+function selectCustomerSuggestion(kh) {
+  if (!kh) return
+  if (customerSuggestBlurTimer) {
+    clearTimeout(customerSuggestBlurTimer)
+    customerSuggestBlurTimer = null
+  }
+  isExistingCustomer = true
+  form.tenKhachHang = kh.Ten_khach_hang || ''
+  form.soDienThoai = kh.So_dien_thoai || ''
+  form.diaChi = kh.Dia_chi || ''
+  form.ghiChu = kh.Ghi_chu || ''
+  form.maKhachHang = kh.Ma_khach_hang || ''
+  lastCheckedName = form.tenKhachHang.trim()
+  showCustomerSuggest.value = false
+}
+
+function closeCustomerSuggestDelayed() {
+  if (customerSuggestBlurTimer) clearTimeout(customerSuggestBlurTimer)
+  customerSuggestBlurTimer = setTimeout(() => {
+    showCustomerSuggest.value = false
+  }, 160)
+}
 
 function handleTenKhachChange(event) {
+  showCustomerSuggest.value = true
   const inputName = event.target.value.trim()
   if (inputName === lastCheckedName) return
   lastCheckedName = inputName
-  
-  const kh = khachHangList.value.find((k) => k.Ten_khach_hang === inputName)
+
+  const inputNorm = normalizeSearchText(inputName)
+  const inputHandle = normalizeTelegramHandle(inputName)
+  const inputPhoneDigits = getPhoneDigitVariants(inputName)
+
+  const kh =
+    khachHangList.value.find((k) => String(k.Ten_khach_hang || '').trim() === inputName) ||
+    (inputNorm
+      ? khachHangList.value.find((k) => normalizeSearchText(k.Ten_khach_hang) === inputNorm)
+      : null) ||
+    (inputHandle && inputName.startsWith('@')
+      ? khachHangList.value.find(
+          (k) =>
+            normalizeTelegramHandle(k.Ten_khach_hang) === inputHandle ||
+            normalizeTelegramHandle(k.So_dien_thoai) === inputHandle,
+        )
+      : null) ||
+    (inputPhoneDigits.length && /^\+?[\d\s\-()]{8,}$/.test(inputName)
+      ? khachHangList.value.find((k) => {
+          const kv = getPhoneDigitVariants(k.So_dien_thoai)
+          return kv.some((v) => inputPhoneDigits.includes(v))
+        })
+      : null)
 
   if (kh) {
     isExistingCustomer = true
@@ -7893,44 +8088,145 @@ const hasActiveFilters = computed(() => {
   )
 })
 
-const allFilteredProducts = computed(() => {
+const productSearchInputRef = ref(null)
+
+const parsedProductSearch = computed(() => parseQuickQtyQuery(searchProduct.value))
+
+const productSearchMeta = computed(() => {
   let products = localizedHangHoaList.value
 
-  // 1. Search across all 5 languages + Ma_hang
-  if (searchProduct.value) {
-    products = products.filter((p) => productMatchesKeyword(p, searchProduct.value))
-  }
-
-  // 2. Filter Category
+  // 1. Filter Category
   if (selectedCategory.value) {
-    products = products.filter(p => p.Danh_muc === selectedCategory.value)
+    products = products.filter((p) => p.Danh_muc === selectedCategory.value)
   }
 
-  // 3. Filter Promotion
+  // 2. Filter Promotion
   if (onlyPromotion.value) {
-    products = products.filter(p => Number(p.Gia_Giam || 0) > 0)
+    products = products.filter((p) => Number(p.Gia_Giam || 0) > 0)
   }
 
-  // 4. Filter Size
+  // 3. Filter Size
   if (selectedSize.value) {
-    products = products.filter(p => p.Size === selectedSize.value)
+    products = products.filter((p) => p.Size === selectedSize.value)
   }
 
-  // 5. Filter Stock Status (Còn hàng / Hết hàng)
+  // 4. Filter Stock Status (Còn hàng / Hết hàng)
   if (selectedStockStatus.value !== 'all') {
     if (selectedStockStatus.value === 'in') {
-      products = products.filter(p => !isOutOfStock(p))
+      products = products.filter((p) => !isOutOfStock(p))
     } else if (selectedStockStatus.value === 'out') {
-      products = products.filter(p => isOutOfStock(p))
+      products = products.filter((p) => isOutOfStock(p))
     }
   }
 
-  return products
+  // 5. Smart search + relevance ranking (accent-insensitive, multi-token, acronym, synonym, description, price, typo fallback)
+  const cleanKw = parsedProductSearch.value.cleanQuery
+  if (cleanKw) {
+    return rankProductsWithMeta(products, cleanKw, {
+      activeLang: selectedLang.value || 'vi',
+      preferInStock: true,
+      fuzzyFallback: true,
+    })
+  }
+
+  return { items: products, usedFuzzy: false }
+})
+
+const allFilteredProducts = computed(() => productSearchMeta.value.items)
+
+const globalProductSearchCount = computed(() => {
+  const cleanKw = parsedProductSearch.value.cleanQuery
+  if (!cleanKw) return 0
+  const hasNonSearchFilter = Boolean(
+    selectedCategory.value ||
+      selectedSize.value ||
+      onlyPromotion.value ||
+      selectedStockStatus.value !== 'all',
+  )
+  if (!hasNonSearchFilter) return allFilteredProducts.value.length
+  return rankProductsWithMeta(localizedHangHoaList.value, cleanKw, {
+    activeLang: selectedLang.value || 'vi',
+    preferInStock: true,
+    fuzzyFallback: true,
+  }).items.length
 })
 
 const filteredProducts = computed(() => {
   return allFilteredProducts.value
 })
+
+function clearCatalogNonSearchFilters() {
+  selectedCategory.value = ''
+  selectedSize.value = ''
+  onlyPromotion.value = false
+  selectedStockStatus.value = 'all'
+  currentPage.value = 1
+}
+
+function handleProductSearchEnter() {
+  const kw = parsedProductSearch.value.cleanQuery
+  if (!kw) return
+
+  let candidates = filteredProducts.value
+  if (!candidates.length && globalProductSearchCount.value > 0) {
+    clearCatalogNonSearchFilters()
+    candidates = filteredProducts.value
+  }
+
+  const firstInStock = candidates.find((p) => !isOutOfStock(p))
+  if (!firstInStock) {
+    if (candidates.length > 0) {
+      toast('error', `Món "${candidates[0].Ten_hang}" đang ở trạng thái HẾT HÀNG!`)
+    }
+    return
+  }
+
+  const quickQty = parsedProductSearch.value.qty
+  if (isMobile.value) {
+    adjustMobileCartQty(firstInStock, quickQty || 1)
+  } else {
+    if (quickQty) {
+      productQty[firstInStock.Ma_hang] = quickQty
+    }
+    addProductToCart(firstInStock)
+  }
+
+  nextTick(() => {
+    productSearchInputRef.value?.focus?.()
+    productSearchInputRef.value?.select?.()
+  })
+}
+
+function handleGlobalSearchShortcut(e) {
+  if (!e) return
+  const key = e.key
+  const isCtrlK = (e.ctrlKey || e.metaKey) && key.toLowerCase() === 'k'
+  const isSlash = key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey
+
+  if (!isCtrlK && !isSlash) return
+
+  if (isSlash) {
+    const tag = String(document.activeElement?.tagName || '').toLowerCase()
+    const isEditable =
+      tag === 'input' ||
+      tag === 'textarea' ||
+      tag === 'select' ||
+      Boolean(document.activeElement?.isContentEditable)
+    if (isEditable) return
+  }
+
+  e.preventDefault()
+  if (entryMode.value !== 'catalog') {
+    entryMode.value = 'catalog'
+  }
+  if (isMobile.value && activeMobileTab.value !== 'entry') {
+    activeMobileTab.value = 'entry'
+  }
+  nextTick(() => {
+    productSearchInputRef.value?.focus?.()
+    productSearchInputRef.value?.select?.()
+  })
+}
 
 const totalPages = computed(() => 1)
 
@@ -26664,5 +26960,118 @@ textarea:focus {
   background: rgba(148, 163, 184, 0.16);
   color: #e2e8f0;
   border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.srb-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.srb-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.srb-badge.is-qty {
+  background: rgba(34, 197, 94, 0.18);
+  border: 1px solid rgba(74, 222, 128, 0.45);
+  color: #86efac;
+}
+
+.srb-badge.is-fuzzy {
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  color: #fde68a;
+}
+
+.srb-global-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  background: rgba(14, 165, 233, 0.18);
+  color: #7dd3fc;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.srb-global-btn:hover {
+  background: rgba(14, 165, 233, 0.32);
+  color: #ffffff;
+}
+
+.no-products-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.cust-suggest-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 60;
+  max-height: 240px;
+  overflow-y: auto;
+  background: #0f172a;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 10px;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.45);
+  padding: 4px;
+}
+
+.cust-suggest-item {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  padding: 8px 10px;
+  color: #f1f5f9;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transition: background 0.14s ease;
+}
+
+.cust-suggest-item:hover {
+  background: rgba(34, 197, 94, 0.16);
+}
+
+.cust-suggest-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.cust-suggest-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+
+.cust-suggest-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 </style>

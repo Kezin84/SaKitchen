@@ -36,7 +36,12 @@
     "allowMessageBadge": "Message"
   },
   "search": {
-    "placeholder": "Search food..."
+    "placeholder": "Search dish, ingredient, price...",
+    "fuzzyHint": "Showing closest matches for",
+    "searchAllMenu": "Search full menu",
+    "clearSearch": "Clear search",
+    "tryKeywords": "Quick suggestions:",
+    "quickTags": "Rice,Pho,Noodle,Hotpot,Milk tea,Beer"
   },
   "filter": {
     "all": "All",

@@ -65,7 +65,12 @@
             >
               <img :src="m.Main_img" alt="" class="suggest-img" />
               <div class="suggest-info">
-                <div class="suggest-name">{{ m.Ten_hang }}</div>
+                <div class="suggest-name">
+                  <template v-for="(seg, sIdx) in getSearchHighlights(m.Ten_hang, searchInput)" :key="sIdx">
+                    <mark v-if="seg.match" class="suggest-hl">{{ seg.text }}</mark>
+                    <template v-else>{{ seg.text }}</template>
+                  </template>
+                </div>
                 <div class="suggest-price">
                   {{ formatPrice(finalPrice(m), m.Don_vi_tien_te) }}
                 </div>
@@ -696,7 +701,12 @@
           >
             <img :src="m.Main_img" alt="" class="suggest-img" />
             <div class="suggest-info">
-              <div class="suggest-name">{{ m.Ten_hang }}</div>
+              <div class="suggest-name">
+                <template v-for="(seg, sIdx) in getSearchHighlights(m.Ten_hang, searchInput)" :key="sIdx">
+                  <mark v-if="seg.match" class="suggest-hl">{{ seg.text }}</mark>
+                  <template v-else>{{ seg.text }}</template>
+                </template>
+              </div>
               <div class="suggest-price">
                 {{ formatPrice(finalPrice(m), m.Don_vi_tien_te) }}
               </div>
@@ -848,7 +858,18 @@
       <!-- MENU GRID -->
       <div class="menu" ref="menuRef" :key="menuKey" v-if="pagedMenu.length > 0">
         <div v-if="keyword" class="search-result-line">
-          Kết quả tìm kiếm cho: "{{ keyword }}"
+          <span>
+            {{ filteredMenuMeta.usedFuzzy ? $t('search.fuzzyHint') : 'Kết quả tìm kiếm cho:' }}
+            "<strong>{{ keyword }}</strong>" ({{ filteredMenu.length }})
+          </span>
+          <button
+            v-if="searchGlobalMatchesCount > filteredMenu.length"
+            type="button"
+            class="srl-all-btn"
+            @click="searchAcrossAllMenu"
+          >
+            {{ $t('search.searchAllMenu') }} ({{ searchGlobalMatchesCount }})
+          </button>
         </div>
         <template v-for="entry in menuDisplayEntries" :key="entry.rowKey">
           <div
@@ -1003,8 +1024,44 @@
         v-else
         class="empty-menu"
       >
-        {{ $t('empty.menu') }}&nbsp;
-        <i class="ri-search-2-line"></i>
+        <div class="empty-menu-title">
+          {{ $t('empty.menu') }}
+          <span v-if="keyword" class="empty-menu-kw">"{{ keyword }}"</span>
+          <i class="ri-search-2-line"></i>
+        </div>
+
+        <div v-if="keyword" class="empty-search-actions">
+          <button
+            v-if="searchGlobalMatchesCount > 0"
+            type="button"
+            class="empty-search-btn primary"
+            @click="searchAcrossAllMenu"
+          >
+            <i class="ri-apps-2-line"></i>
+            {{ $t('search.searchAllMenu') }} ({{ searchGlobalMatchesCount }})
+          </button>
+          <button
+            type="button"
+            class="empty-search-btn"
+            @click="clearSearchAll"
+          >
+            <i class="ri-close-circle-line"></i>
+            {{ $t('search.clearSearch') }}
+          </button>
+        </div>
+
+        <div v-if="keyword && quickSearchTags.length" class="empty-quick-tags">
+          <span class="empty-quick-label">{{ $t('search.tryKeywords') }}</span>
+          <button
+            v-for="tag in quickSearchTags"
+            :key="tag"
+            type="button"
+            class="empty-quick-chip"
+            @click="applyQuickSearchTag(tag)"
+          >
+            {{ tag }}
+          </button>
+        </div>
       </div>
 
       <!-- LAZY LOAD SENTINEL (AUTO LOAD ON SCROLL) -->
@@ -5164,6 +5221,10 @@ import {
   findProductByUrlParams,
 } from '@/utils/i18nData'
 import {
+  rankProductsWithMeta,
+  getAccentInsensitiveHighlights,
+} from '@/utils/searchUtils'
+import {
   normalizeDisplayConfig,
   sortProductsFlat,
   sortLocalizedCategories,
@@ -7521,7 +7582,7 @@ const messagingContactList = computed(() =>
     .filter((c) => isContactMessageAllowed(c) && String(c.Direct_link || '').trim())
     .slice(0, 1),
 )
-const filteredMenu = computed(() => {
+const filteredMenuMeta = computed(() => {
   let list = [...menu.value]
   const activeLocale = locale.value || 'vi'
 
@@ -7540,9 +7601,16 @@ const filteredMenu = computed(() => {
     }
   }
 
-  // SEARCH (matches across all 5 languages)
+  // SEARCH (accent-insensitive, multi-token, 5-lang, Trad->Simp, synonyms, description, price, typo fallback + relevance ranking)
+  let usedFuzzy = false
   if (keyword.value) {
-    list = list.filter(m => productMatchesKeyword(m, keyword.value))
+    const ranked = rankProductsWithMeta(list, keyword.value, {
+      activeLang: activeLocale,
+      preferInStock: true,
+      fuzzyFallback: true,
+    })
+    list = ranked.items
+    usedFuzzy = ranked.usedFuzzy
   }
 
   // SORT
@@ -7569,16 +7637,63 @@ const filteredMenu = computed(() => {
     )
   }
 
-  return list
+  return { items: list, usedFuzzy }
 })
+
+const filteredMenu = computed(() => filteredMenuMeta.value.items)
+
+const searchGlobalMatchesCount = computed(() => {
+  const kw = (keyword.value || '').trim()
+  if (!kw) return 0
+  const isFilteredByCategory =
+    currentCategory.value === 'Sale' ||
+    (Boolean(currentCategory.value) && currentCategory.value !== allCategoryLabel.value) ||
+    Boolean(currentSubCategory.value)
+  if (!isFilteredByCategory) return 0
+  return rankProductsWithMeta(menu.value, kw, {
+    activeLang: locale.value || 'vi',
+    preferInStock: true,
+    fuzzyFallback: true,
+  }).items.length
+})
+
+const quickSearchTags = computed(() => {
+  const raw = String(t('search.quickTags') || '')
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+})
+
+function getSearchHighlights(text, rawKw) {
+  return getAccentInsensitiveHighlights(text, rawKw)
+}
+
+function searchAcrossAllMenu() {
+  currentCategory.value = allCategoryLabel.value
+  currentSubCategory.value = ''
+  resetVisibleMenu()
+}
+
+function applyQuickSearchTag(tag) {
+  searchInput.value = tag
+  keyword.value = tag
+  currentCategory.value = allCategoryLabel.value
+  currentSubCategory.value = ''
+  showSearchSuggest.value = false
+  resetVisibleMenu()
+  scrollToTop()
+}
 
 const searchSuggestions = computed(() => {
   const kw = (searchInput.value || '').trim()
   if (!kw) return []
 
-  return menu.value
-    .filter((m) => productMatchesKeyword(m, kw))
-    .slice(0, 12)
+  return rankProductsWithMeta(menu.value, kw, {
+    activeLang: locale.value || 'vi',
+    preferInStock: true,
+    fuzzyFallback: true,
+  }).items.slice(0, 12)
 })
 
 let sortScrollTimer = null
@@ -7742,9 +7857,23 @@ watch(keyword, () => {
   resetVisibleMenu()
 })
 
+watch(searchInput, (val) => {
+  if (!String(val || '').trim() && keyword.value) {
+    keyword.value = ''
+  }
+})
+
 function applySearch() {
-  keyword.value = (searchInput.value || '').trim()
+  const nextKw = (searchInput.value || '').trim()
+  keyword.value = nextKw
   showSearchSuggest.value = false
+
+  // Escape category trap automatically when user explicitly searches and current category has 0 matches
+  if (nextKw && filteredMenu.value.length === 0 && searchGlobalMatchesCount.value > 0) {
+    currentCategory.value = allCategoryLabel.value
+    currentSubCategory.value = ''
+  }
+
   resetVisibleMenu()
   scrollToTop()
 }
@@ -26617,6 +26746,114 @@ const hasSale = computed(() =>
   100% {
     transform: scale(1) rotate(0deg);
   }
+}
+
+.suggest-hl {
+  background: rgba(250, 204, 21, 0.35);
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 4px;
+  font-weight: 800;
+}
+
+.empty-menu-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.empty-menu-kw {
+  font-weight: 800;
+  color: #059669;
+}
+
+.empty-search-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.empty-search-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.empty-search-btn:hover {
+  background: #f1f5f9;
+}
+
+.empty-search-btn.primary {
+  border-color: #059669;
+  background: #059669;
+  color: #ffffff;
+}
+
+.empty-search-btn.primary:hover {
+  background: #047857;
+}
+
+.empty-quick-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.empty-quick-label {
+  font-size: 12.5px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.empty-quick-chip {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(5, 150, 105, 0.25);
+  background: rgba(16, 185, 129, 0.08);
+  color: #047857;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.empty-quick-chip:hover {
+  background: rgba(16, 185, 129, 0.18);
+  transform: translateY(-1px);
+}
+
+.srl-all-btn {
+  margin-left: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #059669;
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.srl-all-btn:hover {
+  background: #059669;
+  color: #ffffff;
 }
 </style>
 

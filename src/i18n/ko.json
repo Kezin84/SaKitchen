@@ -36,7 +36,12 @@
     "allowMessageBadge": "메시지 가능"
   },
   "search": {
-    "placeholder": "메뉴 검색 ..."
+    "placeholder": "메뉴, 재료, 가격 검색...",
+    "fuzzyHint": "유사한 검색 결과:",
+    "searchAllMenu": "전체 메뉴에서 검색",
+    "clearSearch": "검색 지우기",
+    "tryKeywords": "추천 검색어:",
+    "quickTags": "덮밥,쌀국수,면,전골,밀크티,맥주"
   },
   "filter": {
     "all": "전체",

@@ -10,7 +10,7 @@
           <!-- Label removed here, moved to middle bar -->
           <div class="search-wrapper">
             <i class="app-ico ri-search-line"></i>
-            <input type="text" v-model="searchText" placeholder="Tìm kiếm tên khách, SĐT, mã đơn..." />
+            <input type="text" v-model="searchText" placeholder="Tìm tên, SĐT/@tele, địa chỉ, mã đơn, tên món, số tiền..." />
             <button v-if="searchText" class="btn-clear-search" @click="searchText = ''">
               Xóa
             </button>
@@ -88,8 +88,17 @@
       <div class="result-count">
         Tìm thấy <span class="highlight-count">{{ filteredOrders.length }}</span> đơn hàng
       </div>
-      <div class="result-text" v-if="searchText">
-        cho từ khóa <span class="highlight-text">"{{ searchText }}"</span>
+      <div class="result-text" v-if="searchText.trim()">
+        cho từ khóa <span class="highlight-text">"{{ searchText.trim() }}"</span>
+        <span class="search-all-dates-pill">Tìm trên tất cả các ngày</span>
+        <button
+          v-if="filter.status && baseByPayment.length > filteredOrders.length"
+          type="button"
+          class="btn-search-all-status"
+          @click="filter.status = ''"
+        >
+          Xem tất cả trạng thái ({{ baseByPayment.length }} đơn)
+        </button>
       </div>
     </div>
 
@@ -609,7 +618,7 @@
                       ref="dishSearchInputRef"
                       type="text"
                       v-model="dishSearchQuery"
-                      placeholder="Tìm tên món hoặc mã hàng trong DB..."
+                      placeholder="Tìm tên món (không dấu), mã, viết tắt, giá..."
                       @focus="dishSearchOpen = true"
                     />
                     <button
@@ -676,7 +685,14 @@
                     </button>
                   </template>
                   <div v-else class="dish-search-empty">
-                    Không tìm thấy món phù hợp trong DB — chuyển sang tab
+                    Không tìm thấy món phù hợp trong DB
+                    <template v-if="dishCategoryFilter && dishSearchQuery.trim()">
+                      —
+                      <button type="button" class="inline-switch-btn" @click="dishCategoryFilter = ''">
+                        Tìm ở tất cả danh mục
+                      </button>
+                    </template>
+                    — hoặc chuyển sang tab
                     <button type="button" class="inline-switch-btn" @click="prefillManualFromSearch">
                       Nhập tay / Phụ phí
                     </button>
@@ -1193,6 +1209,7 @@ import {
   makeLineId,
 } from '@/config/api'
 import { normalizeProductI18n, productMatchesKeyword } from '@/utils/i18nData'
+import { rankProductsWithMeta, matchesMultiTokenRecord } from '@/utils/searchUtils'
 
 const router = useRouter()
 
@@ -1371,19 +1388,18 @@ const dbCategories = computed(() => {
 const filteredMenuDishes = computed(() => {
   const q = dishSearchQuery.value.trim()
   const cat = dishCategoryFilter.value.trim()
-  const qNoTone = q ? removeVietnameseTones(q) : ''
+  const byCat = cat
+    ? hangHoaViList.value.filter((hh) => hh._viCat === cat)
+    : hangHoaViList.value
 
-  return hangHoaViList.value
-    .filter((hh) => {
-      if (cat && hh._viCat !== cat) return false
-      if (!q) return true
-      if (productMatchesKeyword(hh, q)) return true
-      if (removeVietnameseTones(hh._viName).includes(qNoTone)) return true
-      if (removeVietnameseTones(hh._viCat).includes(qNoTone)) return true
-      if (String(hh.Ma_hang || '').toLowerCase().includes(q.toLowerCase())) return true
-      return false
-    })
-    .slice(0, 30)
+  if (!q) return byCat.slice(0, 30)
+
+  const ranked = rankProductsWithMeta(byCat, q, {
+    activeLang: 'vi',
+    preferInStock: true,
+    fuzzyFallback: true,
+  })
+  return ranked.items.slice(0, 30)
 })
 
 const activeOrder = computed(() => {
@@ -2311,23 +2327,50 @@ const listAfterSearch = computed(() => {
   const q = searchText.value.trim()
   if (!q) return donHangList.value
 
-  const sNoTone = removeVietnameseTones(q)
-  const sRaw = q.toLowerCase()
-
   return donHangList.value.filter((dh) => {
-    const name = String(dh.Ten_khach_hang || '')
-    if (name.toLowerCase().includes(sRaw) || removeVietnameseTones(name).includes(sNoTone)) return true
+    const oid = String(dh.Ma_hoa_don || '').trim()
+    const live = oid ? liveOrdersMap.value[oid] : null
+    const liveMeta = live?.meta || {}
+    const orderItems = getRawItemsForOrder(oid)
 
-    const phone = String(dh.So_dien_thoai || '')
-    if (phone.toLowerCase().includes(sRaw)) return true
+    const texts = [
+      dh.Ten_khach_hang,
+      dh.Dia_chi,
+      dh.Ma_hoa_don,
+      dh.Ghi_chu,
+      liveMeta.Ghi_chu,
+      liveMeta.Ten_khach_hang,
+      liveMeta.Dia_chi,
+    ]
+    const phones = [dh.So_dien_thoai, liveMeta.So_dien_thoai]
+    const handles = [dh.Ten_khach_hang, dh.So_dien_thoai, liveMeta.Ten_khach_hang, liveMeta.So_dien_thoai]
 
-    const addr = String(dh.Dia_chi || '')
-    if (addr.toLowerCase().includes(sRaw) || removeVietnameseTones(addr).includes(sNoTone)) return true
+    let computedItemsTotal = 0
+    for (const it of orderItems) {
+      const code = String(it?.Ma_hang || '').trim()
+      const hh = code ? hangHoaViMap.value.get(code) : null
+      if (it?.Ten_hang) texts.push(it.Ten_hang)
+      if (code) texts.push(code)
+      if (hh?._viName) texts.push(hh._viName)
+      if (it?.Nguoi_dat) {
+        texts.push(it.Nguoi_dat)
+        handles.push(it.Nguoi_dat)
+      }
+      if (it?.Ghi_chu) texts.push(it.Ghi_chu)
+      const qty = Math.max(0, n(it?.So_luong))
+      const unitPrice = n(it?.Gia_ban) || n(it?.Don_gia)
+      computedItemsTotal += qty * unitPrice
+    }
 
-    const id = String(dh.Ma_hoa_don || '')
-    if (id.toLowerCase().includes(sRaw)) return true
+    const amounts = [
+      dh.Tong_gia_ban,
+      dh.Tong_cong,
+      dh.Tong_tien,
+      liveMeta.Tong_cong,
+      computedItemsTotal,
+    ]
 
-    return false
+    return matchesMultiTokenRecord(q, { texts, phones, handles, amounts })
   })
 })
 
@@ -2345,6 +2388,7 @@ const statsBase = computed(() => baseByDateAndPayment.value)
 
 const ignoreDateForList = computed(
   () =>
+    Boolean(searchText.value.trim()) ||
     filter.value.status === 'Quá hạn' ||
     filter.value.status === 'Chờ duyệt' ||
     filter.value.status === 'Đang ship',
@@ -6439,6 +6483,37 @@ watch(
   font-size: 12.5px;
   font-weight: 700;
   line-height: 1.35;
+}
+
+.search-all-dates-pill {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  color: #34d399;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.btn-search-all-status {
+  margin-left: 8px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(59, 130, 246, 0.45);
+  background: rgba(59, 130, 246, 0.16);
+  color: #93c5fd;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.btn-search-all-status:hover {
+  background: rgba(59, 130, 246, 0.3);
+  color: #fff;
 }
 </style>
 

@@ -36,7 +36,12 @@
     "allowMessageBadge": "Nhắn tin"
   },
   "search": {
-    "placeholder": "Tìm món ...."
+    "placeholder": "Tìm món (không dấu, tên, giá)...",
+    "fuzzyHint": "Hiển thị kết quả gần đúng cho",
+    "searchAllMenu": "Tìm trên toàn bộ thực đơn",
+    "clearSearch": "Xóa tìm kiếm",
+    "tryKeywords": "Gợi ý tìm nhanh:",
+    "quickTags": "Cơm,Bún,Phở,Lẩu,Trà sữa,Bia"
   },
   "filter": {
     "all": "Tất cả",

@@ -8,12 +8,23 @@ import {
   SURFACE_STYLE_OPTIONS,
   CARD_RADIUS_OPTIONS,
   SEASONAL_EFFECT_OPTIONS,
+  INTRO_SPLASH_MODE_OPTIONS,
   normalizeThemeConfig,
   buildStorefrontThemeVars,
   sanitizeHexColor,
   saveCachedStorefrontTheme,
 } from '@/utils/storefrontTheme'
 import SeasonalOverlay from '@/components/SeasonalOverlay.vue'
+import CookingSplashIntro from '@/components/CookingSplashIntro.vue'
+import {
+  INTRO_BG_TEMPLATES,
+  INTRO_EFFECT_TEMPLATES,
+  INTRO_TRANSITION_TEMPLATES,
+  INTRO_EVENT_TEMPLATES,
+  getIntroEventTemplate,
+  getIntroEffectTemplate,
+  resolveIntroSplashPalette,
+} from '@/utils/introSplashTemplates'
 
 const QUICK_PRIMARY_COLORS = [
   '#059669',
@@ -52,6 +63,69 @@ const draft = ref({ ...DEFAULT_STOREFRONT_THEME })
 // Local preview toggles (so admin can test both Light/Dark and Mobile/Desktop)
 const previewDevice = ref('mobile') // 'desktop' | 'mobile'
 const previewColorScheme = ref('light') // 'light' | 'dark'
+const showSplashPreview = ref(false)
+const splashPreviewKey = ref(0)
+
+const activeIntroEventMeta = computed(() => getIntroEventTemplate(draft.value.introEvent))
+const activeIntroEffectMeta = computed(() => getIntroEffectTemplate(draft.value.introEffect))
+const activeIntroTransitionMeta = computed(
+  () =>
+    INTRO_TRANSITION_TEMPLATES.find((t) => t.id === draft.value.introTransition) ||
+    INTRO_TRANSITION_TEMPLATES[0],
+)
+const activeIntroPalette = computed(() =>
+  resolveIntroSplashPalette(
+    draft.value.introBg,
+    draft.value.primaryColor,
+    draft.value.secondaryColor,
+  ),
+)
+const activeIntroPreviewTitle = computed(() => {
+  const custom = String(draft.value.introCustomTitle || '').trim()
+  if (custom) return custom
+  const viCopy = activeIntroEventMeta.value.copy?.vi
+  return [viCopy?.titleA, viCopy?.titleB].filter(Boolean).join(' ')
+})
+const activeIntroPreviewSub = computed(() => {
+  const custom = String(draft.value.introCustomSubtitle || '').trim()
+  return custom || activeIntroEventMeta.value.copy?.vi?.subtitle || ''
+})
+
+function previewCookingSplash() {
+  splashPreviewKey.value += 1
+  showSplashPreview.value = true
+}
+
+function selectIntroEvent(ev) {
+  if (!ev) return
+  draft.value = {
+    ...draft.value,
+    introEvent: ev.id,
+    introBg: ev.bg,
+    introEffect: ev.effect,
+    introTransition: ev.transition,
+    ...(draft.value.introSplashMode === 'off' ? { introSplashMode: 'once_session' } : {}),
+  }
+}
+
+function syncStorefrontWithActiveIntroEvent() {
+  const ev = getIntroEventTemplate(draft.value.introEvent)
+  const preset =
+    STOREFRONT_THEME_PRESETS.find((p) => p.id === ev.storefrontPresetId) ||
+    STOREFRONT_THEME_PRESETS[0]
+  draft.value = {
+    ...draft.value,
+    mode: 'preset',
+    presetId: preset.id,
+    primaryColor: preset.primaryColor,
+    secondaryColor: preset.secondaryColor,
+    surfaceStyle: preset.surfaceStyle || 'clean',
+    defaultColorScheme: preset.defaultColorScheme || 'light',
+    seasonalEffect: ev.storefrontSeasonalEffect || 'none',
+  }
+  previewColorScheme.value = preset.defaultColorScheme || 'light'
+  showAlert(`Đã đồng bộ màu & hiệu ứng trang Order theo sự kiện "${ev.label}". Nhấn "Lưu & Áp dụng" để kích hoạt.`, 'info')
+}
 
 const alertState = ref({ message: '', type: 'success' })
 let alertTimer = null
@@ -77,6 +151,13 @@ function themeComparableKey(cfg) {
     surfaceStyle: cfg.surfaceStyle,
     cardRadius: cfg.cardRadius,
     seasonalEffect: cfg.seasonalEffect,
+    introSplashMode: cfg.introSplashMode,
+    introEvent: cfg.introEvent,
+    introBg: cfg.introBg,
+    introEffect: cfg.introEffect,
+    introTransition: cfg.introTransition,
+    introCustomTitle: cfg.introCustomTitle,
+    introCustomSubtitle: cfg.introCustomSubtitle,
   })
 }
 
@@ -618,6 +699,271 @@ onMounted(() => {
             </button>
           </div>
         </section>
+
+        <!-- SECTION 5: MODULAR INTRO SPLASH STUDIO (EVENT + BACKGROUND + EFFECT + TRANSITION) -->
+        <section class="cfg-card">
+          <div class="cfg-card-head">
+            <div>
+              <h2 class="cfg-card-title">
+                <i class="ri-fire-fill"></i>
+                <span>5. Màn hình chào khi vào trang (Intro Studio)</span>
+              </h2>
+              <p class="cfg-card-desc">
+                Tự chọn Template theo sự kiện, màu nền, hiệu ứng bếp và kiểu mở màn (tự bỏ qua ở link ghép đơn và trang Admin).
+              </p>
+            </div>
+            <button
+              type="button"
+              class="btn-preview-splash"
+              @click="previewCookingSplash"
+            >
+              <i class="ri-play-circle-fill"></i>
+              <span>Xem thử hiệu ứng</span>
+            </button>
+          </div>
+
+          <!-- LIVE MINI PREVIEW BANNER (SHOWS ACTIVE BACKGROUND + TITLE + COMBO AT A GLANCE) -->
+          <div
+            v-if="draft.introSplashMode !== 'off'"
+            class="intro-mini-stage"
+            :style="{ background: activeIntroPalette.loaderBg }"
+            role="button"
+            tabindex="0"
+            @click="previewCookingSplash"
+          >
+            <div class="ims-left">
+              <div
+                class="ims-logo-ring"
+                :style="{
+                  borderColor: activeIntroPalette.accent,
+                  boxShadow: `0 0 18px ${activeIntroPalette.glow}`,
+                }"
+              >
+                <img :src="shopBrand.logo" :alt="shopBrand.name" />
+              </div>
+              <div class="ims-copy">
+                <div class="ims-kicker" :style="{ color: activeIntroPalette.titleStart }">
+                  {{ shopBrand.name }} · {{ activeIntroEventMeta.copy?.vi?.kickerSuffix }}
+                </div>
+                <div class="ims-title" :style="{ color: activeIntroPalette.accent }">
+                  {{ activeIntroPreviewTitle }}
+                </div>
+                <div class="ims-sub">{{ activeIntroPreviewSub }}</div>
+              </div>
+            </div>
+            <div class="ims-right">
+              <div class="ims-badges">
+                <span class="ims-pill">
+                  <i :class="activeIntroEffectMeta.icon"></i> {{ activeIntroEffectMeta.label }}
+                </span>
+                <span class="ims-pill">
+                  <i :class="activeIntroTransitionMeta.icon"></i> {{ activeIntroTransitionMeta.label }}
+                </span>
+              </div>
+              <span class="ims-play-hint">
+                <i class="ri-play-fill"></i> Bấm để chạy thử
+              </span>
+            </div>
+          </div>
+
+          <!-- 5.1 Frequency Mode -->
+          <div class="intro-sub-block">
+            <div class="intro-sub-label">
+              <i class="ri-toggle-line"></i>
+              <span>Chế độ hiển thị</span>
+            </div>
+            <div class="intro-mode-grid">
+              <button
+                v-for="opt in INTRO_SPLASH_MODE_OPTIONS"
+                :key="opt.id"
+                type="button"
+                class="effect-card intro-mode-card"
+                :class="{ active: draft.introSplashMode === opt.id }"
+                @click="draft.introSplashMode = opt.id"
+              >
+                <i :class="opt.icon" class="effect-ico"></i>
+                <div class="effect-info">
+                  <div class="effect-name">{{ opt.label }}</div>
+                  <div class="effect-desc">{{ opt.desc }}</div>
+                </div>
+                <i
+                  v-if="draft.introSplashMode === opt.id"
+                  class="ri-checkbox-circle-fill intro-chk-ico"
+                ></i>
+              </button>
+            </div>
+          </div>
+
+          <template v-if="draft.introSplashMode !== 'off'">
+            <!-- 5.2 Event Templates -->
+            <div class="intro-sub-block">
+              <div class="intro-sub-head-row">
+                <div class="intro-sub-label">
+                  <i class="ri-calendar-event-fill"></i>
+                  <span>Template theo Event (1 chạm đổi trọn bộ)</span>
+                </div>
+                <button
+                  type="button"
+                  class="btn-sync-event-theme"
+                  @click="syncStorefrontWithActiveIntroEvent"
+                >
+                  <i class="ri-magic-line"></i>
+                  <span>Đồng bộ màu trang Order theo Event</span>
+                </button>
+              </div>
+              <div class="intro-events-grid">
+                <button
+                  v-for="ev in INTRO_EVENT_TEMPLATES"
+                  :key="ev.id"
+                  type="button"
+                  class="effect-card intro-event-card"
+                  :class="{ active: draft.introEvent === ev.id }"
+                  @click="selectIntroEvent(ev)"
+                >
+                  <i :class="ev.icon" class="effect-ico"></i>
+                  <div class="effect-info">
+                    <div class="effect-name">
+                      <span>{{ ev.label }}</span>
+                      <span class="intro-ev-tag">{{ ev.tag }}</span>
+                    </div>
+                    <div class="effect-desc">{{ ev.desc }}</div>
+                  </div>
+                  <i
+                    v-if="draft.introEvent === ev.id"
+                    class="ri-checkbox-circle-fill intro-chk-ico"
+                  ></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- 5.3 Background Color Templates -->
+            <div class="intro-sub-block">
+              <div class="intro-sub-label">
+                <i class="ri-palette-fill"></i>
+                <span>Template Màu nền & Cánh cửa</span>
+              </div>
+              <div class="intro-bg-grid">
+                <button
+                  v-for="bg in INTRO_BG_TEMPLATES"
+                  :key="bg.id"
+                  type="button"
+                  class="intro-bg-card"
+                  :class="{ active: draft.introBg === bg.id }"
+                  @click="draft.introBg = bg.id"
+                >
+                  <span
+                    class="intro-bg-swatch"
+                    :style="{
+                      background: bg.isAuto
+                        ? `linear-gradient(135deg, ${draft.primaryColor}, #0f172a 65%, ${draft.secondaryColor})`
+                        : `linear-gradient(135deg, ${bg.swatch[0]}, ${bg.swatch[1]} 68%, ${bg.swatch[2]})`,
+                    }"
+                  >
+                    <i v-if="bg.isAuto" class="ri-links-line"></i>
+                  </span>
+                  <div class="intro-bg-meta">
+                    <div class="intro-bg-name">{{ bg.label }}</div>
+                    <div class="intro-bg-desc">{{ bg.desc }}</div>
+                  </div>
+                  <i
+                    v-if="draft.introBg === bg.id"
+                    class="ri-checkbox-circle-fill intro-chk-ico"
+                  ></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- 5.4 Animation Effect Stage Templates -->
+            <div class="intro-sub-block">
+              <div class="intro-sub-label">
+                <i class="ri-sparkling-fill"></i>
+                <span>Template Hiệu ứng sân khấu</span>
+              </div>
+              <div class="effects-grid">
+                <button
+                  v-for="fx in INTRO_EFFECT_TEMPLATES"
+                  :key="fx.id"
+                  type="button"
+                  class="effect-card"
+                  :class="{ active: draft.introEffect === fx.id }"
+                  @click="draft.introEffect = fx.id"
+                >
+                  <i :class="fx.icon" class="effect-ico"></i>
+                  <div class="effect-info">
+                    <div class="effect-name">{{ fx.label }}</div>
+                    <div class="effect-desc">{{ fx.desc }}</div>
+                  </div>
+                  <i
+                    v-if="draft.introEffect === fx.id"
+                    class="ri-checkbox-circle-fill intro-chk-ico"
+                  ></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- 5.5 Exit Transition Style -->
+            <div class="intro-sub-block">
+              <div class="intro-sub-label">
+                <i class="ri-door-open-line"></i>
+                <span>Kiểu mở màn vào thực đơn</span>
+              </div>
+              <div class="intro-trans-row">
+                <button
+                  v-for="tr in INTRO_TRANSITION_TEMPLATES"
+                  :key="tr.id"
+                  type="button"
+                  class="intro-trans-btn"
+                  :class="{ active: draft.introTransition === tr.id }"
+                  @click="draft.introTransition = tr.id"
+                >
+                  <i :class="tr.icon"></i>
+                  <span>{{ tr.label }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 5.6 Optional Custom Title / Subtitle Override -->
+            <div class="intro-sub-block">
+              <div class="intro-sub-label">
+                <i class="ri-text"></i>
+                <span>Tùy chỉnh tiêu đề riêng (để trống = tự dùng bộ chữ 5 ngôn ngữ của Event)</span>
+              </div>
+              <div class="intro-copy-inputs">
+                <input
+                  v-model="draft.introCustomTitle"
+                  type="text"
+                  maxlength="60"
+                  class="intro-text-input"
+                  placeholder="VD: KHAI TRƯƠNG GIẢM 20% (để trống dùng mặc định)"
+                />
+                <input
+                  v-model="draft.introCustomSubtitle"
+                  type="text"
+                  maxlength="90"
+                  class="intro-text-input"
+                  placeholder="Phụ đề ngắn (VD: FREESHIP NỘI KHU MANILA HÔM NAY)"
+                />
+              </div>
+            </div>
+          </template>
+        </section>
+
+        <CookingSplashIntro
+          v-if="showSplashPreview"
+          :key="splashPreviewKey"
+          :logo-url="shopBrand.logo"
+          :shop-name="shopBrand.name"
+          lang="vi"
+          :event-id="draft.introEvent"
+          :bg-id="draft.introBg"
+          :effect-id="draft.introEffect"
+          :transition-id="draft.introTransition"
+          :primary-color="draft.primaryColor"
+          :secondary-color="draft.secondaryColor"
+          :custom-title="draft.introCustomTitle"
+          :custom-subtitle="draft.introCustomSubtitle"
+          @done="showSplashPreview = false"
+        />
       </div>
 
       <!-- RIGHT COLUMN: LIVE PREVIEW -->
@@ -1912,6 +2258,392 @@ onMounted(() => {
 @media (max-width: 480px) {
   .presets-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+.btn-preview-splash {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(251, 146, 60, 0.55);
+  background: linear-gradient(135deg, #ea580c, #dc2626);
+  color: #fff7ed;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-shadow: 0 6px 18px rgba(234, 88, 12, 0.28);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.btn-preview-splash:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+/* LIVE MINI PREVIEW BANNER FOR INTRO STUDIO */
+.intro-mini-stage {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.intro-mini-stage:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.22);
+}
+
+.ims-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1 1 240px;
+}
+
+.ims-logo-ring {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid #fbbf24;
+  padding: 2px;
+  background: #ffffff;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.ims-logo-ring img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.ims-copy {
+  min-width: 0;
+}
+
+.ims-kicker {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  opacity: 0.92;
+}
+
+.ims-title {
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: -0.2px;
+  text-transform: uppercase;
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
+.ims-sub {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 247, 237, 0.85);
+  margin-top: 2px;
+}
+
+.ims-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.ims-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.ims-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ims-play-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #fde68a;
+}
+
+.intro-sub-block {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.intro-sub-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.intro-sub-head-row .intro-sub-label {
+  margin-bottom: 0;
+}
+
+.intro-sub-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #1e293b;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 10px;
+}
+
+.intro-sub-label i {
+  color: #ea580c;
+  font-size: 15px;
+}
+
+.intro-chk-ico {
+  font-size: 19px;
+  color: #059669;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.intro-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.intro-mode-card {
+  align-items: flex-start;
+}
+
+.btn-sync-event-theme {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 9px;
+  border: 1.5px solid #10b981;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.btn-sync-event-theme:hover {
+  background: #059669;
+  border-color: #059669;
+  color: #ffffff;
+}
+
+.intro-events-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.intro-event-card .effect-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.intro-event-card .effect-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.intro-ev-tag {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  color: #b45309;
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.intro-bg-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.intro-bg-card {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  border: 2px solid #e2e8f0;
+  background: #ffffff;
+  color: #0f172a;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.intro-bg-card:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.intro-bg-card.active {
+  border-color: #059669;
+  background: #f0fdf4;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.12);
+}
+
+.intro-bg-swatch {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  border: 2px solid rgba(15, 23, 42, 0.16);
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.16);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 16px;
+}
+
+.intro-bg-meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.intro-bg-name {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.intro-bg-desc {
+  font-size: 11.5px;
+  color: #64748b;
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+.intro-trans-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.intro-trans-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 11px 12px;
+  border-radius: 11px;
+  border: 2px solid #e2e8f0;
+  background: #ffffff;
+  color: #334155;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.intro-trans-btn:hover {
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.intro-trans-btn.active {
+  border-color: #059669;
+  background: #f0fdf4;
+  color: #047857;
+  font-weight: 800;
+}
+
+.intro-copy-inputs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.intro-text-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.intro-text-input::placeholder {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.intro-text-input:focus {
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.14);
+}
+
+@media (max-width: 900px) {
+  .intro-mode-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .intro-events-grid,
+  .intro-bg-grid,
+  .intro-trans-row,
+  .intro-copy-inputs {
+    grid-template-columns: 1fr;
+  }
+  .ims-right {
+    align-items: flex-start;
+  }
+  .ims-badges {
+    justify-content: flex-start;
   }
 }
 </style>

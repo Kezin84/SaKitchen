@@ -76,6 +76,8 @@
     "timeDay": "일",
     "timeMonth": "월",
     "timeYear": "년",
+    "timeToday": "오늘",
+    "timeTomorrow": "내일",
     "note": "가게에 남길 메모",
     "notePlaceholder": "메모 입력 (덜 맵게, 7시 전에 배달 등)",
     "finish": "주문 보내기",

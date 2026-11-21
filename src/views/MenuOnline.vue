@@ -9,6 +9,21 @@
     ]"
     :style="[pcLayoutStyle, storefrontThemeVars]"
   >
+    <CookingSplashIntro
+      v-if="showCookingSplash"
+      :logo-url="logo?.URL || '/logo-sa.jpg'"
+      :shop-name="logo?.Name || 'SA KITCHEN'"
+      :lang="currentLang"
+      :event-id="activeStorefrontTheme.introEvent"
+      :bg-id="activeStorefrontTheme.introBg"
+      :effect-id="activeStorefrontTheme.introEffect"
+      :transition-id="activeStorefrontTheme.introTransition"
+      :primary-color="activeStorefrontTheme.primaryColor"
+      :secondary-color="activeStorefrontTheme.secondaryColor"
+      :custom-title="activeStorefrontTheme.introCustomTitle"
+      :custom-subtitle="activeStorefrontTheme.introCustomSubtitle"
+      @done="showCookingSplash = false"
+    />
     <SeasonalOverlay :effect="activeStorefrontTheme.seasonalEffect" />
     <!-- ========== DESKTOP TOP HEADER (1A) ========== -->
     <header v-if="!isMobile" class="desktop-top-header">
@@ -3176,7 +3191,7 @@
             </div>
             <div v-if="thoiGian" class="mps-info-row">
               <span class="mps-info-lbl">{{ $t('cart.time') }}</span>
-              <span class="mps-info-val">{{ thoiGian }}</span>
+              <span class="mps-info-val">{{ displayDeliveryTime }}</span>
             </div>
             <div class="mps-info-row">
               <span class="mps-info-lbl">{{ $t('cart.payment') }}</span>
@@ -4011,17 +4026,15 @@
                 />
               </div>
 
-              <div class="form-field dt24-inline-field" :class="{ 'is-mobile-dt24': isMobile }">
+              <div
+                ref="dt24PickerWrapRef"
+                class="form-field dt24-inline-field"
+                :class="{ 'is-mobile-dt24': isMobile }"
+                @keydown.esc="activeDt24Panel = null"
+              >
                 <label class="dt24-inline-label">{{ $t('cart.time') }}</label>
 
                 <div v-if="isMobile && !isOrderLocked" class="dt24-mobile-presets">
-                  <button
-                    type="button"
-                    class="dt24-preset-chip"
-                    @click="setDeliveryTimeNow(0)"
-                  >
-                    <i class="ri-flashlight-line"></i> {{ $t('cart.timeNowBtn') }}
-                  </button>
                   <button
                     type="button"
                     class="dt24-preset-chip"
@@ -4044,7 +4057,7 @@
                     {{ $t('cart.timePlus60') }}
                   </button>
                   <button
-                    v-if="thoiGian"
+                    v-if="deliveryHour || deliveryMinute || thoiGian"
                     type="button"
                     class="dt24-preset-chip is-clear"
                     :aria-label="$t('menu.clearFilter')"
@@ -4054,91 +4067,109 @@
                   </button>
                 </div>
 
-                <div class="dt24-picker-row" :class="{ disabled: isOrderLocked }">
-                  <div class="dt24-segment dt24-pill is-time">
+                <div class="dt24-picker-row" :class="{ disabled: isOrderLocked, 'is-open': Boolean(activeDt24Panel) }">
+                  <div class="dt24-segment dt24-pill is-time" :class="{ 'is-active': activeDt24Panel === 'hh' || activeDt24Panel === 'mm' }">
                     <i class="ri-time-line dt24-seg-ico"></i>
-                    <select
-                      class="dt24-select"
-                      :class="{ empty: !parsedThoiGian.hh }"
-                      :value="parsedThoiGian.hh"
-                      :disabled="isOrderLocked"
-                      @change="onPickDateTimePart('hh', $event.target.value)"
-                    >
-                      <option value="" disabled>{{ $t('cart.timeHour') }}</option>
-                      <option v-for="h in HOURS_24_LIST" :key="'h24-' + h" :value="h">
-                        {{ h }}
-                      </option>
-                    </select>
+                    <div class="dt24-select-wrap">
+                      <button
+                        type="button"
+                        class="dt24-select-btn"
+                        :class="{ empty: !deliveryHour, open: activeDt24Panel === 'hh' }"
+                        :disabled="isOrderLocked"
+                        @click.stop="toggleDt24Panel('hh')"
+                      >
+                        <span>{{ deliveryHour || $t('cart.timeHour') }}</span>
+                        <i class="ri-arrow-down-s-line dt24-caret"></i>
+                      </button>
+                      <div
+                        v-if="!isOrderLocked && activeDt24Panel === 'hh'"
+                        class="dt24-col-menu is-compact"
+                        @click.stop
+                      >
+                        <button
+                          v-for="h in HOURS_24_LIST"
+                          :key="'h24-' + h"
+                          type="button"
+                          class="dt24-col-opt"
+                          :class="{ selected: deliveryHour === h }"
+                          @click="onSelectDeliveryHour(h)"
+                        >
+                          {{ h }}
+                        </button>
+                      </div>
+                    </div>
+
                     <span class="dt24-sep">:</span>
-                    <select
-                      class="dt24-select"
-                      :class="{ empty: !parsedThoiGian.mm }"
-                      :value="parsedThoiGian.mm"
-                      :disabled="isOrderLocked"
-                      @change="onPickDateTimePart('mm', $event.target.value)"
-                    >
-                      <option value="" disabled>{{ $t('cart.timeMinute') }}</option>
-                      <option v-for="m in MINUTES_60_LIST" :key="'m60-' + m" :value="m">
-                        {{ m }}
-                      </option>
-                    </select>
+
+                    <div class="dt24-select-wrap">
+                      <button
+                        type="button"
+                        class="dt24-select-btn"
+                        :class="{ empty: !deliveryMinute, open: activeDt24Panel === 'mm' }"
+                        :disabled="isOrderLocked"
+                        @click.stop="toggleDt24Panel('mm')"
+                      >
+                        <span>{{ deliveryMinute || $t('cart.timeMinute') }}</span>
+                        <i class="ri-arrow-down-s-line dt24-caret"></i>
+                      </button>
+                      <div
+                        v-if="!isOrderLocked && activeDt24Panel === 'mm'"
+                        class="dt24-col-menu is-compact"
+                        @click.stop
+                      >
+                        <button
+                          v-for="m in MINUTES_60_LIST"
+                          :key="'m60-' + m"
+                          type="button"
+                          class="dt24-col-opt"
+                          :class="{ selected: deliveryMinute === m }"
+                          @click="onSelectDeliveryMinute(m)"
+                        >
+                          {{ m }}
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
-                  <div class="dt24-segment dt24-pill is-date">
+                  <div class="dt24-segment dt24-pill is-date" :class="{ 'is-active': activeDt24Panel === 'date' }">
                     <i class="ri-calendar-event-line dt24-seg-ico"></i>
-                    <select
-                      class="dt24-select"
-                      :class="{ empty: !parsedThoiGian.dd }"
-                      :value="parsedThoiGian.dd"
-                      :disabled="isOrderLocked"
-                      @change="onPickDateTimePart('dd', $event.target.value)"
-                    >
-                      <option value="" disabled>{{ $t('cart.timeDay') }}</option>
-                      <option v-for="d in availableDaysList" :key="'d31-' + d" :value="d">
-                        {{ d }}
-                      </option>
-                    </select>
-                    <span class="dt24-sep">/</span>
-                    <select
-                      class="dt24-select"
-                      :class="{ empty: !parsedThoiGian.mo }"
-                      :value="parsedThoiGian.mo"
-                      :disabled="isOrderLocked"
-                      @change="onPickDateTimePart('mo', $event.target.value)"
-                    >
-                      <option value="" disabled>{{ $t('cart.timeMonth') }}</option>
-                      <option v-for="mo in MONTHS_12_LIST" :key="'mo12-' + mo" :value="mo">
-                        {{ mo }}
-                      </option>
-                    </select>
-                    <span class="dt24-sep">/</span>
-                    <select
-                      class="dt24-select dt24-year"
-                      :class="{ empty: !parsedThoiGian.yyyy }"
-                      :value="parsedThoiGian.yyyy"
-                      :disabled="isOrderLocked"
-                      @change="onPickDateTimePart('yyyy', $event.target.value)"
-                    >
-                      <option value="" disabled>{{ $t('cart.timeYear') }}</option>
-                      <option v-for="y in availableYearsList" :key="'yr-' + y" :value="y">
-                        {{ y }}
-                      </option>
-                    </select>
+                    <div class="dt24-select-wrap is-date-wrap">
+                      <button
+                        type="button"
+                        class="dt24-select-btn dt24-date-btn"
+                        :class="{ open: activeDt24Panel === 'date' }"
+                        :disabled="isOrderLocked"
+                        @click.stop="toggleDt24Panel('date')"
+                      >
+                        <span>{{ selectedDeliveryDateLabel }}</span>
+                        <i class="ri-arrow-down-s-line dt24-caret"></i>
+                      </button>
+                      <div
+                        v-if="!isOrderLocked && activeDt24Panel === 'date'"
+                        class="dt24-col-menu is-date-menu"
+                        @click.stop
+                      >
+                        <button
+                          v-for="opt in deliveryDateOptions"
+                          :key="'ddate-' + opt.value"
+                          type="button"
+                          class="dt24-col-opt is-date-opt"
+                          :class="{ selected: deliveryDate === opt.value }"
+                          @click="onSelectDeliveryDate(opt.value)"
+                        >
+                          <span class="dt24-date-opt-main">{{ opt.label }}</span>
+                          <span v-if="opt.subDate" class="dt24-date-opt-sub">{{ opt.subDate }}</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
-                  <div v-if="!isMobile && !isOrderLocked" class="dt24-quick-actions">
+                  <div v-if="!isMobile && !isOrderLocked && (deliveryHour || deliveryMinute || thoiGian)" class="dt24-quick-actions">
                     <button
-                      type="button"
-                      class="dt24-now-btn"
-                      @click="setDeliveryTimeNow(0)"
-                    >
-                      <i class="ri-flashlight-line"></i> {{ $t('cart.timeNowBtn') }}
-                    </button>
-                    <button
-                      v-if="thoiGian"
                       type="button"
                       class="dt24-clear-btn"
-                      @click="clearDeliveryTime"
+                      :aria-label="$t('menu.clearFilter')"
+                      @click.stop="clearDeliveryTime"
                     >
                       <i class="ri-close-line"></i>
                     </button>
@@ -4215,7 +4246,7 @@
               </div>
               <div v-if="thoiGian" class="gdp-row">
                 <i class="ri-time-line"></i>
-                <span>{{ thoiGian }}</span>
+                <span>{{ displayDeliveryTime }}</span>
               </div>
               <div class="gdp-row">
                 <i class="ri-wallet-3-line"></i>
@@ -5185,6 +5216,7 @@ import { ref, reactive, computed, onMounted, watch, nextTick, onUnmounted } from
 import L from 'leaflet'
 import QrcodeVue from 'qrcode.vue'
 import SeasonalOverlay from '@/components/SeasonalOverlay.vue'
+import CookingSplashIntro from '@/components/CookingSplashIntro.vue'
 import {
   buildStorefrontThemeVars,
   getStorefrontMetaThemeColor,
@@ -5383,7 +5415,27 @@ const allCatsWrapRef = ref(null)
 const showAllCatsDrawer = ref(false)
 
 const SA_THEME_MODE_KEY = 'SA_THEME_MODE'
+const SA_INTRO_SPLASH_SESSION_KEY = 'SA_INTRO_SPLASH_SHOWN'
 const cachedStorefrontTheme = ref(loadCachedStorefrontTheme())
+
+function shouldPlayCookingSplashOnLoad() {
+  if (typeof window === 'undefined') return false
+  // Skip intro when entering directly via a shared group-order link (?order=...)
+  if (route.query?.order) return false
+  const mode = cachedStorefrontTheme.value?.introSplashMode || 'once_session'
+  if (mode === 'off') return false
+  if (mode === 'once_session') {
+    try {
+      if (sessionStorage.getItem(SA_INTRO_SPLASH_SESSION_KEY) === '1') {
+        return false
+      }
+      sessionStorage.setItem(SA_INTRO_SPLASH_SESSION_KEY, '1')
+    } catch {}
+  }
+  return true
+}
+
+const showCookingSplash = ref(shouldPlayCookingSplashOnLoad())
 const hasRemoteDisplayConfig = computed(
   () => Array.isArray(displayConfigRows.value) && displayConfigRows.value.length > 0,
 )
@@ -5584,13 +5636,21 @@ const myMemberRecord = computed(() =>
 const isMyGuestSelectionDone = computed(() =>
   Boolean(isGroupGuest.value && myMemberRecord.value?.done),
 )
-const HOURS_24_LIST = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
-const MINUTES_60_LIST = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
-const MONTHS_12_LIST = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'))
+function formatDateDMY(d = new Date()) {
+  const p = (num) => String(num).padStart(2, '0')
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`
+}
+
+function getRelativeDateDMY(dayOffset = 0) {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() + dayOffset)
+  return formatDateDMY(d)
+}
 
 function format24hDateTimeObj(d = new Date()) {
   const p = (num) => String(num).padStart(2, '0')
-  return `${p(d.getHours())}:${p(d.getMinutes())} ${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`
+  return `${p(d.getHours())}:${p(d.getMinutes())} ${formatDateDMY(d)}`
 }
 
 function parseThoiGian24h(raw) {
@@ -5619,43 +5679,108 @@ function parseThoiGian24h(raw) {
   return { hh: '', mm: '', dd: '', mo: '', yyyy: '' }
 }
 
-const parsedThoiGian = computed(() => parseThoiGian24h(thoiGian.value))
+const HOURS_24_LIST = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
+const MINUTES_60_LIST = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
 
-const availableYearsList = computed(() => {
-  const curY = new Date().getFullYear()
-  const set = new Set([String(curY), String(curY + 1), String(curY + 2)])
-  if (parsedThoiGian.value.yyyy) set.add(parsedThoiGian.value.yyyy)
-  return Array.from(set).sort()
-})
+const dt24PickerWrapRef = ref(null)
+const activeDt24Panel = ref(null) // null | 'hh' | 'mm' | 'date'
+const deliveryHour = ref('')
+const deliveryMinute = ref('')
+const deliveryDate = ref(getRelativeDateDMY(0))
 
-const availableDaysList = computed(() => {
-  const now = new Date()
-  const y = Number(parsedThoiGian.value.yyyy || now.getFullYear())
-  const mo = Number(parsedThoiGian.value.mo || now.getMonth() + 1)
-  const maxDays = new Date(y, mo, 0).getDate() || 31
-  return Array.from({ length: maxDays }, (_, i) => String(i + 1).padStart(2, '0'))
-})
+const deliveryDateOptions = computed(() => {
+  const opts = []
+  const seen = new Set()
+  const todayLabel = t('cart.timeToday')
+  const tomorrowLabel = t('cart.timeTomorrow')
 
-function onPickDateTimePart(part, rawVal) {
-  if (isOrderLocked.value || !isGroupHost.value || !rawVal) return
-  const now = new Date()
-  const p = (num) => String(num).padStart(2, '0')
-  const cur = { ...parsedThoiGian.value }
-  cur[part] = String(rawVal)
-
-  if (!cur.hh) cur.hh = p(now.getHours())
-  if (!cur.mm) cur.mm = part === 'hh' ? '00' : p(now.getMinutes())
-  if (!cur.yyyy) cur.yyyy = String(now.getFullYear())
-  if (!cur.mo) cur.mo = p(now.getMonth() + 1)
-  if (!cur.dd) cur.dd = p(now.getDate())
-
-  const maxD = new Date(Number(cur.yyyy), Number(cur.mo), 0).getDate() || 31
-  if (Number(cur.dd) > maxD) {
-    cur.dd = p(maxD)
+  for (let offset = 0; offset < 30; offset += 1) {
+    const val = getRelativeDateDMY(offset)
+    seen.add(val)
+    const label = offset === 0 ? todayLabel : offset === 1 ? tomorrowLabel : val
+    const subDate = offset <= 1 ? val : ''
+    opts.push({ value: val, label, subDate })
   }
 
-  thoiGian.value = `${cur.hh}:${cur.mm} ${cur.dd}/${cur.mo}/${cur.yyyy}`
+  const cur = String(deliveryDate.value || '').trim()
+  if (cur && !seen.has(cur)) {
+    opts.unshift({ value: cur, label: cur, subDate: '' })
+  }
+
+  return opts
+})
+
+const selectedDeliveryDateLabel = computed(() => {
+  const cur = String(deliveryDate.value || '').trim() || getRelativeDateDMY(0)
+  if (cur === getRelativeDateDMY(0)) return t('cart.timeToday')
+  if (cur === getRelativeDateDMY(1)) return t('cart.timeTomorrow')
+  return cur
+})
+
+function syncDeliveryInputsFromThoiGian(raw) {
+  const parsed = parseThoiGian24h(raw)
+  if (parsed.hh && parsed.mm && parsed.dd && parsed.mo && parsed.yyyy) {
+    deliveryHour.value = parsed.hh
+    deliveryMinute.value = parsed.mm
+    deliveryDate.value = `${parsed.dd}/${parsed.mo}/${parsed.yyyy}`
+  } else if (!String(raw || '').trim()) {
+    deliveryHour.value = ''
+    deliveryMinute.value = ''
+    deliveryDate.value = getRelativeDateDMY(0)
+  }
+}
+
+function commitDeliveryTimeFromInputs({ padParts = false } = {}) {
+  const rawH = String(deliveryHour.value || '').replace(/\D+/g, '')
+  const rawM = String(deliveryMinute.value || '').replace(/\D+/g, '')
+  const datePart = String(deliveryDate.value || '').trim() || getRelativeDateDMY(0)
+
+  if (!rawH && !rawM) {
+    thoiGian.value = ''
+    return
+  }
+
+  const clampH = rawH ? String(Math.min(23, Math.max(0, Number(rawH)))).padStart(2, '0') : ''
+  const clampM = rawM ? String(Math.min(59, Math.max(0, Number(rawM)))).padStart(2, '0') : ''
+
+  if (padParts) {
+    if (clampH) deliveryHour.value = clampH
+    if (clampM) deliveryMinute.value = clampM
+    else if (clampH) deliveryMinute.value = '00'
+  }
+
+  const finalH = clampH || String(new Date().getHours()).padStart(2, '0')
+  const finalM = clampM || '00'
+  thoiGian.value = `${finalH}:${finalM} ${datePart}`
+}
+
+function toggleDt24Panel(panel) {
+  if (isOrderLocked.value || !isGroupHost.value) return
+  activeDt24Panel.value = activeDt24Panel.value === panel ? null : panel
+}
+
+function onSelectDeliveryHour(h) {
+  if (isOrderLocked.value || !isGroupHost.value) return
+  deliveryHour.value = String(h).padStart(2, '0')
+  commitDeliveryTimeFromInputs({ padParts: false })
   scheduleSyncLiveMeta()
+  activeDt24Panel.value = deliveryMinute.value ? null : 'mm'
+}
+
+function onSelectDeliveryMinute(m) {
+  if (isOrderLocked.value || !isGroupHost.value) return
+  deliveryMinute.value = String(m).padStart(2, '0')
+  commitDeliveryTimeFromInputs({ padParts: false })
+  scheduleSyncLiveMeta()
+  activeDt24Panel.value = null
+}
+
+function onSelectDeliveryDate(rawDate) {
+  if (isOrderLocked.value || !isGroupHost.value || !rawDate) return
+  deliveryDate.value = String(rawDate).trim() || getRelativeDateDMY(0)
+  commitDeliveryTimeFromInputs({ padParts: false })
+  scheduleSyncLiveMeta()
+  activeDt24Panel.value = null
 }
 
 function setDeliveryTimeNow(addMinutes = 0) {
@@ -5663,14 +5788,50 @@ function setDeliveryTimeNow(addMinutes = 0) {
   const offsetMin =
     typeof addMinutes === 'number' && Number.isFinite(addMinutes) ? addMinutes : 0
   const target = new Date(Date.now() + offsetMin * 60000)
-  thoiGian.value = format24hDateTimeObj(target)
+  const formatted = format24hDateTimeObj(target)
+  thoiGian.value = formatted
+  syncDeliveryInputsFromThoiGian(formatted)
+  activeDt24Panel.value = null
   scheduleSyncLiveMeta()
 }
 
 function clearDeliveryTime() {
   if (isOrderLocked.value || !isGroupHost.value) return
+  deliveryHour.value = ''
+  deliveryMinute.value = ''
+  deliveryDate.value = getRelativeDateDMY(0)
   thoiGian.value = ''
+  activeDt24Panel.value = null
   scheduleSyncLiveMeta()
+}
+
+watch(thoiGian, (val) => {
+  if (isEditingMeta.value) return
+  syncDeliveryInputsFromThoiGian(val)
+})
+
+const displayDeliveryTime = computed(() => {
+  const raw = String(thoiGian.value || '').trim()
+  if (!raw) return ''
+  const parsed = parseThoiGian24h(raw)
+  if (!parsed.hh || !parsed.mm || !parsed.dd || !parsed.mo || !parsed.yyyy) return raw
+  const dmy = `${parsed.dd}/${parsed.mo}/${parsed.yyyy}`
+  if (dmy === getRelativeDateDMY(0)) return `${parsed.hh}:${parsed.mm} ${t('cart.timeToday')}`
+  if (dmy === getRelativeDateDMY(1)) return `${parsed.hh}:${parsed.mm} ${t('cart.timeTomorrow')}`
+  return `${parsed.hh}:${parsed.mm} ${dmy}`
+})
+
+function ensureDeliveryTimeForSubmit() {
+  if (deliveryHour.value || deliveryMinute.value) {
+    commitDeliveryTimeFromInputs({ padParts: true })
+  }
+  if (!thoiGian.value.trim()) {
+    const now = new Date()
+    const p = (num) => String(num).padStart(2, '0')
+    const datePart = String(deliveryDate.value || '').trim() || formatDateDMY(now)
+    thoiGian.value = `${p(now.getHours())}:${p(now.getMinutes())} ${datePart}`
+    syncDeliveryInputsFromThoiGian(thoiGian.value)
+  }
 }
 
 const lastSubmittedSig = ref('')
@@ -7143,6 +7304,9 @@ function onDocumentClick(e) {
   }
   if (allCatsWrapRef.value && !allCatsWrapRef.value.contains(e.target)) {
     showAllCatsDrawer.value = false
+  }
+  if (dt24PickerWrapRef.value && !dt24PickerWrapRef.value.contains(e.target)) {
+    activeDt24Panel.value = null
   }
 }
 
@@ -10058,7 +10222,7 @@ async function submitOrderToWebCore({ silentToast = false } = {}) {
     const recipientName =
       tenKhach.value.trim() || memberName.value.trim() || t('group.guestDefault')
     if (!tenKhach.value.trim()) tenKhach.value = recipientName
-    if (!thoiGian.value.trim()) thoiGian.value = format24hDateTimeObj(new Date())
+    ensureDeliveryTimeForSubmit()
     const nextSubmittedSig = currentOrderSignature.value
 
     const payloadItems = cartItems.value.map((i) => ({
@@ -10256,9 +10420,7 @@ async function onFinish(arg) {
   if (!tenKhach.value.trim()) {
     tenKhach.value = memberName.value.trim() || t('group.guestDefault')
   }
-  if (!thoiGian.value.trim()) {
-    thoiGian.value = format24hDateTimeObj(new Date())
-  }
+  ensureDeliveryTimeForSubmit()
 
   // Cập nhật optimistic trạng thái tiến trình lên 'Chờ duyệt' ngay trong modal trước khi đợi Firebase
   const prevLiveBeforeSubmit = liveOrderData.value
@@ -23882,7 +24044,8 @@ const hasSale = computed(() =>
   transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
-.dt24-picker-row:focus-within {
+.dt24-picker-row:focus-within,
+.dt24-picker-row.is-open {
   border-color: var(--sa-accent);
   box-shadow: 0 0 0 3px rgba(var(--sa-primary-rgb), 0.12);
 }
@@ -23894,16 +24057,17 @@ const hasSale = computed(() =>
 .dt24-segment.dt24-pill {
   display: inline-flex;
   align-items: center;
-  gap: 1px;
+  gap: 2px;
   padding: 2px 6px;
-  height: 28px;
+  height: 30px;
   border-radius: 7px;
   background: var(--sa-surface-2);
   border: 1px solid var(--sa-border);
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.dt24-segment.dt24-pill:focus-within {
+.dt24-segment.dt24-pill:focus-within,
+.dt24-segment.dt24-pill.is-active {
   background: var(--sa-surface);
   border-color: var(--sa-accent);
 }
@@ -23955,6 +24119,151 @@ const hasSale = computed(() =>
 
 .dt24-select.dt24-year {
   min-width: 42px;
+}
+
+.dt24-select-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sa-heading);
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.dt24-select-btn.empty {
+  color: var(--sa-muted);
+  font-weight: 600;
+}
+
+.dt24-select-btn:hover:not(:disabled),
+.dt24-select-btn.open {
+  background: var(--sa-surface-soft);
+  border-color: var(--sa-border-green);
+  color: var(--sa-price);
+}
+
+.dt24-select-btn:disabled {
+  cursor: not-allowed;
+}
+
+.dt24-select-btn .dt24-caret {
+  font-size: 13px;
+  color: var(--sa-muted);
+  transition: transform 0.16s ease, color 0.15s ease;
+}
+
+.dt24-select-btn.open .dt24-caret {
+  transform: rotate(180deg);
+  color: var(--sa-accent);
+}
+
+.dt24-date-btn {
+  min-width: 78px;
+  justify-content: space-between;
+  padding: 0 7px;
+  gap: 5px;
+}
+
+.dt24-select-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* COMPACT VERTICAL-COLUMN DROPDOWN (100% SYNCED WITH STOREFRONT THEME VARS) */
+.dt24-col-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 80;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--sa-surface);
+  border: 1px solid var(--sa-border-green);
+  box-shadow: 0 10px 26px rgba(var(--sa-primary-rgb), 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 176px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.dt24-col-menu.is-compact {
+  min-width: 58px;
+}
+
+.dt24-col-menu.is-date-menu {
+  left: auto;
+  right: 0;
+  transform: none;
+  min-width: 148px;
+  max-height: 188px;
+}
+
+.dt24-col-opt {
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--sa-heading);
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.dt24-col-opt:hover {
+  background: var(--sa-surface-soft);
+  color: var(--sa-price);
+}
+
+.dt24-col-opt.selected {
+  background: var(--sa-accent);
+  border-color: var(--sa-accent);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.dt24-col-opt.is-date-opt {
+  justify-content: space-between;
+  padding: 5px 9px;
+}
+
+.dt24-col-opt.selected .dt24-date-opt-sub {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.dt24-date-opt-main {
+  font-weight: 700;
+}
+
+.dt24-date-opt-sub {
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--sa-muted);
 }
 
 .dt24-select option {
@@ -24124,6 +24433,46 @@ const hasSale = computed(() =>
 .is-mobile-dt24 .dt24-select.dt24-year {
   flex: 1.25 1 0;
   min-width: 68px;
+}
+
+.is-mobile-dt24 .dt24-select-wrap {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.is-mobile-dt24 .dt24-select-btn {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  background: var(--sa-surface);
+  border: 1px solid var(--sa-border);
+  border-radius: 8px;
+  font-size: 14px;
+  justify-content: space-between;
+}
+
+.is-mobile-dt24 .dt24-select-btn.open {
+  background: var(--sa-surface-soft);
+  border-color: var(--sa-accent);
+  color: var(--sa-price);
+}
+
+.is-mobile-dt24 .dt24-col-menu.is-compact {
+  left: 0;
+  right: 0;
+  transform: none;
+  min-width: 100%;
+}
+
+.is-mobile-dt24 .dt24-col-menu.is-date-menu {
+  left: 0;
+  right: 0;
+  min-width: 100%;
+}
+
+.is-mobile-dt24 .dt24-col-opt {
+  min-height: 34px;
+  font-size: 13.5px;
 }
 
 .is-mobile-dt24 .dt24-sep {

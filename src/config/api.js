@@ -1913,7 +1913,7 @@ export async function submitCustomerOrder(body = {}) {
       tongCong,
       donViTienTe: currency,
       items: resolvedList,
-      adminUrl: 'https://checkscam8888.vercel.app/admin',
+      adminUrl: 'https://sakitchen.shop/admin',
     })
   } catch {}
 

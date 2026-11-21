@@ -76,6 +76,8 @@
     "timeDay": "DD",
     "timeMonth": "MM",
     "timeYear": "YYYY",
+    "timeToday": "Ngayon",
+    "timeTomorrow": "Bukas",
     "note": "Karagdagang tala para sa shop",
     "notePlaceholder": "Tala (konting anghang, ihatid bago 7pm…)",
     "finish": "Ipadala ang Order",

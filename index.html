@@ -188,6 +188,35 @@
   <div id="app-loader">
     <div class="loader-spinner"></div>
   </div>
+  <script>
+    (function () {
+      try {
+        var path = (window.location.pathname || '').toLowerCase();
+        var params = new URLSearchParams(window.location.search);
+        var isStorefront = !path.startsWith('/admin') && !path.startsWith('/login') && !params.get('order');
+        if (!isStorefront) return;
+        var rawTheme = localStorage.getItem('SA_STOREFRONT_THEME_V1');
+        var mode = 'once_session';
+        var loaderBg = 'radial-gradient(circle at 50% 45%, #4b1008 0%, #180504 65%, #090202 100%)';
+        if (rawTheme) {
+          var parsed = JSON.parse(rawTheme);
+          if (parsed && parsed.introSplashMode) mode = parsed.introSplashMode;
+          if (parsed && parsed.introLoaderBg) loaderBg = parsed.introLoaderBg;
+        }
+        var shouldSplash =
+          mode === 'always' ||
+          (mode !== 'off' && sessionStorage.getItem('SA_INTRO_SPLASH_SHOWN') !== '1');
+        if (shouldSplash) {
+          var loader = document.getElementById('app-loader');
+          if (loader) {
+            loader.style.background = loaderBg;
+            var sp = loader.querySelector('.loader-spinner');
+            if (sp) sp.style.display = 'none';
+          }
+        }
+      } catch (e) {}
+    })();
+  </script>
 
   <div id="app"></div>
 

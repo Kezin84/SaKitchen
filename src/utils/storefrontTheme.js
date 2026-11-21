@@ -1,5 +1,12 @@
 // Shared storefront theme & display configuration utilities
 // Used by MenuOnline.vue (customer storefront), CauHinhHienThi.vue (admin), api.js, and displayOrder.js
+import {
+  INTRO_BG_TEMPLATES,
+  INTRO_EFFECT_TEMPLATES,
+  INTRO_TRANSITION_TEMPLATES,
+  INTRO_EVENT_TEMPLATES,
+  resolveIntroSplashPalette,
+} from './introSplashTemplates'
 
 export const STOREFRONT_THEME_CACHE_KEY = 'SA_STOREFRONT_THEME_V1'
 
@@ -81,6 +88,27 @@ export const SEASONAL_EFFECT_OPTIONS = [
     label: 'Lễ hội (Lấp lánh)',
     icon: 'ri-star-smile-fill',
     desc: 'Hạt ánh sáng vàng kim lung linh dịp sự kiện',
+  },
+]
+
+export const INTRO_SPLASH_MODE_OPTIONS = [
+  {
+    id: 'once_session',
+    label: 'Bật (1 lần mỗi phiên)',
+    icon: 'ri-fire-fill',
+    desc: 'Chạy animation chảo lửa khi khách mới mở web, F5 trong phiên không làm phiền',
+  },
+  {
+    id: 'always',
+    label: 'Bật (Mỗi lần tải trang)',
+    icon: 'ri-sparkling-fill',
+    desc: 'Luôn chạy màn hình chào chảo lửa mỗi khi khách mở hoặc F5 trang thực đơn',
+  },
+  {
+    id: 'off',
+    label: 'Tắt màn hình chào',
+    icon: 'ri-prohibited-line',
+    desc: 'Vào thẳng danh sách món ăn ngay lập tức',
   },
 ]
 
@@ -186,12 +214,24 @@ export const DEFAULT_STOREFRONT_THEME = {
   surfaceStyle: 'clean',
   cardRadius: 'rounded',
   seasonalEffect: 'none',
+  introSplashMode: 'once_session',
+  introEvent: 'default',
+  introBg: 'wok-crimson',
+  introEffect: 'wok',
+  introTransition: 'doors',
+  introCustomTitle: '',
+  introCustomSubtitle: '',
   updatedAt: 0,
 }
 
 const VALID_SURFACE_STYLES = new Set(SURFACE_STYLE_OPTIONS.map((o) => o.id))
 const VALID_CARD_RADII = new Set(CARD_RADIUS_OPTIONS.map((o) => o.id))
 const VALID_SEASONAL_EFFECTS = new Set(SEASONAL_EFFECT_OPTIONS.map((o) => o.id))
+const VALID_INTRO_SPLASH_MODES = new Set(INTRO_SPLASH_MODE_OPTIONS.map((o) => o.id))
+const VALID_INTRO_EVENTS = new Set(INTRO_EVENT_TEMPLATES.map((o) => o.id))
+const VALID_INTRO_BGS = new Set(INTRO_BG_TEMPLATES.map((o) => o.id))
+const VALID_INTRO_EFFECTS = new Set(INTRO_EFFECT_TEMPLATES.map((o) => o.id))
+const VALID_INTRO_TRANSITIONS = new Set(INTRO_TRANSITION_TEMPLATES.map((o) => o.id))
 
 export function sanitizeHexColor(val, fallback = '#059669') {
   const str = String(val || '').trim()
@@ -235,6 +275,23 @@ export function normalizeThemeConfig(raw) {
   const seasonalEffect = VALID_SEASONAL_EFFECTS.has(raw.seasonalEffect)
     ? raw.seasonalEffect
     : DEFAULT_STOREFRONT_THEME.seasonalEffect
+  const introSplashMode = VALID_INTRO_SPLASH_MODES.has(raw.introSplashMode)
+    ? raw.introSplashMode
+    : DEFAULT_STOREFRONT_THEME.introSplashMode
+  const introEvent = VALID_INTRO_EVENTS.has(raw.introEvent)
+    ? raw.introEvent
+    : DEFAULT_STOREFRONT_THEME.introEvent
+  const introBg = VALID_INTRO_BGS.has(raw.introBg)
+    ? raw.introBg
+    : DEFAULT_STOREFRONT_THEME.introBg
+  const introEffect = VALID_INTRO_EFFECTS.has(raw.introEffect)
+    ? raw.introEffect
+    : DEFAULT_STOREFRONT_THEME.introEffect
+  const introTransition = VALID_INTRO_TRANSITIONS.has(raw.introTransition)
+    ? raw.introTransition
+    : DEFAULT_STOREFRONT_THEME.introTransition
+  const introCustomTitle = String(raw.introCustomTitle ?? '').trim().slice(0, 60)
+  const introCustomSubtitle = String(raw.introCustomSubtitle ?? '').trim().slice(0, 90)
   const updatedAt = Number.isFinite(Number(raw.updatedAt)) ? Number(raw.updatedAt) : 0
 
   return {
@@ -246,6 +303,13 @@ export function normalizeThemeConfig(raw) {
     surfaceStyle,
     cardRadius,
     seasonalEffect,
+    introSplashMode,
+    introEvent,
+    introBg,
+    introEffect,
+    introTransition,
+    introCustomTitle,
+    introCustomSubtitle,
     updatedAt,
   }
 }
@@ -568,7 +632,18 @@ export function saveCachedStorefrontTheme(config) {
   if (typeof window === 'undefined') return
   try {
     const normalized = normalizeThemeConfig(config)
-    localStorage.setItem(STOREFRONT_THEME_CACHE_KEY, JSON.stringify(normalized))
+    const palette = resolveIntroSplashPalette(
+      normalized.introBg,
+      normalized.primaryColor,
+      normalized.secondaryColor,
+    )
+    localStorage.setItem(
+      STOREFRONT_THEME_CACHE_KEY,
+      JSON.stringify({
+        ...normalized,
+        introLoaderBg: palette.loaderBg,
+      }),
+    )
   } catch {}
 }
 

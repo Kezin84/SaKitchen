@@ -76,6 +76,8 @@
     "timeDay": "DD",
     "timeMonth": "MM",
     "timeYear": "YYYY",
+    "timeToday": "Today",
+    "timeTomorrow": "Tomorrow",
     "note": "Additional note for shop",
     "notePlaceholder": "Note for shop (less spicy, deliver before 7pm...)",
     "finish": "Send Order",

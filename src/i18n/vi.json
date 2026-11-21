@@ -76,6 +76,8 @@
     "timeDay": "Ngày",
     "timeMonth": "Tháng",
     "timeYear": "Năm",
+    "timeToday": "Hôm nay",
+    "timeTomorrow": "Ngày mai",
     "note": "Ghi chú thêm cho quán",
     "notePlaceholder": "Ghi chú cho quán (ít cay, giao trước 7h...)",
     "finish": "Gửi đơn",

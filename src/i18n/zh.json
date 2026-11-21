@@ -76,6 +76,8 @@
     "timeDay": "日",
     "timeMonth": "月",
     "timeYear": "年",
+    "timeToday": "今天",
+    "timeTomorrow": "明天",
     "note": "给商家的备注",
     "notePlaceholder": "备注（少辣，7点前送达…）",
     "finish": "发送订单",

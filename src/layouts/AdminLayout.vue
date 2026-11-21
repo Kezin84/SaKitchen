@@ -7,6 +7,7 @@ import {
   subscribeSheet,
   checkUserExpired,
   logoutFirebase,
+  subscribeAdminAuthState,
 } from '@/config/api'
 import { attachAdminZeroInputBehavior } from '@/utils/adminZeroInput'
 const sidebarOpen = ref(true)
@@ -67,6 +68,7 @@ const logout = async () => {
 let expiredTimer = null
 let unsubDonHang = null
 let unsubLogo = null
+let unsubAuth = null
 let detachZeroInputBehavior = null
 let checking = false
 let hasInitWebOrderBell = false
@@ -281,21 +283,8 @@ const checkExpiredSilently = async () => {
   if (checking) return
   checking = true
 
-  let user = null
   try {
-    user = JSON.parse(localStorage.getItem('user') || 'null')
-  } catch {
-    checking = false
-    return
-  }
-
-  if (!user?.username) {
-    checking = false
-    return
-  }
-
-  try {
-    const data = await checkUserExpired(user.username)
+    const data = await checkUserExpired()
     if (data?.expired === true) {
       localStorage.removeItem('user')
       router.replace('/login')
@@ -323,6 +312,11 @@ onMounted(() => {
   }
 
   checkExpiredSilently()
+  unsubAuth = subscribeAdminAuthState((adminSession) => {
+    if (!adminSession) {
+      router.replace('/login')
+    }
+  })
   loadMenuOnlineNcc()
 
   // Realtime Firebase listener cho đơn hàng chờ duyệt + đang xử lý
@@ -437,6 +431,10 @@ onUnmounted(() => {
   if (unsubLogo) {
     unsubLogo()
     unsubLogo = null
+  }
+  if (unsubAuth) {
+    unsubAuth()
+    unsubAuth = null
   }
   if (newOrderAlertTimer) {
     clearTimeout(newOrderAlertTimer)

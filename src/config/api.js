@@ -1,7 +1,15 @@
 // src/config/api.js
 import { ref as dbRef, get, set, update, remove, onValue } from 'firebase/database'
-import { signInWithEmailAndPassword, signOut } from 'firebase/auth'
-import { db, auth } from './firebase'
+import { db } from './firebase'
+import {
+  ALLOWED_ADMIN_EMAILS,
+  isAllowedAdminEmail,
+  getAuthorizedAdminUser,
+  loginWithGoogleFirebase,
+  logoutAdminFirebase,
+  subscribeAdminAuthState,
+  waitForFirebaseAuth,
+} from './adminAuth'
 import {
   DATA_LANG_CODES,
   normalizeProductI18n,
@@ -200,87 +208,28 @@ export function subscribeSheet(sheetName, callback, onError) {
 }
 
 /* =========================================================
- * AUTHENTICATION & EXPIRATION CHECK
+ * AUTHENTICATION & EXPIRATION CHECK (Firebase Google Auth)
  * ========================================================= */
-function toAuthEmail(username) {
-  const clean = s(username).trim()
-  return clean.includes('@') ? clean : `${clean}@sakitchen.local`
+export {
+  ALLOWED_ADMIN_EMAILS,
+  isAllowedAdminEmail,
+  getAuthorizedAdminUser,
+  loginWithGoogleFirebase,
+  subscribeAdminAuthState,
+  waitForFirebaseAuth,
 }
 
-export async function loginWithFirebase(username, password) {
-  const uInput = s(username).trim()
-  const pInput = s(password).trim()
-
-  if (!uInput || !pInput) {
-    return { success: false, message: 'Thiếu username hoặc password' }
-  }
-
-  let firebaseAuthMatched = false
-  try {
-    await signInWithEmailAndPassword(auth, toAuthEmail(uInput), pInput)
-    firebaseAuthMatched = true
-  } catch {
-    // Ignore when Firebase Auth is not configured or user is managed in RTDB Login sheet
-  }
-
-  try {
-    const entries = await readSheetEntries('Login')
-    for (const { row } of entries) {
-      const u = s(row.USERNAME).trim()
-      const p = s(row.PASSWORD).trim()
-      const expired = s(row.Expired).trim().toLowerCase()
-
-      if (u === uInput && (p === pInput || firebaseAuthMatched)) {
-        if (expired === 'yes') {
-          return {
-            success: false,
-            code: 'EXPIRED',
-            message: 'Gói dịch vụ của bạn đã hết hạn. Vui lòng gia hạn để tiếp tục sử dụng.',
-          }
-        }
-        return {
-          success: true,
-          user: { username: u },
-        }
-      }
-    }
-
-    if (firebaseAuthMatched) {
-      return {
-        success: true,
-        user: { username: uInput },
-      }
-    }
-
-    return { success: false, message: 'Sai tài khoản hoặc mật khẩu' }
-  } catch (err) {
-    console.error('[Firebase] Login error:', err)
-    if (firebaseAuthMatched) {
-      return { success: true, user: { username: uInput } }
-    }
-    throw err
+export async function loginWithFirebase() {
+  return {
+    success: false,
+    message: 'Hệ thống đã chuyển sang đăng nhập bằng tài khoản Google quản trị.',
   }
 }
 
-export async function checkUserExpired(username) {
-  const uInput = s(username).trim()
-  if (!uInput) return { success: true, expired: true }
-
+export async function checkUserExpired() {
   try {
-    const entries = await readSheetEntries('Login')
-    if (!entries.length) {
-      if (auth.currentUser) return { success: true, expired: false }
-      return { success: true, expired: true }
-    }
-
-    for (const { row } of entries) {
-      const u = s(row.USERNAME).trim()
-      const expired = s(row.Expired).trim().toLowerCase()
-      if (u === uInput) {
-        return { success: true, expired: expired === 'yes' }
-      }
-    }
-    return { success: true, expired: true }
+    const adminUser = await getAuthorizedAdminUser()
+    return { success: true, expired: !adminUser }
   } catch (err) {
     console.warn('[Firebase] checkUserExpired warning:', err)
     return { success: false, expired: false }
@@ -288,12 +237,7 @@ export async function checkUserExpired(username) {
 }
 
 export async function logoutFirebase() {
-  try {
-    await signOut(auth)
-  } catch {
-    // Ignore if Auth not active
-  }
-  return { success: true }
+  return logoutAdminFirebase()
 }
 
 /* =========================================================

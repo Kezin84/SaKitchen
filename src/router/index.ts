@@ -20,6 +20,7 @@ import TinhChietKhau from '@/views/TinhChietKhau.vue'
 import ChiPhiPhatSinh from '@/views/chiPhiPhatSinh.vue'
 
 import KhachHang from '@/views/khachHang.vue'
+import { getAuthorizedAdminUser } from '@/config/adminAuth'
 
 const SUPPORTED_LANGS = ['vi', 'en', 'zh-CN', 'fil', 'ko']
 
@@ -150,27 +151,25 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to, from, next) => {
-  const user = JSON.parse(localStorage.getItem('user') || 'null')
+router.beforeEach(async (to) => {
+  const requiresAuth = to.matched.some((record) => Boolean(record.meta?.requiresAuth))
   const isLoginPage = to.name === 'login'
-  const isPublicMenu =
-    to.name === 'menu-online' ||
-    to.name === 'menu-online-legacy' ||
-    to.name === 'menu-mobile'
 
-  if (to.meta.requiresAuth && !user) {
-    return next({ name: 'login' })
+  if (!requiresAuth && !isLoginPage) {
+    return true
   }
 
-  if (user && isLoginPage) {
-    return next('/admin/kho-hang')
+  const adminUser = await getAuthorizedAdminUser()
+
+  if (requiresAuth && !adminUser) {
+    return { name: 'login' }
   }
 
-  if (isPublicMenu || isLoginPage) {
-    return next()
+  if (isLoginPage && adminUser) {
+    return '/admin/kho-hang'
   }
 
-  next()
+  return true
 })
 
 export default router

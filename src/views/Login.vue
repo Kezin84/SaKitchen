@@ -4,107 +4,103 @@
       <div class="login-card">
         <div class="login-header">
           <div class="logo-icon">
-            <img src="/Logo/FBC ONLY LOGO NO TEXT.png" alt="FBC Logo" class="logo-image" />
+            <img src="/Logo/FBC ONLY LOGO NO TEXT.png" alt="SA Kitchen Logo" class="logo-image" />
           </div>
           <h2>ĐĂNG NHẬP HỆ THỐNG</h2>
-          <p class="subtitle">Truy cập vào hệ thống quản lý</p>
+          <p class="subtitle">Xác thực bằng tài khoản Google quản trị viên</p>
         </div>
 
-        <form @submit.prevent="handleLogin" class="login-form">
-          <div class="form-group">
-            <label>
-              <i class="app-ico ri-user-line"></i>
-              Tên đăng nhập
-            </label>
-            <input
-              v-model="username"
-              type="text"
-              placeholder="Nhập username"
-              required
-              autocomplete="username"
-            />
+        <div class="login-form">
+          <div class="auth-notice">
+            <i class="app-ico ri-shield-keyhole-line"></i>
+            <span>Chỉ tài khoản Gmail quản trị được cấp quyền mới có thể truy cập trang Admin.</span>
           </div>
 
-          <div class="form-group">
-            <label>
-              <i class="app-ico ri-lock-password-line"></i>
-              Mật khẩu
-            </label>
-            <input
-              v-model="password"
-              type="password"
-              placeholder="Nhập password"
-              required
-              autocomplete="current-password"
-            />
-          </div>
-
-          <button type="submit" :disabled="loading" class="login-btn">
+          <button
+            type="button"
+            :disabled="loading"
+            class="google-login-btn"
+            @click="handleGoogleLogin"
+          >
             <span v-if="loading" class="spinner"></span>
-            <span v-else><i class="app-ico ri-login-box-line"></i></span>
-            <span>{{ loading ? 'ĐANG ĐĂNG NHẬP...' : 'ĐĂNG NHẬP' }}</span>
+            <svg
+              v-else
+              class="google-icon"
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              aria-hidden="true"
+            >
+              <path
+                fill="#4285F4"
+                d="M23.745 12.27c0-.79-.07-1.54-.19-2.27h-11.3v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z"
+              />
+              <path
+                fill="#34A853"
+                d="M12.255 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96h-3.98v3.09C3.515 21.3 7.565 24 12.255 24z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.525 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62h-3.98a11.86 11.86 0 0 0 0 10.76l3.98-3.09z"
+              />
+              <path
+                fill="#EA4335"
+                d="M12.255 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C18.205 1.19 15.495 0 12.255 0c-4.69 0-8.74 2.7-10.71 6.62l3.98 3.09c.95-2.85 3.6-4.96 6.73-4.96z"
+              />
+            </svg>
+            <span>{{ loading ? 'ĐANG XÁC THỰC...' : 'ĐĂNG NHẬP BẰNG GOOGLE' }}</span>
           </button>
 
           <div v-if="error" class="error-box">
             <i class="app-ico ri-error-warning-line"></i>
             <span>{{ error }}</span>
           </div>
-        </form>
+
+          <router-link to="/" class="back-menu-link">
+            <i class="app-ico ri-arrow-left-line"></i>
+            <span>Quay lại trang Menu đặt món</span>
+          </router-link>
+        </div>
       </div>
 
       <div class="login-footer">
-        <p>© 2025 • Powered by <span class="fbc-text">FBC</span></p>
+        <p>© 2026 • Powered by <span class="fbc-text">FBC</span></p>
       </div>
     </div>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { loginWithFirebase } from '@/config/api'
-const router = useRouter()
+import { loginWithGoogleFirebase } from '@/config/adminAuth'
 
-const username = ref('')
-const password = ref('')
+const router = useRouter()
 const loading = ref(false)
 const error = ref('')
 
-const handleLogin = async () => {
+const handleGoogleLogin = async () => {
+  if (loading.value) return
   loading.value = true
   error.value = ''
 
   try {
-    const data = await loginWithFirebase(username.value.trim(), password.value.trim())
+    const data = await loginWithGoogleFirebase()
 
-    if (data.code === 'EXPIRED') {
-      localStorage.removeItem('user')
-      error.value = data.message || 'Gói dịch vụ đã hết hạn'
-      loading.value = false
-      return
-    }
     if (!data.success) {
-      error.value = data.message || 'Đăng nhập thất bại'
-      loading.value = false
+      if (data.message) {
+        error.value = data.message
+      }
       return
     }
 
-    // ✅ LƯU LOGIN
-    localStorage.setItem(
-      'user',
-      JSON.stringify({
-        username: data.user.username,
-      }),
-    )
-
-    // ✅ CHUYỂN TRANG SAU LOGIN
     router.replace({ name: 'kho-hang' })
   } catch (err) {
     console.error(err)
-    error.value = 'Không kết nối được Firebase Database (kiểm tra Rules trên Console)'
+    error.value = 'Không thể kết nối Firebase Authentication. Vui lòng thử lại.'
+  } finally {
+    loading.value = false
   }
-
-  loading.value = false
 }
 </script>
 
@@ -149,13 +145,21 @@ const handleLogin = async () => {
 }
 
 @keyframes pulse {
-  0%, 100% { transform: scale(1); opacity: 0.5; }
-  50% { transform: scale(1.1); opacity: 0.8; }
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
 }
 
 .login-container {
   position: relative;
   z-index: 1;
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -165,12 +169,12 @@ const handleLogin = async () => {
 .login-card {
   width: 100%;
   max-width: 440px;
-  background: rgba(30, 41, 59, 0.8);
+  background: rgba(30, 41, 59, 0.82);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 20px;
   padding: 40px;
-  box-shadow: 
+  box-shadow:
     0 20px 60px rgba(0, 0, 0, 0.5),
     0 0 0 1px rgba(34, 197, 94, 0.1);
   animation: cardEntry 0.6s cubic-bezier(0.4, 0, 0.2, 1);
@@ -189,7 +193,7 @@ const handleLogin = async () => {
 
 .login-header {
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 28px;
 }
 
 .logo-icon {
@@ -202,7 +206,7 @@ const handleLogin = async () => {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  box-shadow: 
+  box-shadow:
     0 8px 24px rgba(34, 197, 94, 0.4),
     0 0 0 1px rgba(34, 197, 94, 0.3);
   animation: iconFloat 3s ease-in-out infinite;
@@ -216,8 +220,13 @@ const handleLogin = async () => {
 }
 
 @keyframes iconFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 .login-header h2 {
@@ -237,132 +246,135 @@ const handleLogin = async () => {
 .login-form {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
 }
 
-.form-group {
+.auth-notice {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
   gap: 10px;
-}
-
-.form-group label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.22);
   color: #cbd5e1;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
-.form-group label i {
-  font-size: 16px;
-  color: rgb(134, 239, 172);
+.auth-notice i {
+  font-size: 18px;
+  color: #4ade80;
+  margin-top: 1px;
+  flex-shrink: 0;
 }
 
-.form-group input {
+.google-login-btn {
   width: 100%;
-  padding: 14px 16px;
-  background: rgba(51, 65, 85, 0.4);
-  border: 2px solid rgba(148, 163, 184, 0.2);
+  padding: 15px 18px;
+  background: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: 12px;
-  color: #f8fafc;
-  font-size: 15px;
-  font-weight: 500;
-  outline: none;
-  transition: all 0.3s ease;
-}
-
-.form-group input::placeholder {
-  color: #64748b;
-}
-
-.form-group input:focus {
-  background: rgba(51, 65, 85, 0.6);
-  border-color: rgb(34, 197, 94);
-  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.1);
-}
-
-.login-btn {
-  width: 100%;
-  padding: 16px;
-  background: linear-gradient(135deg, rgb(34, 197, 94), rgb(22, 163, 74));
-  border: none;
-  border-radius: 12px;
-  color: #fff;
+  color: #0f172a;
   font-size: 15px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.4px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  transition: all 0.3s ease;
-  box-shadow: 0 8px 20px rgba(34, 197, 94, 0.3);
-  margin-top: 8px;
+  gap: 12px;
+  transition: all 0.25s ease;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.28);
 }
 
-.login-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, rgb(22, 163, 74), rgb(21, 128, 61));
+.google-login-btn:hover:not(:disabled) {
+  background: #f8fafc;
   transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(34, 197, 94, 0.4);
+  box-shadow:
+    0 14px 32px rgba(0, 0, 0, 0.36),
+    0 0 0 3px rgba(74, 222, 128, 0.25);
 }
 
-.login-btn:active:not(:disabled) {
+.google-login-btn:active:not(:disabled) {
   transform: translateY(0);
 }
 
-.login-btn:disabled {
-  opacity: 0.7;
+.google-login-btn:disabled {
+  opacity: 0.72;
   cursor: not-allowed;
   transform: none;
 }
 
-.login-btn i {
-  font-size: 20px;
+.google-icon {
+  flex-shrink: 0;
 }
 
 .spinner {
   width: 18px;
   height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
+  border: 2px solid rgba(15, 23, 42, 0.2);
+  border-top-color: #16a34a;
   border-radius: 50%;
   display: inline-block;
   animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .error-box {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   padding: 14px 16px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
   border-radius: 10px;
   color: #fca5a5;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
-  animation: errorShake 0.5s ease;
+  line-height: 1.45;
+  animation: errorShake 0.45s ease;
 }
 
 .error-box i {
-  font-size: 20px;
+  font-size: 19px;
   flex-shrink: 0;
+  margin-top: 1px;
 }
 
 @keyframes errorShake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-8px); }
-  75% { transform: translateX(8px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-8px);
+  }
+  75% {
+    transform: translateX(8px);
+  }
+}
+
+.back-menu-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 4px;
+  color: #94a3b8;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.back-menu-link:hover {
+  color: #e2e8f0;
 }
 
 .login-footer {
@@ -405,13 +417,8 @@ const handleLogin = async () => {
     font-size: 13px;
   }
 
-  .form-group input {
-    padding: 12px 14px;
-    font-size: 14px;
-  }
-
-  .login-btn {
-    padding: 14px;
+  .google-login-btn {
+    padding: 14px 16px;
     font-size: 14px;
   }
 }

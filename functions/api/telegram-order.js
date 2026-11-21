@@ -1,6 +1,6 @@
 // Cloudflare Pages Function: Send new customer order alerts to Telegram group/chat (/api/telegram-order)
 
-const DEFAULT_ADMIN_ORDERS_URL = 'https://checkscam8888.vercel.app/admin'
+const DEFAULT_ADMIN_ORDERS_URL = 'https://sakitchen.shop/admin'
 const TELEGRAM_MAX_TEXT = 3900
 
 function jsonResponse(payload, status = 200, extraHeaders = {}) {

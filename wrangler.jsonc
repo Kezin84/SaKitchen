@@ -27,7 +27,10 @@
       "/fil/*",
       "/ko",
       "/ko/*",
-      "/welcome"
+      "/welcome",
+      "/blog",
+      "/blog/*",
+      "/sitemap.xml"
     ]
   }
 }

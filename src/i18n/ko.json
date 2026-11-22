@@ -182,6 +182,9 @@
     "title": "주문 내용",
     "subtitle": "주문 내역을 확인한 뒤 아래 채널로 매장에 전송해 주세요",
     "savedWeb": "시스템에 저장됨",
+    "submitSuccessTitle": "주문이 접수되었습니다!",
+    "updateSuccessTitle": "주문이 수정되었습니다!",
+    "submitSuccessSub": "주문 진행 상태에 반영됨",
     "messageLabel": "주문 요약 내용",
     "sendChannelTitle": "빠른 주문 전송",
     "copy": "주문 복사",
@@ -267,5 +270,15 @@
     "finalCancelledTitle": "주문 #{code} 취소됨",
     "finalNewOrderBtn": "새 주문 시작",
     "finalCloseBtn": "닫기"
+  },
+  "footer": {
+    "exploreTitle": "바로가기",
+    "blogLink": "맛집 블로그 & 가이드",
+    "welcomeLink": "매장 소개",
+    "safetyTitle": "안심 인증",
+    "locationLabel": "배달 가능 지역",
+    "viewMap": "지도 보기",
+    "backToTop": "맨 위로",
+    "rights": "빠르고 편리한 온라인 배달 주문."
   }
 }

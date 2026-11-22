@@ -578,7 +578,12 @@ onUnmounted(() => {
 
         <RouterLink to="/admin/logo" class="menu-item">
           <i class="ri-image-line"></i>
-          <span>Logo</span>
+          <span>Logo &amp; SEO</span>
+        </RouterLink>
+
+        <RouterLink to="/admin/bai-viet" class="menu-item">
+          <i class="ri-article-line"></i>
+          <span>Bài viết SEO (Blog)</span>
         </RouterLink>
 
         <RouterLink :to="{ name: 'admin-khuyen-mai' }" class="menu-item">
@@ -813,7 +818,12 @@ onUnmounted(() => {
 
         <RouterLink to="/admin/logo" class="mobile-menu-item" @click="closeMobileSidebar">
           <i class="ri-image-line"></i>
-          <span>Logo</span>
+          <span>Logo &amp; SEO</span>
+        </RouterLink>
+
+        <RouterLink to="/admin/bai-viet" class="mobile-menu-item" @click="closeMobileSidebar">
+          <i class="ri-article-line"></i>
+          <span>Bài viết SEO (Blog)</span>
         </RouterLink>
 
         <RouterLink :to="{ name: 'admin-khuyen-mai' }" class="mobile-menu-item" @click="closeMobileSidebar">

@@ -207,7 +207,7 @@
       try {
         var path = (window.location.pathname || '').toLowerCase();
         var params = new URLSearchParams(window.location.search);
-        var isStorefront = !path.startsWith('/admin') && !path.startsWith('/login') && !params.get('order');
+        var isStorefront = !path.startsWith('/admin') && !path.startsWith('/login') && !path.startsWith('/blog') && !params.get('order');
         if (!isStorefront) return;
         var rawTheme = localStorage.getItem('SA_STOREFRONT_THEME_V1');
         var mode = 'once_session';

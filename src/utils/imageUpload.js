@@ -24,10 +24,15 @@ function loadImageElement(file) {
 
     img.onload = () => {
       URL.revokeObjectURL(objectUrl)
-      if (!img.naturalWidth || !img.naturalHeight) {
+      const isSvg = file?.type === 'image/svg+xml'
+      const w = img.naturalWidth || img.width || (isSvg ? 512 : 0)
+      const h = img.naturalHeight || img.height || (isSvg ? 512 : 0)
+      if (!w || !h) {
         reject(new Error('Ảnh không có kích thước hợp lệ'))
         return
       }
+      if (!img.naturalWidth) img.width = w
+      if (!img.naturalHeight) img.height = h
       resolve(img)
     }
 
@@ -227,9 +232,11 @@ export async function compressImageToPng(file, options = {}) {
   const pngName = toPngFileName(originalName)
 
   const img = await loadImageElement(file)
-  const scale = Math.min(1, maxWidth / img.naturalWidth, maxHeight / img.naturalHeight)
-  const width = Math.max(1, Math.round(img.naturalWidth * scale))
-  const height = Math.max(1, Math.round(img.naturalHeight * scale))
+  const srcW = img.naturalWidth || img.width || 512
+  const srcH = img.naturalHeight || img.height || 512
+  const scale = Math.min(1, maxWidth / srcW, maxHeight / srcH)
+  const width = Math.max(1, Math.round(srcW * scale))
+  const height = Math.max(1, Math.round(srcH * scale))
   const blob = await encodeCanvasToPng(img, width, height)
   return new File([blob], pngName, { type: 'image/png', lastModified: Date.now() })
 }
@@ -246,7 +253,11 @@ export async function compressImageToPng(file, options = {}) {
 export async function uploadImageToCloudinary(file, options = {}) {
   const keepPng =
     Boolean(options.preserveTransparency) &&
-    (file?.type === 'image/png' || file?.type === 'image/webp' || file?.type === 'image/svg+xml')
+    (file?.type === 'image/png' ||
+      file?.type === 'image/webp' ||
+      file?.type === 'image/svg+xml' ||
+      file?.type === 'image/x-icon' ||
+      file?.type === 'image/vnd.microsoft.icon')
   const compressedFile = keepPng
     ? await compressImageToPng(file, options)
     : await compressImageToJpg(file, options)

@@ -117,8 +117,12 @@
             </a>
           </nav>
 
-          <!-- RIGHT CONTROLS: CONTACT + THEME + LANG + CART PILL -->
+          <!-- RIGHT CONTROLS: BLOG + CONTACT + THEME + LANG + CART PILL -->
           <div class="dth-actions">
+          <RouterLink to="/blog" class="dth-ctrl-btn dth-blog-link" title="Blog & Cẩm nang ẩm thực">
+            <i class="ri-article-line"></i>
+            <span>Blog</span>
+          </RouterLink>
           <div
             class="dth-contact-wrap"
             ref="contactPopoverRef"
@@ -945,7 +949,11 @@
               :class="{ 'is-in-cart': (cartQtyByCode[entry.item.Ma_hang] || 0) > 0 }"
               @click="openDetail(entry.item)"
             >
-              <div class="card-img-wrap">
+              <div
+                class="card-img-wrap"
+                :class="{ 'has-ambient': Boolean(getCardImage(entry.item)) }"
+                :style="getAmbientGlassStyle(getCardImage(entry.item))"
+              >
                 <transition name="card-fade" mode="out-in">
                   <img
                     v-if="getCardImage(entry.item)"
@@ -1274,9 +1282,9 @@
         <span>{{ pagedMenu.length }} / {{ filteredMenu.length }}</span>
       </div>
 
-      <!-- SEO STOREFRONT INTRO BOX (SINGLE HOMEPAGE H1 ABOVE FOOTER) -->
+      <!-- MOBILE: SEO STOREFRONT INTRO BOX + 3 CHECKSCAM BUTTONS (UNCHANGED ON MOBILE) -->
       <section
-        v-if="brandAssets.seoH1 || brandAssets.seoIntro"
+        v-if="isMobile && (brandAssets.seoH1 || brandAssets.seoIntro)"
         class="storefront-seo-box"
         aria-label="Storefront overview"
       >
@@ -1289,10 +1297,16 @@
         <p v-if="brandAssets.seoIntro" class="seo-box-intro">
           {{ brandAssets.seoIntro }}
         </p>
+        <div class="seo-box-links">
+          <RouterLink to="/blog" class="seo-box-blog-link">
+            <i class="ri-article-line"></i>
+            <span>{{ $t('footer.blogLink') }} {{ brandAssets.siteName }}</span>
+            <i class="ri-arrow-right-line"></i>
+          </RouterLink>
+        </div>
       </section>
 
-      <!-- FOOTER CHECK SCAM BUTTONS (3 SEPARATE LARGER BUTTONS) -->
-      <div class="footer-checkscam-group">
+      <div v-if="isMobile" class="footer-checkscam-group">
         <a
           v-for="item in CHECK_SCAM_LINKS"
           :key="'footer-' + item.key"
@@ -1307,6 +1321,152 @@
           <i class="ri-external-link-line footer-cs-ext"></i>
         </a>
       </div>
+
+      <!-- PC WEBSITE FOOTER (3 COLUMNS + SUBTLE LINKS + LOCATION + COPYRIGHT) -->
+      <footer v-if="!isMobile" class="pc-web-footer" aria-label="Site footer">
+        <div class="pwf-grid">
+          <!-- COL 1: BRAND, SEO H1/INTRO & LOCATION -->
+          <div class="pwf-col pwf-brand-col">
+            <div class="pwf-brand-head">
+              <img
+                v-if="logo?.URL"
+                :src="logo.URL"
+                :alt="brandAssets.siteName"
+                class="pwf-logo"
+              />
+              <div class="pwf-brand-meta">
+                <strong class="pwf-brand-name">{{ brandAssets.siteName }}</strong>
+                <div v-if="shopTime" class="pwf-open-pill">
+                  <span class="dot-online"></span>
+                  <span>{{ shopTime }}</span>
+                </div>
+              </div>
+            </div>
+
+            <h1 v-if="!selectedItem && brandAssets.seoH1" class="pwf-seo-h1">
+              {{ brandAssets.seoH1 }}
+            </h1>
+            <p v-else-if="brandAssets.seoH1" class="pwf-seo-h1">
+              {{ brandAssets.seoH1 }}
+            </p>
+
+            <p v-if="brandAssets.seoIntro" class="pwf-seo-intro">
+              {{ brandAssets.seoIntro }}
+            </p>
+
+            <div v-if="brandAssets.shopAddress" class="pwf-location-box">
+              <i class="ri-map-pin-2-fill pwf-loc-ico"></i>
+              <div class="pwf-loc-body">
+                <span class="pwf-loc-label">{{ $t('footer.locationLabel') }}:</span>
+                <span class="pwf-loc-text">{{ brandAssets.shopAddress }}</span>
+                <a
+                  v-if="brandAssets.mapUrl"
+                  :href="brandAssets.mapUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="pwf-map-link"
+                >
+                  <span>{{ $t('footer.viewMap') }}</span>
+                  <i class="ri-arrow-right-up-line"></i>
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- COL 2: EXPLORE QUICK LINKS & SUBTLE SAFETY LINKS -->
+          <div class="pwf-col pwf-links-col">
+            <strong class="pwf-col-title">{{ $t('footer.exploreTitle') }}</strong>
+            <ul class="pwf-nav-list">
+              <li>
+                <button type="button" class="pwf-nav-link" @click="onAllFilter">
+                  <i class="ri-restaurant-2-line"></i>
+                  <span>{{ $t('menu.allCategories') }}</span>
+                </button>
+              </li>
+              <li v-for="cat in footerQuickCategories" :key="'fcat-' + cat">
+                <button type="button" class="pwf-nav-link" @click="selectCategory(cat)">
+                  <i class="ri-arrow-right-s-line"></i>
+                  <span>{{ cat }}</span>
+                </button>
+              </li>
+              <li>
+                <RouterLink to="/blog" class="pwf-nav-link is-highlight">
+                  <i class="ri-article-line"></i>
+                  <span>{{ $t('footer.blogLink') }}</span>
+                </RouterLink>
+              </li>
+              <li>
+                <RouterLink to="/welcome" class="pwf-nav-link">
+                  <i class="ri-sparkling-2-line"></i>
+                  <span>{{ $t('footer.welcomeLink') }}</span>
+                </RouterLink>
+              </li>
+            </ul>
+
+            <div class="pwf-safety-block">
+              <span class="pwf-safety-title">{{ $t('footer.safetyTitle') }}</span>
+              <div class="pwf-safety-links">
+                <a
+                  v-for="item in CHECK_SCAM_LINKS"
+                  :key="'pwf-scam-' + item.key"
+                  :href="item.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="pwf-safety-link"
+                >
+                  <i :class="item.icon"></i>
+                  <span>{{ item.headerLabel || item.title }}</span>
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- COL 3: OFFICIAL CONTACTS -->
+          <div class="pwf-col pwf-contact-col">
+            <strong class="pwf-col-title">{{ $t('contact.officialChannels') }}</strong>
+            <div v-if="shopContactList.length" class="pwf-contact-list">
+              <component
+                :is="c.Direct_link ? 'a' : 'div'"
+                v-for="c in shopContactList"
+                :key="'pwf-ct-' + c.ID"
+                :href="c.Direct_link || undefined"
+                :target="c.Direct_link ? '_blank' : undefined"
+                :rel="c.Direct_link ? 'noopener noreferrer' : undefined"
+                class="pwf-contact-item"
+                :class="{ 'is-clickable': Boolean(c.Direct_link) }"
+              >
+                <img v-if="c.URL_img" :src="c.URL_img" alt="" class="pwf-contact-avatar" />
+                <div v-else class="pwf-contact-avatar is-fallback">
+                  <i class="ri-customer-service-2-fill"></i>
+                </div>
+                <div class="pwf-contact-info">
+                  <div class="pwf-contact-top">
+                    <strong class="pwf-contact-name">{{ c.PLATFORM_name }}</strong>
+                    <span v-if="isContactMessageAllowed(c)" class="pwf-msg-pill">
+                      {{ $t('contact.allowMessageBadge') }}
+                    </span>
+                  </div>
+                  <span v-if="c.INFO" class="pwf-contact-sub">{{ c.INFO }}</span>
+                </div>
+                <i v-if="c.Direct_link" class="ri-external-link-line pwf-contact-ext"></i>
+              </component>
+            </div>
+            <p v-else class="pwf-contact-empty">
+              {{ $t('footer.rights') }}
+            </p>
+          </div>
+        </div>
+
+        <div class="pwf-bottom">
+          <div class="pwf-copyright">
+            © {{ currentFooterYear }} <strong>{{ brandAssets.siteName }}</strong> · sakitchen.shop — {{ $t('footer.rights') }}
+          </div>
+          <button type="button" class="pwf-top-btn" @click="scrollToPageTop">
+            <span>{{ $t('footer.backToTop') }}</span>
+            <i class="ri-arrow-up-line"></i>
+          </button>
+        </div>
+      </footer>
       </div>
       </template>
     </main>
@@ -1336,7 +1496,11 @@
     <div class="dp-mob-scroll">
       <!-- HERO GALLERY -->
       <div class="dp-mob-gallery">
-        <div class="detail-image-main dp-mob-hero">
+        <div
+          class="detail-image-main dp-mob-hero"
+          :class="{ 'has-ambient': Boolean(activeDetailImageUrl) }"
+          :style="getAmbientGlassStyle(activeDetailImageUrl)"
+        >
           <img
             v-if="activeDetailImageUrl"
             :src="activeDetailImageUrl"
@@ -1637,7 +1801,16 @@
         <div class="cart-header-zone">
           <div class="cart-top-header">
             <div class="cart-top-title">
-              <i class="ri-shopping-basket-2-fill"></i>
+              <button
+                v-if="isMobile"
+                type="button"
+                class="cart-mob-back-btn"
+                :aria-label="$t('cart.back')"
+                @click="closeCart"
+              >
+                <i class="ri-arrow-left-line"></i>
+              </button>
+              <i v-else class="ri-shopping-basket-2-fill"></i>
               <span>{{ $t('cart.title') }}</span>
               <span class="order-count">({{ cartQtyTotal }})</span>
             </div>
@@ -2350,7 +2523,11 @@
       <div class="modal-content detail-page-body">
         <!-- ẢNH BÊN TRÁI -->
         <div class="dp-gallery-card" :class="{ 'no-thumbs': !hasModalThumbs }">
-          <div class="dp-hero-frame">
+          <div
+            class="dp-hero-frame"
+            :class="{ 'has-ambient': Boolean(activeDetailImageUrl) }"
+            :style="getAmbientGlassStyle(activeDetailImageUrl)"
+          >
             <img
               v-if="activeDetailImageUrl"
               :src="activeDetailImageUrl"
@@ -2643,7 +2820,16 @@
     </button>
 
     <div class="exm-header">
-      <div class="exm-icon-badge">
+      <button
+        v-if="isMobile"
+        type="button"
+        class="exm-mob-back-btn"
+        :aria-label="$t('cart.back')"
+        @click="showExportModal = false"
+      >
+        <i class="ri-arrow-left-line"></i>
+      </button>
+      <div v-else class="exm-icon-badge">
         <i class="ri-file-list-3-fill"></i>
       </div>
       <div class="exm-header-text">
@@ -2655,102 +2841,113 @@
       </div>
     </div>
 
-    <div class="exm-summary-strip">
-      <div class="exm-stat-item">
-        <i class="ri-shopping-basket-2-line"></i>
-        <span>{{ cartQtyTotal }} {{ $t('group.itemsCount') }}</span>
+    <div class="exm-body-scroll">
+      <div class="exm-summary-strip">
+        <div class="exm-stat-item">
+          <i class="ri-shopping-basket-2-line"></i>
+          <span>{{ cartQtyTotal }} {{ $t('group.itemsCount') }}</span>
+        </div>
+        <span class="exm-stat-dot">•</span>
+        <div class="exm-stat-item is-price">
+          <strong>{{ formatPrice(customerPayableTotal, cartCurrency) }}</strong>
+        </div>
+        <span class="exm-stat-dot">•</span>
+        <div class="exm-stat-item">
+          <i :class="hinhThucTT === 'CHUYEN_KHOAN' ? 'ri-bank-card-line' : 'ri-money-dollar-circle-line'"></i>
+          <span>{{ hinhThucTT === 'CHUYEN_KHOAN' ? $t('cart.transfer') : $t('cart.cash') }}</span>
+        </div>
+        <span
+          v-if="liveStatus && liveStatus !== 'Nháp'"
+          class="exm-saved-pill"
+          :class="{ 'is-pop': exportProgressDropHit }"
+        >
+          <i class="ri-checkbox-circle-fill"></i> {{ $t('export.savedWeb') }}
+        </span>
       </div>
-      <span class="exm-stat-dot">•</span>
-      <div class="exm-stat-item is-price">
-        <strong>{{ formatPrice(customerPayableTotal, cartCurrency) }}</strong>
-      </div>
-      <span class="exm-stat-dot">•</span>
-      <div class="exm-stat-item">
-        <i :class="hinhThucTT === 'CHUYEN_KHOAN' ? 'ri-bank-card-line' : 'ri-money-dollar-circle-line'"></i>
-        <span>{{ hinhThucTT === 'CHUYEN_KHOAN' ? $t('cart.transfer') : $t('cart.cash') }}</span>
-      </div>
-      <span
-        v-if="liveStatus && liveStatus !== 'Nháp'"
-        class="exm-saved-pill"
+
+      <div
+        ref="exportProgressCardRef"
+        class="grab-status-card in-full-modal in-export-modal"
+        :class="[
+          orderStatusInfo.stateClass,
+          {
+            'is-cancelled': orderStatusProgress.isCancelled,
+            'is-pre-drop': exportProgressPreDrop,
+            'is-drop-hit': exportProgressDropHit,
+          },
+        ]"
       >
-        <i class="ri-checkbox-circle-fill"></i> {{ $t('export.savedWeb') }}
-      </span>
-    </div>
-
-    <div
-      class="grab-status-card in-full-modal in-export-modal"
-      :class="[orderStatusInfo.stateClass, { 'is-cancelled': orderStatusProgress.isCancelled }]"
-    >
-      <div class="gs-top-row">
-        <span class="gs-status-main">
-          <span class="gs-live-dot" :class="{ paused: orderStatusProgress.isTerminal }"></span>
-          <i class="gs-main-ico" :class="orderStatusInfo.icon"></i>
-          <strong class="gs-status-text">{{ orderStatusInfo.text }}</strong>
-        </span>
-        <span v-if="!orderStatusProgress.isCancelled" class="gs-step-count">
-          {{ orderStatusProgress.activeIndex + 1 }}/{{ orderStatusProgress.steps.length }}
-        </span>
-      </div>
-
-      <div v-if="!orderStatusProgress.isCancelled" class="gs-stepper">
-        <div class="gs-rail">
-          <div
-            class="gs-rail-fill"
-            :style="{ width: `${orderStatusProgress.fillPercent}%` }"
-          ></div>
+        <div class="gs-top-row">
+          <span class="gs-status-main">
+            <span class="gs-live-dot" :class="{ paused: orderStatusProgress.isTerminal }"></span>
+            <i class="gs-main-ico" :class="orderStatusInfo.icon"></i>
+            <strong class="gs-status-text">{{ orderStatusInfo.text }}</strong>
+          </span>
+          <span v-if="!orderStatusProgress.isCancelled" class="gs-step-count">
+            {{ orderStatusProgress.activeIndex + 1 }}/{{ orderStatusProgress.steps.length }}
+          </span>
         </div>
 
-        <div class="gs-steps-grid">
-          <div
-            v-for="(st, sIdx) in orderStatusProgress.steps"
-            :key="'exm-st-' + st.key"
-            class="gs-step"
-            :class="{
-              'is-done': sIdx < orderStatusProgress.activeIndex,
-              'is-current': sIdx === orderStatusProgress.activeIndex,
-              'is-upcoming': sIdx > orderStatusProgress.activeIndex,
-              'is-shipping-active': st.key === 'shipping' && sIdx === orderStatusProgress.activeIndex
-            }"
-          >
-            <div class="gs-node">
-              <span v-if="sIdx === orderStatusProgress.activeIndex && !orderStatusProgress.isTerminal" class="gs-pulse-ring"></span>
-              <i
-                :class="
-                  sIdx < orderStatusProgress.activeIndex
-                    ? 'ri-check-line'
-                    : st.icon
-                "
-              ></i>
+        <div v-if="!orderStatusProgress.isCancelled" class="gs-stepper">
+          <div class="gs-rail">
+            <div
+              class="gs-rail-fill"
+              :style="{ width: `${orderStatusProgress.fillPercent}%` }"
+            ></div>
+          </div>
+
+          <div class="gs-steps-grid">
+            <div
+              v-for="(st, sIdx) in orderStatusProgress.steps"
+              :key="'exm-st-' + st.key"
+              class="gs-step"
+              :class="{
+                'is-done': sIdx < orderStatusProgress.activeIndex,
+                'is-current': sIdx === orderStatusProgress.activeIndex,
+                'is-upcoming': sIdx > orderStatusProgress.activeIndex,
+                'is-shipping-active': st.key === 'shipping' && sIdx === orderStatusProgress.activeIndex
+              }"
+            >
+              <div class="gs-node">
+                <span v-if="sIdx === orderStatusProgress.activeIndex && !orderStatusProgress.isTerminal" class="gs-pulse-ring"></span>
+                <i
+                  :class="
+                    sIdx < orderStatusProgress.activeIndex
+                      ? 'ri-check-line'
+                      : st.icon
+                  "
+                ></i>
+              </div>
+              <span class="gs-label">{{ st.label }}</span>
             </div>
-            <span class="gs-label">{{ st.label }}</span>
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="exm-content-card">
-      <div class="exm-card-bar">
-        <span class="exm-card-label">
-          <i class="ri-article-line"></i>
-          <span>{{ $t('export.messageLabel') }}</span>
-        </span>
-        <button
-          type="button"
-          class="exm-copy-inline-btn"
-          :class="{ copied }"
-          @click="copy"
-        >
-          <i :class="copied ? 'ri-check-line' : 'ri-file-copy-line'"></i>
-          <span>{{ copied ? $t('export.copied') : $t('export.copy') }}</span>
-        </button>
+      <div class="exm-content-card">
+        <div class="exm-card-bar">
+          <span class="exm-card-label">
+            <i class="ri-article-line"></i>
+            <span>{{ $t('export.messageLabel') }}</span>
+          </span>
+          <button
+            type="button"
+            class="exm-copy-inline-btn"
+            :class="{ copied }"
+            @click="copy"
+          >
+            <i :class="copied ? 'ri-check-line' : 'ri-file-copy-line'"></i>
+            <span>{{ copied ? $t('export.copied') : $t('export.copy') }}</span>
+          </button>
+        </div>
+
+        <textarea
+          class="exm-textarea"
+          rows="9"
+          readonly
+          :value="exportText"
+        ></textarea>
       </div>
-
-      <textarea
-        class="exm-textarea"
-        rows="9"
-        readonly
-        :value="exportText"
-      ></textarea>
     </div>
 
     <div v-if="messagingContactList.length" class="exm-send-section">
@@ -2866,10 +3063,10 @@
  <transition name="mobile-modal">
 <div
   v-if="showContactModal"
-  class="modal-overlay"
+  class="modal-overlay z-top contact-sheet-overlay"
   @click="showContactModal = false"
 >
-  <div class="modal-card" @click.stop>
+  <div class="modal-card contact-support-sheet" @click.stop>
     <button class="modal-close" @click="showContactModal = false">✕</button>
 
     <h3 class="export-title">{{ $t('contact.supportInfo') }}</h3>
@@ -3589,53 +3786,61 @@
             </div>
           </div>
         </section>
+      </template>
+    </div>
 
-        <!-- HÀNH ĐỘNG ĐƠN HÀNG -->
-        <div class="mps-actions">
+    <!-- STICKY FOOTER HÀNH ĐỘNG ĐƠN HÀNG -->
+    <div
+      v-if="
+        !(isCartVisuallyEmpty && (!liveStatus || liveStatus === 'Nháp'))
+        && (isOrderTerminal || isOrderLocked || (isGroupHost && !isOrderLocked))
+      "
+      class="mps-footer"
+    >
+      <div class="mps-actions">
+        <button
+          v-if="isOrderTerminal"
+          type="button"
+          class="finish-btn new-order-finish-btn"
+          @click="startNewOrder"
+        >
+          + {{ $t('group.newOrderBtn') }}
+        </button>
+        <template v-else-if="isOrderLocked">
           <button
-            v-if="isOrderTerminal"
             type="button"
-            class="finish-btn new-order-finish-btn"
+            class="finish-btn mps-contact-shop-btn"
+            @click="openLockedOrderContactPrompt"
+          >
+            <i class="ri-chat-3-line"></i>
+            <span>{{ $t('group.messageShopBtn') }}</span>
+          </button>
+          <button
+            v-if="!isOrderInDeliveryProgress"
+            type="button"
+            class="mps-secondary-action-btn"
             @click="startNewOrder"
           >
             + {{ $t('group.newOrderBtn') }}
           </button>
-          <template v-else-if="isOrderLocked">
-            <button
-              type="button"
-              class="finish-btn mps-contact-shop-btn"
-              @click="openLockedOrderContactPrompt"
-            >
-              <i class="ri-chat-3-line"></i>
-              <span>{{ $t('group.messageShopBtn') }}</span>
-            </button>
-            <button
-              v-if="!isOrderInDeliveryProgress"
-              type="button"
-              class="mps-secondary-action-btn"
-              @click="startNewOrder"
-            >
-              + {{ $t('group.newOrderBtn') }}
-            </button>
-          </template>
-          <button
-            v-else-if="isGroupHost && !isOrderLocked"
-            type="button"
-            class="mps-secondary-action-btn"
-            @click="openCheckoutFromProgress"
-          >
-            <i class="ri-edit-box-line"></i>
-            <span>{{ $t('mobile.editOrder') }}</span>
-          </button>
-        </div>
-      </template>
+        </template>
+        <button
+          v-else-if="isGroupHost && !isOrderLocked"
+          type="button"
+          class="mps-secondary-action-btn"
+          @click="openCheckoutFromProgress"
+        >
+          <i class="ri-edit-box-line"></i>
+          <span>{{ $t('mobile.editOrder') }}</span>
+        </button>
+      </div>
     </div>
   </aside>
 </transition>
 
 <!-- ===== MODAL CHỌN NGÔN NGỮ ===== -->
 <!-- ===== MODAL CHỌN NGÔN NGỮ ===== -->
-<div v-if="showLangModal" class="modal-overlay">
+<div v-if="showLangModal" class="modal-overlay is-center-dialog" @click.self="showLangModal = false">
   <div class="modal-card lang-modal">
 
     <!-- HEADER -->
@@ -3741,27 +3946,27 @@
     </div>
 
     <!-- NGƯỜI ĐẶT -->
-    <div v-if="!editingItem?.isAdminAdded" class="note-box" style="margin-bottom: 10px; width: 100%">
-      <label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px; color:#4b5563;">
+    <div v-if="!editingItem?.isAdminAdded" class="note-box qty-note-box">
+      <label class="qty-note-label">
         {{ $t('group.orderedBy') }}
       </label>
       <input
         v-model="editAuthor"
         type="text"
-        style="width:100%; border:1px solid var(--sa-border-green); border-radius:8px; padding:8px; outline:none; font-size:14px;"
+        class="qty-note-input"
         :placeholder="$t('group.yourNamePlaceholder')"
       />
     </div>
 
     <!-- GHI CHÚ -->
-    <div class="note-box" style="margin-bottom: 12px;width:100%">
-      <label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px; color:#4b5563;">
+    <div class="note-box qty-note-box qty-note-box-last">
+      <label class="qty-note-label">
         {{ $t('menu.note') }}
       </label>
       <textarea
         v-model="editNote"
         rows="2"
-        style="width:100%; border:1px solid var(--sa-border-green); border-radius:8px; padding:8px; outline:none; font-size:14px;"
+        class="qty-note-input"
         placeholder="..."
       ></textarea>
     </div>
@@ -4839,7 +5044,7 @@
 <!-- ===== MODAL THÔNG BÁO HOÀN THÀNH / HỦY ĐƠN TỪ QUÁN ===== -->
 <div
   v-if="orderFinalNoticeModal.show"
-  class="modal-overlay z-top ofn-overlay"
+  class="modal-overlay z-top ofn-overlay is-center-dialog"
   @click="closeOrderFinalNoticeModal()"
 >
   <div
@@ -4948,7 +5153,7 @@
 </div>
 
 <!-- ===== MODAL THÔNG BÁO GIỎ HÀNG TRỐNG ===== -->
-<div v-if="showEmptyCartModal" class="modal-overlay z-top" @click="showEmptyCartModal = false">
+<div v-if="showEmptyCartModal" class="modal-overlay z-top is-center-dialog" @click="showEmptyCartModal = false">
   <div class="modal-card empty-cart-modal" @click.stop>
     <button class="modal-close" @click="showEmptyCartModal = false">✕</button>
     <div class="empty-modal-content">
@@ -4964,7 +5169,7 @@
 <!-- ===== MODAL KHI ĐƠN CHỜ DUYỆT BỊ XÓA SẠCH GIỎ ===== -->
 <div
   v-if="showEmptyPendingOrderModal"
-  class="modal-overlay z-top"
+  class="modal-overlay z-top is-center-dialog"
   @click="showEmptyPendingOrderModal = false"
 >
   <div class="modal-card empty-pending-order-modal" @click.stop>
@@ -5021,7 +5226,7 @@
 <!-- ===== MODAL THÔNG BÁO ĐƠN ĐANG CHUẨN BỊ / GIAO -> NHẮN TIN QUÁN ===== -->
 <div
   v-if="showLockedOrderContactModal"
-  class="modal-overlay z-top"
+  class="modal-overlay z-top is-center-dialog"
   @click="showLockedOrderContactModal = false"
 >
   <div class="modal-card locked-order-contact-modal" @click.stop>
@@ -5107,7 +5312,7 @@
 </div>
 
 <!-- ===== MODAL NHẬP TÊN KHI VÀO LINK GHÉP ĐƠN ===== -->
-<div v-if="showJoinGroupModal" class="modal-overlay z-top" @click="confirmJoinGroup">
+<div v-if="showJoinGroupModal" class="modal-overlay z-top is-center-dialog" @click="confirmJoinGroup">
   <div class="modal-card join-group-modal" @click.stop>
     <button class="modal-close" @click="confirmJoinGroup">✕</button>
     <div class="join-group-content">
@@ -5204,7 +5409,7 @@
 </div>
 
 <!-- ===== MODAL BÁO THÀNH VIÊN CHƯA HOÀN THÀNH CHỌN MÓN ===== -->
-<div v-if="showUnfinishedGuestsModal" class="modal-overlay z-top" @click="showUnfinishedGuestsModal = false">
+<div v-if="showUnfinishedGuestsModal" class="modal-overlay z-top is-center-dialog" @click="showUnfinishedGuestsModal = false">
   <div class="modal-card unfinished-guests-modal" @click.stop>
     <button type="button" class="modal-close" @click="showUnfinishedGuestsModal = false">
       <i class="ri-close-line"></i>
@@ -5288,7 +5493,7 @@
 </div>
 
 <!-- ===== MODAL XÁC NHẬN XÓA THÀNH VIÊN ===== -->
-<div v-if="memberToRemove" class="modal-overlay z-top" @click="memberToRemove = null">
+<div v-if="memberToRemove" class="modal-overlay z-top is-center-dialog" @click="memberToRemove = null">
   <div class="modal-card confirm-remove-member-modal" @click.stop>
     <button type="button" class="modal-close" @click="memberToRemove = null">
       <i class="ri-close-line"></i>
@@ -5331,7 +5536,7 @@
 </div>
 
 <!-- ===== MODAL CẢNH BÁO THÀNH VIÊN NHẤN HOÀN THÀNH ===== -->
-<div v-if="showGuestNudgeModal" class="modal-overlay z-top" @click="showGuestNudgeModal = false">
+<div v-if="showGuestNudgeModal" class="modal-overlay z-top is-center-dialog" @click="showGuestNudgeModal = false">
   <div class="modal-card guest-nudge-modal" @click.stop>
     <button type="button" class="modal-close" @click="showGuestNudgeModal = false">
       <i class="ri-close-line"></i>
@@ -5385,7 +5590,7 @@
 </div>
 
 <!-- ===== MODAL THÔNG BÁO BỊ ĐÁ KHỎI ĐƠN ===== -->
-<div v-if="showKickedModal" class="modal-overlay z-top" @click="startNewOrderFromKick">
+<div v-if="showKickedModal" class="modal-overlay z-top is-center-dialog" @click="startNewOrderFromKick">
   <div class="modal-card kicked-member-modal" @click.stop>
     <button type="button" class="modal-close" @click="startNewOrderFromKick">
       <i class="ri-close-line"></i>
@@ -5422,6 +5627,111 @@
     </div>
   </div>
 </div>
+
+<!-- ===== PRO VIP MEDALLION -> BEZIER COMET -> PROGRESS LOCK-ON ANIMATION ===== -->
+<Teleport to="body">
+  <div
+    v-if="exportSubmitFx.visible"
+    class="sa-submit-fx-layer"
+    :class="{
+      'is-dark': isDarkMode,
+      'is-flying': exportSubmitFx.flying,
+      'is-impacting': exportSubmitFx.impacting,
+    }"
+  >
+    <div
+      class="sa-submit-fx-backdrop"
+      :class="{ 'is-fading': exportSubmitFx.flying || exportSubmitFx.impacting }"
+    ></div>
+
+    <!-- Pre-pooled 60fps Bezier comet ribbon dots -->
+    <span
+      v-for="idx in 8"
+      :key="'sfx-comet-' + idx"
+      :ref="(el) => setCometDotRef(el, idx - 1)"
+      class="sfx-comet-dot"
+      :class="{ 'is-gold': idx % 2 === 0 }"
+    ></span>
+
+    <!-- Impact shockwave burst anchored at exact target node coordinates -->
+    <div
+      v-if="exportSubmitFx.impacting"
+      class="sfx-impact-burst"
+      :style="{
+        transform: `translate3d(${exportSubmitFx.impactX}px, ${exportSubmitFx.impactY}px, 0)`,
+      }"
+    >
+      <span class="sfx-impact-ring r1"></span>
+      <span class="sfx-impact-ring r2"></span>
+      <span class="sfx-impact-flash"></span>
+    </div>
+
+    <!-- Center Hero Stage (Frameless Medallion + Floating Caption) -->
+    <div v-show="!exportSubmitFx.impacting" class="sfx-hero-stage">
+      <div
+        ref="exportSubmitFxCardRef"
+        class="sfx-medallion"
+        :class="{
+          'is-entering': !exportSubmitFx.flying,
+          'is-condensing': exportSubmitFx.flying,
+        }"
+      >
+        <span class="sfx-aurora-halo"></span>
+        <span class="sfx-sonar-ring r1"></span>
+        <span class="sfx-sonar-ring r2"></span>
+
+        <div class="sfx-sparks" aria-hidden="true">
+          <span
+            v-for="sp in 8"
+            :key="'sfx-sp-' + sp"
+            class="sfx-spark"
+            :class="{ 'is-gold': sp % 2 === 0 }"
+            :style="{ '--sfx-ang': `${(sp - 1) * 45}deg` }"
+          ></span>
+        </div>
+
+        <span class="sfx-orbit-ring"></span>
+
+        <div class="sfx-core-sphere">
+          <svg class="sfx-check-svg" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+            <circle
+              class="sfx-svg-ring"
+              cx="32"
+              cy="32"
+              r="27"
+              stroke="rgba(255,255,255,0.42)"
+              stroke-width="2.4"
+            />
+            <path
+              class="sfx-svg-tick"
+              d="M19.5 33.2L28.2 41.8L45.2 23.2"
+              stroke="#ffffff"
+              stroke-width="5.4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+      </div>
+
+      <div class="sfx-float-caption" :class="{ 'is-dissolving': exportSubmitFx.flying }">
+        <div class="sfx-caption-pill">
+          <strong class="sfx-title">
+            {{
+              exportSubmitFx.isUpdate
+                ? $t('export.updateSuccessTitle')
+                : $t('export.submitSuccessTitle')
+            }}
+          </strong>
+          <span v-if="exportSubmitFx.orderCode" class="sfx-code-pill">
+            #{{ exportSubmitFx.orderCode }}
+          </span>
+        </div>
+        <span class="sfx-sub">{{ $t('export.submitSuccessSub') }}</span>
+      </div>
+    </div>
+  </div>
+</Teleport>
 
 <!-- ===== TOAST NOTIFICATION ===== -->
 <Teleport to="body">
@@ -5509,6 +5819,7 @@ import {
 } from '@/utils/bannerLink'
 import {
   resolveBrandAssets,
+  buildSeoJsonLdGraph,
   toFaviconAssetUrl,
   toMobileIconAssetUrl,
 } from '@/utils/brandAssets'
@@ -7956,6 +8267,11 @@ const categories = computed(() => {
   )
 })
 
+const footerQuickCategories = computed(() =>
+  categories.value.filter((c) => c && c !== 'Tất cả' && c !== 'Sale').slice(0, 4),
+)
+const currentFooterYear = new Date().getFullYear()
+
 const categoryHierarchyMap = computed(() => {
   const map = new Map()
   for (const node of categoryHierarchy.value) {
@@ -8977,9 +9293,13 @@ function setTitleAndFavicon(brandOrName, legacyIconUrl) {
   const resolvedShortName = assets.shortName || assets.name || 'SA KITCHEN'
   document.title = resolvedSeoTitle
 
-  // SYNC META DESCRIPTION & KEYWORDS FOR SPA NAVIGATION
+  // SYNC META DESCRIPTION, ROBOTS, CANONICAL & JSON-LD FOR SPA NAVIGATION (e.g. returning from /blog)
+  const cleanCanonical = `${window.location.origin}${window.location.pathname}`
   setMetaTagContent('meta[name="description"]', 'name', 'description', assets.seoDescription)
   setMetaTagContent('meta[name="keywords"]', 'name', 'keywords', assets.seoKeywords)
+  setMetaTagContent('meta[name="robots"]', 'name', 'robots', 'index, follow')
+  setMetaTagContent('meta[property="og:type"]', 'property', 'og:type', 'restaurant')
+  setMetaTagContent('meta[property="og:url"]', 'property', 'og:url', cleanCanonical)
   setMetaTagContent('meta[property="og:title"]', 'property', 'og:title', resolvedSeoTitle)
   setMetaTagContent(
     'meta[property="og:description"]',
@@ -8987,25 +9307,42 @@ function setTitleAndFavicon(brandOrName, legacyIconUrl) {
     'og:description',
     assets.seoDescription,
   )
+  const canonicalLink = document.querySelector('link[rel="canonical"]')
+  if (canonicalLink) {
+    canonicalLink.setAttribute('href', cleanCanonical)
+  }
+  const jsonLdScript = document.getElementById('sa-seo-jsonld')
+  if (jsonLdScript) {
+    jsonLdScript.textContent = JSON.stringify(buildSeoJsonLdGraph(assets, window.location.origin))
+  }
 
   // FAVICON TAB (prefers dedicated Favicon_URL, falls back to Logo URL)
+  const verQuery = assets.updatedAt ? `?v=${encodeURIComponent(assets.updatedAt)}` : ''
+  const icoLink = document.querySelector("link[rel='icon'][sizes='48x48']")
+  if (icoLink) {
+    icoLink.setAttribute('href', toFaviconAssetUrl(assets.faviconUrl, 48) || `/favicon.ico${verQuery}`)
+  }
+
   let link =
     document.querySelector("link[rel='icon'][type='image/png']") ||
-    document.querySelector("link[rel~='icon']") ||
-    document.createElement('link')
-  link.rel = 'icon'
-  link.type = 'image/png'
-  link.href = toFaviconAssetUrl(assets.faviconUrl, 192) || '/favicon-192.png'
-  document.head.appendChild(link)
+    document.querySelector("link[rel~='icon']")
+  if (!link) {
+    link = document.createElement('link')
+    link.rel = 'icon'
+    link.type = 'image/png'
+    document.head.appendChild(link)
+  }
+  link.href = toFaviconAssetUrl(assets.faviconUrl, 192) || `/favicon-192.png${verQuery}`
 
   // IOS HOME SCREEN ICON (prefers dedicated Mobile_Icon_URL, falls back to Logo URL)
-  let appleLink =
-    document.querySelector("link[rel='apple-touch-icon']") ||
-    document.createElement('link')
-  appleLink.rel = 'apple-touch-icon'
-  appleLink.sizes = '180x180'
-  appleLink.href = toMobileIconAssetUrl(assets.mobileIconUrl, 180) || '/apple-touch-icon.png'
-  document.head.appendChild(appleLink)
+  let appleLink = document.querySelector("link[rel='apple-touch-icon']")
+  if (!appleLink) {
+    appleLink = document.createElement('link')
+    appleLink.rel = 'apple-touch-icon'
+    appleLink.sizes = '180x180'
+    document.head.appendChild(appleLink)
+  }
+  appleLink.href = toMobileIconAssetUrl(assets.mobileIconUrl, 180) || `/apple-touch-icon.png${verQuery}`
 
   // IOS APP TITLE
   setMetaTagContent(
@@ -9778,6 +10115,22 @@ function getCardImage(item) {
 function getCardImageKey(item) {
   const id = item?.Ma_hang || 'item'
   return `${id}-${getCardImageIndex(item)}`
+}
+
+function toAmbientBlurUrl(rawUrl) {
+  const url = String(rawUrl || '').trim()
+  if (!url) return ''
+  if (url.includes('res.cloudinary.com') && url.includes('/upload/')) {
+    return url.replace('/upload/', '/upload/w_72,h_72,c_fill,e_blur:900,q_auto:low,f_auto/')
+  }
+  return url
+}
+
+function getAmbientGlassStyle(rawUrl) {
+  const ambient = toAmbientBlurUrl(rawUrl)
+  if (!ambient) return undefined
+  const safe = ambient.replace(/["\\]/g, '\\$&')
+  return { '--sa-ambient-img': `url("${safe}")` }
 }
 
 function resetCardImageIndex(item) {
@@ -10714,6 +11067,200 @@ function openCheckoutFromProgress() {
   showFullCartModal.value = true
 }
 
+const exportProgressCardRef = ref(null)
+const exportSubmitFxCardRef = ref(null)
+const exportCometDotRefs = []
+const exportProgressPreDrop = ref(false)
+const exportProgressDropHit = ref(false)
+const exportSubmitFx = reactive({
+  visible: false,
+  flying: false,
+  impacting: false,
+  isUpdate: false,
+  orderCode: '',
+  impactX: 0,
+  impactY: 0,
+})
+let exportSubmitRafId = 0
+let exportSubmitPhaseTimer = null
+let exportSubmitImpactTimer = null
+let exportSubmitResetTimer = null
+
+function setCometDotRef(el, idx) {
+  exportCometDotRefs[idx] = el || null
+}
+
+function cleanupExportSubmitFx() {
+  if (exportSubmitPhaseTimer) {
+    clearTimeout(exportSubmitPhaseTimer)
+    exportSubmitPhaseTimer = null
+  }
+  if (exportSubmitImpactTimer) {
+    clearTimeout(exportSubmitImpactTimer)
+    exportSubmitImpactTimer = null
+  }
+  if (exportSubmitResetTimer) {
+    clearTimeout(exportSubmitResetTimer)
+    exportSubmitResetTimer = null
+  }
+  if (exportSubmitRafId) {
+    cancelAnimationFrame(exportSubmitRafId)
+    exportSubmitRafId = 0
+  }
+  for (const dot of exportCometDotRefs) {
+    if (dot) {
+      dot.style.opacity = '0'
+    }
+  }
+  exportSubmitFx.visible = false
+  exportSubmitFx.flying = false
+  exportSubmitFx.impacting = false
+  exportProgressPreDrop.value = false
+  exportProgressDropHit.value = false
+}
+
+watch(showExportModal, (open) => {
+  if (!open) cleanupExportSubmitFx()
+})
+
+function evalQuadBezier(p0x, p0y, p1x, p1y, p2x, p2y, tVal) {
+  const inv = 1 - tVal
+  return {
+    x: inv * inv * p0x + 2 * inv * tVal * p1x + tVal * tVal * p2x,
+    y: inv * inv * p0y + 2 * inv * tVal * p1y + tVal * tVal * p2y,
+  }
+}
+
+async function triggerExportSubmitAnimation({ isUpdate = false, orderCode = '' } = {}) {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return
+  cleanupExportSubmitFx()
+
+  exportProgressPreDrop.value = true
+  exportSubmitFx.isUpdate = Boolean(isUpdate)
+  exportSubmitFx.orderCode = String(orderCode || '').trim()
+  exportSubmitFx.flying = false
+  exportSubmitFx.impacting = false
+  exportSubmitFx.visible = true
+
+  await nextTick()
+  await new Promise((resolve) => requestAnimationFrame(resolve))
+  if (!showExportModal.value) {
+    cleanupExportSubmitFx()
+    return
+  }
+
+  exportProgressCardRef.value?.scrollIntoView?.({ block: 'nearest' })
+
+  const triggerLockOnImpact = (hitX, hitY) => {
+    exportSubmitRafId = 0
+    for (const dot of exportCometDotRefs) {
+      if (dot) dot.style.opacity = '0'
+    }
+    exportProgressPreDrop.value = false
+    exportProgressDropHit.value = true
+
+    if (hitX > 0 || hitY > 0) {
+      exportSubmitFx.impactX = Math.round(hitX)
+      exportSubmitFx.impactY = Math.round(hitY)
+      exportSubmitFx.flying = false
+      exportSubmitFx.impacting = true
+      exportSubmitImpactTimer = setTimeout(() => {
+        exportSubmitImpactTimer = null
+        exportSubmitFx.impacting = false
+        exportSubmitFx.visible = false
+      }, 560)
+    } else {
+      exportSubmitFx.visible = false
+      exportSubmitFx.flying = false
+    }
+
+    exportSubmitResetTimer = setTimeout(() => {
+      exportProgressDropHit.value = false
+      exportSubmitResetTimer = null
+    }, 980)
+  }
+
+  exportSubmitPhaseTimer = setTimeout(() => {
+    exportSubmitPhaseTimer = null
+    if (!showExportModal.value || !exportSubmitFx.visible) {
+      cleanupExportSubmitFx()
+      return
+    }
+
+    const medallionEl = exportSubmitFxCardRef.value
+    const progressCard = exportProgressCardRef.value
+    const getTargetCenter = () => {
+      const node =
+        progressCard?.querySelector?.('.gs-step.is-current .gs-node') || progressCard
+      if (!node) return null
+      const r = node.getBoundingClientRect()
+      if (!r.width && !r.height) return null
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+    }
+
+    const initialTarget = getTargetCenter()
+    if (!medallionEl || !initialTarget) {
+      triggerLockOnImpact(0, 0)
+      return
+    }
+
+    const startRect = medallionEl.getBoundingClientRect()
+    const startX = startRect.left + startRect.width / 2
+    const startY = startRect.top + startRect.height / 2
+
+    exportSubmitFx.flying = true
+
+    const durationMs = 620
+    const t0 = performance.now()
+
+    const stepFrame = (now) => {
+      if (!showExportModal.value || !exportSubmitFx.visible) {
+        cleanupExportSubmitFx()
+        return
+      }
+
+      const rawP = Math.min(1, Math.max(0, (now - t0) / durationMs))
+      const eased =
+        rawP < 0.5
+          ? 4 * rawP * rawP * rawP
+          : 1 - Math.pow(-2 * rawP + 2, 3) / 2
+
+      const liveTarget = getTargetCenter() || initialTarget
+      const endX = liveTarget.x
+      const endY = liveTarget.y
+      const spanX = endX - startX
+      const spanY = endY - startY
+      const sideArc = spanX >= 0 ? Math.max(44, spanX * 0.32) : Math.min(-44, spanX * 0.32)
+      const ctrlX = startX + spanX * 0.38 + sideArc
+      const ctrlY = Math.min(startY, endY) - Math.max(54, Math.abs(spanY) * 0.22)
+
+      const head = evalQuadBezier(startX, startY, ctrlX, ctrlY, endX, endY, eased)
+      const orbScale = 1 - 0.72 * Math.pow(eased, 0.82)
+      medallionEl.style.transform = `translate3d(${(head.x - startX).toFixed(1)}px, ${(head.y - startY).toFixed(1)}px, 0) scale(${orbScale.toFixed(3)})`
+
+      const tailEnvelope = Math.sin(rawP * Math.PI)
+      for (let i = 0; i < exportCometDotRefs.length; i++) {
+        const dot = exportCometDotRefs[i]
+        if (!dot) continue
+        const lagT = Math.max(0, eased - (i + 1) * 0.036)
+        const pt = evalQuadBezier(startX, startY, ctrlX, ctrlY, endX, endY, lagT)
+        const dotScale = (1 - i * 0.095) * (0.65 + 0.35 * tailEnvelope)
+        const dotOpacity = (1 - i / (exportCometDotRefs.length + 0.5)) * tailEnvelope * 0.92
+        dot.style.transform = `translate3d(${pt.x.toFixed(1)}px, ${pt.y.toFixed(1)}px, 0) translate(-50%, -50%) scale(${dotScale.toFixed(2)})`
+        dot.style.opacity = dotOpacity > 0.02 ? dotOpacity.toFixed(2) : '0'
+      }
+
+      if (rawP < 1) {
+        exportSubmitRafId = requestAnimationFrame(stepFrame)
+      } else {
+        triggerLockOnImpact(endX, endY)
+      }
+    }
+
+    exportSubmitRafId = requestAnimationFrame(stepFrame)
+  }, 940)
+}
+
 async function onFinish(arg) {
   const skipUnfinishedCheck = Boolean(
     arg && typeof arg === 'object' && arg.skipUnfinishedCheck === true,
@@ -10777,52 +11324,20 @@ async function onFinish(arg) {
   }
   ensureDeliveryTimeForSubmit()
 
-  // Cập nhật optimistic trạng thái tiến trình lên 'Chờ duyệt' ngay trong modal trước khi đợi Firebase
-  const prevLiveBeforeSubmit = liveOrderData.value
-  const shouldOptimisticPromote = !liveStatus.value || liveStatus.value === 'Nháp'
-  if (shouldOptimisticPromote) {
-    const baseLive = prevLiveBeforeSubmit || {
-      itemsMap: {},
-      itemsList: cartItems.value.map((i) => ({
-        lineId: i.lineId,
-        Ma_hang: i.Ma_hang,
-        Ten_hang: i.Ten_hang,
-        Gia_ban: i.unitPrice,
-        Don_vi_tien_te: i.Don_vi_tien_te,
-        Main_img: i.Main_img,
-        So_luong: i.qty,
-        Ghi_chu: i.note || '',
-        Nguoi_dat: i.rawAuthor || memberName.value.trim() || tenKhach.value.trim(),
-        Nguoi_dat_id: i.memberId || memberId,
-        Added_by_role: (i.memberId || memberId) === memberId ? 'host' : 'guest',
-      })),
-      membersList: [],
-    }
-    liveOrderData.value = {
-      ...baseLive,
-      meta: {
-        ...(baseLive.meta || {}),
-        Trang_thai: 'Chờ duyệt',
-        Ten_khach_hang: tenKhach.value.trim(),
-        So_dien_thoai: sdt.value.trim(),
-        Dia_chi: diaChi.value.trim(),
-        Thoi_gian_nhan_hang: thoiGian.value.trim(),
-        Hinh_thuc_thanh_toan: hinhThucTT.value || 'TIEN_MAT',
-        Ghi_chu: ghiChu.value,
-        Host_id: baseLive.meta?.Host_id || memberId,
-      },
-    }
-  }
+  const wasAlreadySubmitted = Boolean(liveStatus.value && liveStatus.value !== 'Nháp')
+  const ok = await submitOrderToWebCore({ silentToast: true })
+  if (!ok) return
 
-  // Mở modal gửi đơn MXH ngay lập tức, đồng thời gửi ngầm đơn về web ở background
   if (isMobile.value) {
     openMobileProgressAfterSubmit({ toast: false, keepExport: true })
+  } else {
+    showFullCartModal.value = false
   }
+  exportProgressPreDrop.value = true
   showExportModal.value = true
-  void submitOrderToWebCore({ silentToast: true }).then((ok) => {
-    if (!ok && shouldOptimisticPromote && liveOrderData.value?.meta?.Trang_thai === 'Chờ duyệt') {
-      liveOrderData.value = prevLiveBeforeSubmit
-    }
+  void triggerExportSubmitAnimation({
+    isUpdate: wasAlreadySubmitted,
+    orderCode: activeOrderId.value,
   })
 }
 
@@ -11138,6 +11653,7 @@ onUnmounted(() => {
   }
   if (metaSyncTimer) clearTimeout(metaSyncTimer)
   if (toastTimer) clearTimeout(toastTimer)
+  cleanupExportSubmitFx()
   if (noticeResizeObserver) {
     noticeResizeObserver.disconnect()
     noticeResizeObserver = null
@@ -11531,7 +12047,7 @@ const hasSale = computed(() =>
   --sa-border-green: rgba(52, 211, 153, 0.28);
   --sa-accent: #10b981;
   --sa-accent-hover: #0ea472;
-  --sa-on-accent: #0b1724;
+  --sa-on-accent: #ffffff;
   --sa-price: #34d399;
   --sa-sale: #fb7185;
   --sa-qty-bg: #1c2536;
@@ -13393,9 +13909,10 @@ const hasSale = computed(() =>
 .mobile-checkscam-group {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  padding-bottom: 12px;
-  margin-bottom: 12px;
+  gap: 8px;
+  margin-top: 4px;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
   border-bottom: 1px dashed var(--sa-border-strong);
 }
 
@@ -15194,8 +15711,10 @@ const hasSale = computed(() =>
 
   .dp-hero-frame {
     position: relative;
+    isolation: isolate;
     border-radius: 20px;
-    background: var(--sa-img-bg);
+    background: linear-gradient(135deg, var(--sa-surface-soft) 0%, var(--sa-img-bg) 52%, var(--sa-surface-2) 100%);
+    border: 1px solid var(--sa-border);
     height: clamp(360px, 46vh, 430px);
     width: 100%;
     padding: 18px;
@@ -15206,12 +15725,24 @@ const hasSale = computed(() =>
   }
 
   .dp-hero-frame .modal-img {
-    width: 100%;
-    height: 100%;
-    max-height: none;
+    position: relative;
+    z-index: 2;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
     object-fit: contain;
-    border-radius: 12px;
+    border-radius: 14px;
+    box-shadow:
+      0 10px 28px rgba(15, 23, 42, 0.18),
+      0 2px 6px rgba(15, 23, 42, 0.08);
     transition: transform 0.28s ease;
+  }
+
+  .sa-storefront.theme-dark .dp-hero-frame .modal-img {
+    box-shadow:
+      0 12px 32px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.1);
   }
 
   .dp-hero-frame .modal-img:hover {
@@ -17236,12 +17767,14 @@ const hasSale = computed(() =>
   transition: none !important;
 }
 
-/* ===== CARD IMAGE ===== */
+/* ===== CARD IMAGE (AMBIENT FROSTED GLASS STAGE) ===== */
 .card-img-wrap {
   width: 100%;
   aspect-ratio: 4 / 3;
-  background: var(--sa-img-bg);
+  padding: 9px;
+  background: linear-gradient(135deg, var(--sa-surface-soft) 0%, var(--sa-img-bg) 52%, var(--sa-surface-2) 100%);
   position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -17250,23 +17783,110 @@ const hasSale = computed(() =>
   transition: background-color 0.22s ease;
 }
 
-.card-img-wrap::after {
-  display: none;
+/* Layer 1: Ambient blurred color glow reflected from the dish photo itself */
+.card-img-wrap.has-ambient::before,
+.dp-hero-frame.has-ambient::before,
+.dp-mob-hero.has-ambient::before {
+  content: '';
+  position: absolute;
+  inset: -12%;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--sa-ambient-img);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(13px) saturate(1.32);
+  transform: scale(1.08);
+  opacity: 0.62;
+  transition: opacity 0.28s ease, transform 0.35s ease;
 }
 
+.sa-storefront.theme-dark .card-img-wrap.has-ambient::before,
+.sa-storefront.theme-dark .dp-hero-frame.has-ambient::before,
+.sa-storefront.theme-dark .dp-mob-hero.has-ambient::before {
+  opacity: 0.5;
+  filter: blur(15px) saturate(1.38) brightness(0.82);
+}
+
+/* Layer 2: Frosted crystal glass sheen & specular inner border */
+.card-img-wrap::after,
+.dp-hero-frame::after,
+.dp-mob-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.68) 0%, transparent 54%),
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.48) 0%,
+      rgba(255, 255, 255, 0.16) 50%,
+      rgba(255, 255, 255, 0.36) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    inset 0 -1px 0 rgba(15, 23, 42, 0.05);
+}
+
+.sa-storefront.theme-dark .card-img-wrap::after,
+.sa-storefront.theme-dark .dp-hero-frame::after,
+.sa-storefront.theme-dark .dp-mob-hero::after {
+  background:
+    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.14) 0%, transparent 50%),
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(15, 23, 42, 0.28) 52%,
+      rgba(15, 23, 42, 0.48) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.34);
+}
+
+/* Layer 3: Crisp dish image floating above frosted glass */
 .card-img-wrap img {
-  width: 100%;
-  height: 100%;
+  position: relative;
+  z-index: 2;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
-  padding: 10px;
-  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 0;
+  border-radius: 10px;
+  box-shadow:
+    0 6px 18px rgba(15, 23, 42, 0.14),
+    0 1px 3px rgba(15, 23, 42, 0.08);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s ease;
+}
+
+.sa-storefront.theme-dark .card-img-wrap img {
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.44),
+    0 0 0 1px rgba(255, 255, 255, 0.09);
 }
 
 .card:hover .card-img-wrap img {
-  transform: scale(1.04);
+  transform: scale(1.045);
+}
+
+.card:hover .card-img-wrap.has-ambient::before {
+  transform: scale(1.14);
+  opacity: 0.72;
+}
+
+.sa-storefront.theme-dark .card:hover .card-img-wrap.has-ambient::before {
+  opacity: 0.58;
 }
 
 .card-img-name-fallback {
+  position: relative;
+  z-index: 2;
   width: 100%;
   height: 100%;
   padding: 28px 12px 14px;
@@ -17274,6 +17894,7 @@ const hasSale = computed(() =>
   align-items: center;
   justify-content: center;
   text-align: center;
+  border-radius: 10px;
   background: linear-gradient(145deg, var(--sa-img-bg) 0%, var(--sa-surface-2) 100%);
 }
 
@@ -17939,28 +18560,61 @@ const hasSale = computed(() =>
   }
 
   .mobile-sheet-backdrop.is-cart {
-    z-index: 998;
+    z-index: 2098;
   }
 
   .mobile-sheet-backdrop.is-detail {
     z-index: 1998;
   }
 
-  .modal-overlay:not(.image-modal):not(.full-cart-overlay) {
+  .modal-overlay:not(.image-modal):not(.full-cart-overlay):not(.export-modal-overlay):not(.is-center-dialog) {
     align-items: flex-end;
     justify-content: center;
-    padding: calc(48px + env(safe-area-inset-top, 0px)) 0 0;
+    padding: max(56px, calc(env(safe-area-inset-top, 0px) + 16px)) 0 0;
+  }
+
+  .modal-overlay.is-center-dialog {
+    align-items: center;
+    justify-content: center;
+    padding:
+      max(56px, calc(env(safe-area-inset-top, 0px) + 16px))
+      16px
+      max(24px, calc(env(safe-area-inset-bottom, 0px) + 16px));
+  }
+
+  .modal-overlay.is-center-dialog .modal-card {
+    width: min(100%, 420px) !important;
+    max-width: 100% !important;
+    max-height: calc(
+      100dvh
+      - max(56px, calc(env(safe-area-inset-top, 0px) + 16px))
+      - max(24px, calc(env(safe-area-inset-bottom, 0px) + 16px))
+    ) !important;
+    border-radius: 22px !important;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .modal-overlay.image-modal {
-    padding: calc(48px + env(safe-area-inset-top, 0px)) 12px calc(16px + env(safe-area-inset-bottom, 0px));
+    padding:
+      max(56px, calc(env(safe-area-inset-top, 0px) + 16px))
+      12px
+      max(24px, calc(env(safe-area-inset-bottom, 0px) + 16px));
   }
 
-  .modal-overlay:not(.image-modal):not(.full-cart-overlay) .modal-card {
+  .modal-overlay.image-modal .image-modal-card {
+    max-height: calc(
+      100dvh
+      - max(56px, calc(env(safe-area-inset-top, 0px) + 16px))
+      - max(24px, calc(env(safe-area-inset-bottom, 0px) + 16px))
+    );
+  }
+
+  .modal-overlay:not(.image-modal):not(.full-cart-overlay):not(.export-modal-overlay):not(.is-center-dialog) .modal-card {
     position: relative;
     width: 100% !important;
     max-width: 100% !important;
-    max-height: 100% !important; /* chừa khoảng trống phía trên kiểu Grab */
+    max-height: 100% !important;
     border-radius: 22px 22px 0 0 !important;
     padding-top: 22px;
     padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
@@ -17971,7 +18625,7 @@ const hasSale = computed(() =>
     box-shadow: 0 -10px 36px rgba(15, 23, 42, 0.28);
   }
 
-  .modal-overlay:not(.image-modal):not(.full-cart-overlay) .modal-card::before {
+  .modal-overlay:not(.image-modal):not(.full-cart-overlay):not(.export-modal-overlay):not(.is-center-dialog) .modal-card::before {
     content: '';
     position: absolute;
     top: 8px;
@@ -18124,124 +18778,106 @@ const hasSale = computed(() =>
   }
 
   .modal-card .modal-categories .cat.active .cat-label {
-    color: var(--sa-secondary-soft);
+    color: #ffffff;
   }
 
   .modal-card .modal-categories .cat.sale .cat-label {
     color: #ffffff;
   }
   
- /* header modal */
+  /* === HEADER (TIÊU ĐỀ BOTTOM SHEET) === */
   .modal-card .export-title {
-    background: linear-gradient(
-      135deg,
-      var(--sa-primary-bright),
-      var(--sa-primary-bright)
-    );
-
-    color: #ffffff;
+    background: transparent;
+    color: var(--sa-primary-bright);
     font-weight: 900;
-
-    padding: 14px 16px;
-    margin: -14px -14px 10px -14px; /* ăn sát viền modal */
-
-    border-top-left-radius: 16px;
-    border-top-right-radius: 16px;
-
+    padding: 4px 38px 12px;
+    margin: 0 0 12px 0;
+    border-radius: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-
-    position: relative;
+    border-bottom: 1px solid var(--sa-border);
   }
 
-  /* nút đóng (X) nổi trên nền xanh */
-  .modal-card .modal-close {
-    top: 10px;
-    right: 10px;
-
-    background: rgba(255, 255, 255, 0.25);
-    color: #ffffff;
-
-    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  .sa-storefront.theme-dark .modal-card .export-title {
+    color: var(--sa-primary-light);
   }
 
-  .modal-card .modal-close:hover {
-    background: rgba(255, 255, 255, 0.4);
-  }
-   /* === HEADER (TIÊU ĐỀ) === */
-  .modal-card .export-title {
-    background: #ffffff;
-    color: var(--sa-primary-bright); /* xanh lá */
-
-    font-weight: 900;
-    padding: 14px 16px;
-
-    margin: -14px -14px 0 -14px; /* ăn sát viền trên */
-    border-top-left-radius: 16px;
-    border-top-right-radius: 16px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    border-bottom: 2px solid var(--sa-primary-bright);
-  }
-
-  /* header ch?n danh m?c: ch? xanh ?m, d?m */
+  /* header chọn danh mục: chữ xanh đậm */
   .modal-card .export-title.category-modal-title {
     color: var(--sa-primary-dark);
     font-weight: 900;
   }
 
-  /* nút đóng (X) */
-  .modal-card .modal-close {
-    background: var(--sa-primary-bright);
-    color: #ffffff;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  .sa-storefront.theme-dark .modal-card .export-title.category-modal-title {
+    color: var(--sa-heading);
   }
 
-  /* === PHẦN CONTENT (NỀN XANH) === */
+  /* nút đóng (X) */
+  .modal-card .modal-close {
+    top: 16px;
+    right: 14px;
+    background: var(--sa-primary-bright);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  /* === BOTTOM SHEET THÔNG TIN HỖ TRỢ (MOBILE) === */
+  .modal-card.contact-support-sheet {
+    padding: 22px 16px calc(20px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .modal-card.contact-support-sheet .export-title {
+    margin: 2px 0 16px 0;
+    padding: 2px 40px 12px;
+    font-size: 16.5px;
+    letter-spacing: 0.02em;
+    border-bottom: 1px solid var(--sa-border);
+  }
+
+  .modal-card.contact-support-sheet .mobile-checkscam-group {
+    margin-top: 0;
+    margin-bottom: 14px;
+    padding: 0 0 14px;
+    gap: 8px;
+  }
+
+  /* === PHẦN CONTENT LIÊN HỆ (NỀN XANH THƯƠNG HIỆU, BO GỌN) === */
   .modal-card .shop-contact {
-    background: linear-gradient(
-      135deg,
-      var(--sa-primary-bright),
-      var(--sa-primary-bright)
-    );
-
-    padding: 16px 12px;
-    margin: 0 -14px -14px -14px; /* ăn sát viền modal */
-
-    border-bottom-left-radius: 16px;
-    border-bottom-right-radius: 16px;
+    background: var(--sa-top-header-bg);
+    padding: 14px 12px;
+    margin: 0;
+    border-radius: 16px;
+    box-shadow: 0 8px 22px rgba(var(--sa-primary-rgb), 0.18);
   }
 
   /* từng item liên hệ */
   .modal-card .shop-contact .contact-item {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.13);
+    border: 1px solid rgba(255, 255, 255, 0.16);
     border-radius: 14px;
     padding: 10px 12px;
     margin-bottom: 10px;
-
     display: flex;
     align-items: center;
     gap: 12px;
   }
 
+  .modal-card .shop-contact .contact-item:last-child {
+    margin-bottom: 0;
+  }
+
   /* text */
   .modal-card .shop-contact .contact-name {
-    color: var(--sa-secondary-light); /* vàng nhạt nổi */
+    color: var(--sa-secondary-light);
     font-weight: 900;
   }
 
   .modal-card .shop-contact .contact-desc {
-    color: rgba(255,255,255,0.9);
+    color: rgba(255, 255, 255, 0.9);
     font-size: 12px;
     font-style: italic;
   }
-  .modal-card .shop-contact .contact-item {
-  animation: pulse 1.2s ease infinite;
-}
 
 @keyframes pulse {
   0% { transform: scale(1); }
@@ -18468,7 +19104,13 @@ const hasSale = computed(() =>
 }
 
 .detail-image-main::after {
-  display: none;
+  /* Overridden by .dp-mob-hero::after ambient glass layer */
+}
+
+.dp-zoom-pill,
+.dp-nav-btn,
+.discount-tag {
+  z-index: 3;
 }
 
 /* ================= MOBILE CART BAR ================= */
@@ -19211,8 +19853,9 @@ const hasSale = computed(() =>
   }
 
   .detail-header.dp-mob-header {
-    height: calc(54px + env(safe-area-inset-top, 0px));
-    padding: env(safe-area-inset-top, 0px) 10px 0;
+    height: auto;
+    min-height: calc(48px + max(52px, calc(env(safe-area-inset-top, 0px) + 8px)));
+    padding: max(52px, calc(env(safe-area-inset-top, 0px) + 8px)) 12px 12px;
     background: var(--sa-top-header-bg);
     color: #ffffff;
     border-bottom: 1px solid rgba(255, 255, 255, 0.14);
@@ -19269,18 +19912,37 @@ const hasSale = computed(() =>
 
   .dp-mob-hero {
     position: relative;
+    isolation: isolate;
     border-radius: 16px;
-    background: var(--sa-img-bg);
+    background: linear-gradient(135deg, var(--sa-surface-soft) 0%, var(--sa-img-bg) 52%, var(--sa-surface-2) 100%);
+    border: 1px solid var(--sa-border);
     padding: 10px;
     overflow: hidden;
   }
 
   .detail-img {
-    width: 100%;
-    height: 260px;
-    max-height: 300px;
+    position: relative;
+    z-index: 2;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 260px;
     object-fit: contain;
     display: block;
+    border-radius: 12px;
+    box-shadow:
+      0 8px 22px rgba(15, 23, 42, 0.16),
+      0 1px 4px rgba(15, 23, 42, 0.08);
+  }
+
+  .sa-storefront.theme-dark .detail-img {
+    box-shadow:
+      0 10px 26px rgba(0, 0, 0, 0.46),
+      0 0 0 1px rgba(255, 255, 255, 0.1);
+  }
+
+  .card-img-wrap {
+    padding: 7px;
   }
 
   .dp-mob-thumbs {
@@ -19346,7 +20008,7 @@ const hasSale = computed(() =>
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
-    padding: 10px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    padding: 10px 16px calc(14px + env(safe-area-inset-bottom, 0px));
     background: var(--sa-bottom-bar-bg);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
@@ -20431,7 +21093,8 @@ const hasSale = computed(() =>
   margin-top: 2px;
   font-size: 11px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
+  color: inherit;
+  opacity: 0.88;
 }
 
 .ck-info {
@@ -21728,6 +22391,398 @@ const hasSale = computed(() =>
   line-height: 1.55;
 }
 
+.dth-blog-link {
+  text-decoration: none;
+}
+
+.seo-box-links {
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+}
+
+.seo-box-blog-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--sa-border);
+  background: var(--sa-bg-soft, var(--sa-bg));
+  color: var(--sa-accent);
+  font-size: 12.5px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.seo-box-blog-link:hover {
+  transform: translateY(-1px);
+  border-color: var(--sa-accent);
+}
+
+/* ===== PC WEBSITE FOOTER (3-COLUMN CLEAN WEB FOOTER) ===== */
+.pc-web-footer {
+  margin: 34px 0 10px;
+  padding: 26px 28px 18px;
+  border-radius: var(--sa-radius-panel, 16px);
+  background: var(--sa-surface);
+  border: 1px solid var(--sa-border);
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
+}
+
+.pwf-grid {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr 1.05fr;
+  gap: 28px;
+  align-items: start;
+}
+
+.pwf-col {
+  min-width: 0;
+}
+
+.pwf-brand-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.pwf-logo {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid var(--sa-border);
+  flex-shrink: 0;
+}
+
+.pwf-brand-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sa-storefront .pwf-brand-name,
+.pwf-brand-name {
+  font-size: 16.5px;
+  font-weight: 800;
+  color: var(--sa-heading);
+  line-height: 1.2;
+}
+
+.pwf-open-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--sa-surface-soft);
+  color: var(--sa-accent);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.pwf-seo-h1 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--sa-heading);
+  line-height: 1.45;
+}
+
+.pwf-seo-intro {
+  margin: 0 0 12px;
+  font-size: 12.8px;
+  color: var(--sa-muted);
+  line-height: 1.6;
+}
+
+.pwf-location-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 11px;
+  background: var(--sa-surface-2);
+  border: 1px solid var(--sa-border);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.pwf-loc-ico {
+  color: var(--sa-accent);
+  font-size: 16px;
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+
+.pwf-loc-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  color: var(--sa-text);
+}
+
+.sa-storefront .pwf-loc-label {
+  font-weight: 700;
+  color: var(--sa-heading);
+}
+
+.pwf-map-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+  color: var(--sa-accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.pwf-map-link:hover {
+  text-decoration: underline;
+}
+
+.sa-storefront .pwf-col-title,
+.pwf-col-title {
+  display: block;
+  margin-bottom: 11px;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.45px;
+  color: var(--sa-heading);
+}
+
+.pwf-nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pwf-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 0;
+  border: none;
+  background: transparent;
+  color: var(--sa-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.pwf-nav-link i {
+  font-size: 15px;
+  color: var(--sa-muted);
+  transition: color 0.15s ease;
+}
+
+.pwf-nav-link.is-highlight,
+.pwf-nav-link.is-highlight i {
+  color: var(--sa-accent);
+  font-weight: 700;
+}
+
+.pwf-nav-link:hover {
+  color: var(--sa-accent);
+  transform: translateX(2px);
+}
+
+.pwf-nav-link:hover i {
+  color: var(--sa-accent);
+}
+
+.pwf-safety-block {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--sa-border);
+}
+
+.sa-storefront .pwf-safety-title {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--sa-muted);
+  margin-bottom: 7px;
+}
+
+.pwf-safety-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.pwf-safety-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--sa-muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.pwf-safety-link i {
+  font-size: 13.5px;
+}
+
+.pwf-safety-link:hover {
+  color: var(--sa-accent);
+  text-decoration: underline;
+}
+
+.pwf-contact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pwf-contact-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 11px;
+  background: var(--sa-surface-2);
+  border: 1px solid var(--sa-border);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.pwf-contact-item.is-clickable:hover {
+  border-color: var(--sa-accent);
+  transform: translateY(-1px);
+}
+
+.pwf-contact-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.pwf-contact-avatar.is-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sa-surface-soft);
+  color: var(--sa-accent);
+  font-size: 16px;
+}
+
+.pwf-contact-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.pwf-contact-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sa-storefront .pwf-contact-name,
+.pwf-contact-name {
+  font-size: 12.8px;
+  font-weight: 700;
+  color: var(--sa-heading);
+}
+
+.sa-storefront .pwf-msg-pill {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--sa-accent);
+  color: var(--sa-on-accent, #ffffff);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.pwf-contact-sub {
+  font-size: 11.8px;
+  color: var(--sa-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pwf-contact-ext {
+  font-size: 14px;
+  color: var(--sa-muted);
+  flex-shrink: 0;
+}
+
+.pwf-contact-empty {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--sa-muted);
+}
+
+.pwf-bottom {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--sa-border);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--sa-muted);
+}
+
+.pwf-copyright strong {
+  color: var(--sa-heading);
+  font-weight: 700;
+}
+
+.pwf-top-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--sa-border);
+  background: var(--sa-surface-2);
+  color: var(--sa-heading);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.pwf-top-btn:hover {
+  border-color: var(--sa-accent);
+  color: var(--sa-accent);
+}
+
+@media (max-width: 1100px) {
+  .pwf-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .pwf-brand-col {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 768px) {
   .storefront-seo-box {
     margin: 16px 0 10px;
@@ -22446,14 +23501,19 @@ const hasSale = computed(() =>
 
 @media (max-width: 768px) {
   .sidebar-right {
-    top: var(--sa-mob-sheet-top, calc(48px + env(safe-area-inset-top, 0px))) !important;
+    top: 0 !important;
     right: 0 !important;
-    left: auto !important;
-    bottom: calc(66px + env(safe-area-inset-bottom, 0px)) !important;
-    height: auto !important;
-    border-radius: 20px 20px 0 0;
-    box-shadow: 0 -10px 36px rgba(15, 23, 42, 0.24);
+    left: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
     overflow: hidden !important;
+    z-index: 2100 !important;
+    background: var(--sa-bg);
   }
 
   .sidebar-right .cart-box {
@@ -22461,7 +23521,69 @@ const hasSale = computed(() =>
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    padding: 14px 14px 12px !important;
+    padding: 0 !important;
+    background: var(--sa-bg);
+  }
+
+  .sidebar-right .cart-header-zone {
+    padding: max(52px, calc(env(safe-area-inset-top, 0px) + 8px)) 14px 12px;
+    background: var(--sa-top-header-bg);
+    color: #ffffff;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 4px 14px rgba(var(--sa-primary-rgb), 0.18);
+  }
+
+  .sidebar-right .cart-top-header {
+    margin-bottom: 0;
+    min-height: 36px;
+  }
+
+  .sidebar-right .cart-mob-back-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    padding: 0;
+    margin-right: 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .sidebar-right .cart-mob-back-btn i {
+    color: #ffffff;
+    font-size: 18px;
+  }
+
+  .sidebar-right .cart-top-title,
+  .sidebar-right .cart-top-title span:not(.order-count) {
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 800;
+  }
+
+  .sidebar-right .cart-top-title .order-count {
+    color: rgba(255, 255, 255, 0.85);
+    font-weight: 700;
+  }
+
+  .sidebar-right .cart-hdr-icon-btn.close {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    color: #ffffff;
+    font-size: 18px;
+  }
+
+  .sidebar-right .cart-live-status-notice {
+    margin: 12px 14px 0;
   }
 
   .cart-scroll-area {
@@ -22469,9 +23591,17 @@ const hasSale = computed(() =>
     min-height: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding-right: 2px;
+    padding: 12px 14px 14px;
     display: flex;
     flex-direction: column;
+  }
+
+  .sidebar-right .cart-sticky-footer {
+    margin-top: 0;
+    padding: 10px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+    background: var(--sa-surface);
+    border-top: 1px solid var(--sa-border);
+    box-shadow: 0 -6px 18px rgba(15, 23, 42, 0.08);
   }
 }
 
@@ -23700,26 +24830,30 @@ const hasSale = computed(() =>
 /* RESPONSIVE FULL CHECKOUT MODAL ON MOBILE / SMALL TABLETS */
 @media (max-width: 860px) {
   .modal-overlay.full-cart-overlay {
-    align-items: flex-end !important;
+    align-items: stretch !important;
     justify-content: center !important;
-    padding: var(--sa-mob-sheet-top, calc(48px + env(safe-area-inset-top, 0px))) 0 0 !important;
-    background: rgba(15, 23, 42, 0.52) !important;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    padding: 0 !important;
+    inset: 0;
+    background: var(--sa-bg) !important;
   }
 
   .modal-card.full-checkout-modal {
     width: 100vw !important;
     max-width: 100vw !important;
-    height: 100% !important;
-    max-height: 100% !important;
-    border-radius: 20px 20px 0 0 !important;
-    box-shadow: 0 -10px 36px rgba(15, 23, 42, 0.28) !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
   }
 
   .fcm-header {
-    padding: 12px 14px;
-    border-radius: 20px 20px 0 0;
+    padding: max(52px, calc(env(safe-area-inset-top, 0px) + 8px)) 14px 12px;
+    background: var(--sa-top-header-bg);
+    color: #ffffff;
+    border-radius: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 4px 14px rgba(var(--sa-primary-rgb), 0.18);
   }
 
   .fcm-header.is-mobile-header {
@@ -23727,30 +24861,65 @@ const hasSale = computed(() =>
     flex-direction: column;
     align-items: stretch;
     gap: 8px;
-    padding: 12px 14px 10px;
+    padding: max(52px, calc(env(safe-area-inset-top, 0px) + 8px)) 14px 12px;
+    background: var(--sa-top-header-bg);
+    color: #ffffff;
+    border-radius: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.14);
   }
 
   .fcm-header.is-mobile-header .fcm-header-left {
     padding-right: 42px;
     flex-wrap: nowrap;
     gap: 8px;
+    min-height: 34px;
   }
 
   .fcm-header.is-mobile-header .fcm-back-menu-btn {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     padding: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    color: #ffffff;
     justify-content: center;
     flex-shrink: 0;
   }
 
+  .fcm-header.is-mobile-header .fcm-back-menu-btn span {
+    display: none;
+  }
+
+  .fcm-header.is-mobile-header .fcm-title-wrap,
+  .fcm-header.is-mobile-header .fcm-title-wrap i {
+    color: #ffffff;
+  }
+
+  .fcm-header.is-mobile-header .fcm-count-pill {
+    background: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: #ffffff;
+  }
+
   .fcm-header.is-mobile-header .fcm-close-btn {
     position: absolute;
-    top: 10px;
-    right: 12px;
-    width: 32px;
-    height: 32px;
+    top: max(52px, calc(env(safe-area-inset-top, 0px) + 8px));
+    right: 14px;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    color: #ffffff;
     z-index: 2;
+  }
+
+  .fcm-header.is-mobile-header .fcm-live-pill,
+  .fcm-header.is-mobile-header .fcm-created-pill {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.28);
+    color: #ffffff;
   }
 
   .fcm-header.is-mobile-header .fcm-header-right {
@@ -23984,6 +25153,184 @@ const hasSale = computed(() =>
   color: var(--sa-text);
 }
 
+/* ===== UNIFIED LIGHT/DARK CONTRAST FIXES (CATEGORIES, TRACKERS, STATUSES, MODALS) ===== */
+.qty-note-box {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.qty-note-box-last {
+  margin-bottom: 12px;
+}
+
+.qty-note-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--sa-muted);
+}
+
+.qty-note-input {
+  width: 100%;
+  border: 1px solid var(--sa-input-border);
+  background: var(--sa-input-bg);
+  color: var(--sa-heading);
+  border-radius: 9px;
+  padding: 8px 10px;
+  outline: none;
+  font-family: inherit;
+  font-size: 14px;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.qty-note-input:focus {
+  border-color: var(--sa-accent);
+  box-shadow: 0 0 0 3px rgba(var(--sa-primary-rgb), 0.14);
+}
+
+.sa-storefront.theme-dark .modal-card .categories,
+.sa-storefront.theme-dark .modal-card .modal-categories,
+.sa-storefront.theme-dark .sidebar-left .categories {
+  background: var(--sa-surface-2);
+  border-color: var(--sa-border-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.sa-storefront.theme-dark .sidebar-left .categories h4,
+.sa-storefront.theme-dark .category-modal-title {
+  color: var(--sa-heading);
+}
+
+.sa-storefront.theme-dark .modal-card .modal-categories .cat:not(.active):not(.sale),
+.sa-storefront.theme-dark .sidebar-left .categories .cat:not(.active):not(.sale) {
+  background: var(--sa-surface);
+  color: var(--sa-heading);
+  border-color: var(--sa-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.26);
+}
+
+.sa-storefront.theme-dark .sidebar-left .categories .cat:not(.active):not(.sale):hover {
+  background: var(--sa-pill-hover);
+  border-color: var(--sa-border-green);
+}
+
+.sa-storefront.theme-dark .modal-card .modal-categories .cat:not(.active):not(.sale) .cat-label {
+  color: var(--sa-heading);
+}
+
+.sa-storefront.theme-dark .mcb-promo-text,
+.sa-storefront.theme-dark .mcb-promo-text i {
+  color: var(--sa-primary-light);
+}
+
+.sa-storefront.theme-dark .mcb-tracker-pill.is-pending .mcb-tracker-ico {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+}
+
+.sa-storefront.theme-dark .mcb-tracker-pill.is-approved .mcb-tracker-ico {
+  background: rgba(var(--sa-primary-bright-rgb), 0.18);
+  color: var(--sa-primary-light);
+}
+
+.sa-storefront.theme-dark .mcb-edit-btn.has-added-badge {
+  border-color: rgba(248, 113, 113, 0.48);
+  color: #f87171;
+}
+
+.sa-storefront.theme-dark .cart-live-status-notice .clsn-icon {
+  color: var(--sa-primary-light);
+  background: rgba(var(--sa-primary-bright-rgb), 0.18);
+}
+
+.sa-storefront.theme-dark .cart-live-status-notice.is-pending {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(251, 191, 36, 0.36);
+}
+
+.sa-storefront.theme-dark .cart-live-status-notice.is-pending .clsn-icon {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+
+.sa-storefront.theme-dark .cart-live-status-notice.is-pending .clsn-title {
+  color: #fbbf24;
+}
+
+.sa-storefront.theme-dark .cart-live-status-notice.is-shipping {
+  background: rgba(99, 102, 241, 0.16);
+  border-color: rgba(129, 140, 248, 0.4);
+}
+
+.sa-storefront.theme-dark .cart-live-status-notice.is-shipping .clsn-icon {
+  background: rgba(99, 102, 241, 0.24);
+  color: #a5b4fc;
+}
+
+.sa-storefront.theme-dark .cart-live-status-notice.is-shipping .clsn-title {
+  color: #a5b4fc;
+}
+
+.sa-storefront.theme-dark .cart-live-status-notice.is-completed .clsn-icon,
+.sa-storefront.theme-dark .cart-live-status-notice.is-completed .clsn-title {
+  color: var(--sa-primary-light);
+}
+
+.sa-storefront.theme-dark .cart-live-status-notice.is-cancelled {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(248, 113, 113, 0.38);
+}
+
+.sa-storefront.theme-dark .cart-live-status-notice.is-cancelled .clsn-icon,
+.sa-storefront.theme-dark .cart-live-status-notice.is-cancelled .clsn-title {
+  color: #fca5a5;
+}
+
+.sa-storefront.theme-dark .order-status-btn.is-pending .osb-left,
+.sa-storefront.theme-dark .order-status-btn.is-pending .osb-right {
+  color: #fbbf24;
+}
+
+.sa-storefront.theme-dark .order-status-btn.is-approved .osb-left,
+.sa-storefront.theme-dark .order-status-btn.is-approved .osb-right {
+  color: var(--sa-primary-light);
+}
+
+.sa-storefront.theme-dark .delivery-accordion.missing .da-ico {
+  color: var(--sa-secondary-mid);
+}
+
+.sa-storefront.theme-dark .ugm-icon-badge:not(.danger),
+.sa-storefront.theme-dark .epo-icon-badge {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+}
+
+.sa-storefront.theme-dark .ugm-icon-badge.danger {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(248, 113, 113, 0.38);
+  color: #fca5a5;
+}
+
+.sa-storefront.theme-dark .epo-btn.is-cancel {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(248, 113, 113, 0.45);
+  color: #fca5a5;
+}
+
+.sa-storefront.theme-dark .lang-switch-btn {
+  background: var(--sa-surface);
+  color: var(--sa-primary-light);
+  border-color: var(--sa-border-green);
+}
+
+.sa-storefront.theme-dark .cart-member-group .cm-summary {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+}
+
 /* =========================================================
    MILESTONE FREESHIP & GIFT PROGRESS PROMOTION CARDS
    ========================================================= */
@@ -24148,6 +25495,20 @@ const hasSale = computed(() =>
 
 .sa-storefront.theme-dark .mpc-progress-track {
   background: rgba(148, 163, 184, 0.2);
+}
+
+.sa-storefront.theme-dark .mpc-chip:not(.unlocked) {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: var(--sa-text);
+}
+
+.sa-storefront.theme-dark .mpc-chip:not(.unlocked) i {
+  color: var(--sa-primary-light);
+}
+
+.sa-storefront.theme-dark .mpc-chip:not(.unlocked) .mpc-chip-reward {
+  color: var(--sa-heading);
 }
 
 .sa-storefront.theme-dark .mpc-chip {
@@ -26888,34 +28249,100 @@ const hasSale = computed(() =>
   font-size: 15px;
 }
 
+.exm-body-scroll {
+  display: contents;
+}
+
 @media (max-width: 860px) {
   .modal-overlay.export-modal-overlay {
-    align-items: flex-end !important;
+    align-items: stretch !important;
     justify-content: center !important;
-    padding: var(--sa-mob-sheet-top, calc(48px + env(safe-area-inset-top, 0px))) 0 0 !important;
+    padding: 0 !important;
+    inset: 0;
+    background: var(--sa-bg) !important;
   }
 
   .modal-overlay.export-modal-overlay .modal-card.export-modal {
-    width: 100% !important;
-    max-width: 100% !important;
-    height: 100% !important;
-    max-height: 100% !important;
-    padding: 24px 16px calc(18px + env(safe-area-inset-bottom, 0px));
-    border-radius: 22px 22px 0 0 !important;
-    gap: 11px;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    border: none !important;
+    background: var(--sa-bg);
+    gap: 0;
     overflow: hidden;
+    box-shadow: none !important;
+  }
+
+  .modal-card.export-modal .exm-header {
+    padding: max(52px, calc(env(safe-area-inset-top, 0px) + 8px)) 52px 12px 14px;
+    background: var(--sa-top-header-bg);
+    color: #ffffff;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 4px 14px rgba(var(--sa-primary-rgb), 0.18);
+    gap: 10px;
+  }
+
+  .modal-card.export-modal .exm-mob-back-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    cursor: pointer;
+    flex-shrink: 0;
   }
 
   .modal-card.export-modal .exm-close-btn {
-    top: 14px;
+    top: max(52px, calc(env(safe-area-inset-top, 0px) + 8px));
     right: 14px;
     width: 34px;
     height: 34px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    color: #ffffff;
     font-size: 18px;
+    z-index: 3;
   }
 
   .modal-card.export-modal .exm-title {
-    font-size: 18px;
+    font-size: 16.5px;
+    color: #ffffff;
+  }
+
+  .modal-card.export-modal .exm-code-pill {
+    background: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: #ffffff;
+  }
+
+  .modal-card.export-modal .exm-subtitle {
+    color: rgba(255, 255, 255, 0.84);
+    font-size: 12px;
+  }
+
+  .modal-card.export-modal .exm-body-scroll {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px 14px calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .modal-card.export-modal .exm-body-scroll:has(+ .exm-send-section) {
+    padding-bottom: 12px;
   }
 
   .modal-card.export-modal .exm-textarea {
@@ -26929,6 +28356,13 @@ const hasSale = computed(() =>
 
   .modal-card.export-modal .exm-saved-pill {
     margin-left: 0;
+  }
+
+  .modal-card.export-modal .exm-send-section {
+    padding: 12px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+    background: var(--sa-surface);
+    border-top: 1px solid var(--sa-border);
+    box-shadow: 0 -6px 18px rgba(15, 23, 42, 0.08);
   }
 }
 
@@ -27000,32 +28434,35 @@ const hasSale = computed(() =>
    MOBILE DEDICATED ORDER PROGRESS SHEET (.mob-progress-sheet)
    ========================================================= */
 .mobile-sheet-backdrop.is-progress {
-  z-index: 1004;
+  z-index: 2148;
 }
 
 .mob-progress-sheet {
   position: fixed;
-  top: calc(48px + env(safe-area-inset-top, 0px));
-  left: 0;
-  right: 0;
-  bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
   background: var(--sa-bg);
   color: var(--sa-text);
-  border-radius: 20px 20px 0 0;
-  box-shadow: 0 -10px 36px rgba(15, 23, 42, 0.28);
+  border-radius: 0;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  z-index: 1005;
+  z-index: 2150;
 }
 
 .mps-header {
   flex-shrink: 0;
-  height: 54px;
-  padding: 0 12px;
-  background: var(--sa-surface);
-  border-bottom: 1px solid var(--sa-border);
-  border-radius: 20px 20px 0 0;
+  height: auto;
+  min-height: calc(48px + max(52px, calc(env(safe-area-inset-top, 0px) + 8px)));
+  padding: max(52px, calc(env(safe-area-inset-top, 0px) + 8px)) 14px 12px;
+  background: var(--sa-top-header-bg);
+  color: #ffffff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 4px 14px rgba(var(--sa-primary-rgb), 0.18);
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -27036,10 +28473,10 @@ const hasSale = computed(() =>
 .mps-close-btn {
   width: 34px;
   height: 34px;
-  border-radius: 50%;
-  border: 1px solid var(--sa-border);
-  background: var(--sa-surface-2);
-  color: var(--sa-heading);
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -27058,9 +28495,9 @@ const hasSale = computed(() =>
 }
 
 .mps-title {
-  font-size: 15px;
+  font-size: 15.5px;
   font-weight: 800;
-  color: var(--sa-heading);
+  color: #ffffff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -27069,9 +28506,9 @@ const hasSale = computed(() =>
 .mps-code-pill {
   font-size: 11px;
   font-weight: 800;
-  color: var(--sa-accent);
-  background: var(--sa-surface-soft);
-  border: 1px solid var(--sa-border-green);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 999px;
   padding: 2px 8px;
   white-space: nowrap;
@@ -27083,10 +28520,22 @@ const hasSale = computed(() =>
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 12px 12px 24px;
+  padding: 12px 12px calc(20px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.mps-scroll-body:has(+ .mps-footer) {
+  padding-bottom: 16px;
+}
+
+.mps-footer {
+  flex-shrink: 0;
+  padding: 12px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: var(--sa-surface);
+  border-top: 1px solid var(--sa-border);
+  box-shadow: 0 -6px 18px rgba(15, 23, 42, 0.08);
 }
 
 .mps-progress-section {
@@ -27518,8 +28967,14 @@ const hasSale = computed(() =>
   justify-content: space-between;
   font-size: 12px;
   font-weight: 700;
-  color: #f87171;
+  color: #dc2626;
   padding-bottom: 4px;
+}
+
+.sa-storefront.theme-dark .cart-discount-row,
+.sa-storefront.theme-dark .mps-discount-row,
+.sa-storefront.theme-dark .fcm-discount-row {
+  color: #f87171;
 }
 
 .cart-ship-row,
@@ -27530,8 +28985,14 @@ const hasSale = computed(() =>
   justify-content: space-between;
   font-size: 12px;
   font-weight: 700;
-  color: #38bdf8;
+  color: #0284c7;
   padding-bottom: 4px;
+}
+
+.sa-storefront.theme-dark .cart-ship-row,
+.sa-storefront.theme-dark .mps-ship-row,
+.sa-storefront.theme-dark .fcm-ship-row {
+  color: #38bdf8;
 }
 
 .fcm-created-pill {
@@ -27857,13 +29318,21 @@ const hasSale = computed(() =>
   color: var(--sa-muted, #64748b);
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .epn-overlay {
-    padding: 14px;
+    padding:
+      max(56px, calc(env(safe-area-inset-top, 0px) + 16px))
+      16px
+      max(24px, calc(env(safe-area-inset-bottom, 0px) + 16px));
   }
 
   .epn-modal {
-    max-width: 100%;
+    max-width: 420px;
+    max-height: calc(
+      100dvh
+      - max(56px, calc(env(safe-area-inset-top, 0px) + 16px))
+      - max(24px, calc(env(safe-area-inset-bottom, 0px) + 16px))
+    );
     border-radius: 20px;
   }
 
@@ -27955,9 +29424,14 @@ const hasSale = computed(() =>
 }
 
 .epo-btn.is-pick {
-  background: var(--sa-chip-bg, #f1f5f9);
-  border-color: var(--sa-border, #cbd5e1);
-  color: var(--sa-heading, #334155);
+  background: var(--sa-surface-2);
+  border-color: var(--sa-border-strong);
+  color: var(--sa-heading);
+}
+
+.epo-btn.is-pick:hover:not(:disabled) {
+  background: var(--sa-pill-hover);
+  border-color: var(--sa-accent);
 }
 
 /* ===== STATUS NOTICE SHOP MESSAGE & FINAL ORDER NOTICE MODAL ===== */
@@ -28058,8 +29532,8 @@ const hasSale = computed(() =>
   text-align: left;
   padding: 12px 14px;
   border-radius: 14px;
-  background: var(--sa-chip-bg, #f8fafc);
-  border: 1px solid var(--sa-border, #e2e8f0);
+  background: var(--sa-surface-2);
+  border: 1px solid var(--sa-border-strong);
   margin-bottom: 18px;
 }
 
@@ -28068,9 +29542,19 @@ const hasSale = computed(() =>
   border-color: rgba(239, 68, 68, 0.25);
 }
 
+.sa-storefront.theme-dark .ofn-modal-card.is-cancelled .ofn-shop-msg {
+  background: rgba(239, 68, 68, 0.13);
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
 .ofn-modal-card.is-completed .ofn-shop-msg {
   background: rgba(var(--sa-primary-bright-rgb), 0.07);
   border-color: rgba(var(--sa-primary-bright-rgb), 0.28);
+}
+
+.sa-storefront.theme-dark .ofn-modal-card.is-completed .ofn-shop-msg {
+  background: rgba(var(--sa-primary-bright-rgb), 0.14);
+  border-color: rgba(var(--sa-primary-bright-rgb), 0.36);
 }
 
 .ofn-shop-msg-head {
@@ -28087,6 +29571,20 @@ const hasSale = computed(() =>
 
 .ofn-modal-card.is-cancelled .ofn-shop-msg-head {
   color: #ef4444;
+}
+
+.sa-storefront.theme-dark .ofn-modal-card.is-cancelled .ofn-shop-msg-head {
+  color: #fca5a5;
+}
+
+.sa-storefront.theme-dark .ofn-icon-badge.is-cancelled {
+  background: rgba(239, 68, 68, 0.18);
+  color: #f87171;
+}
+
+.sa-storefront.theme-dark .ofn-icon-badge.is-message {
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
 }
 
 .ofn-shop-msg-text {
@@ -28151,9 +29649,25 @@ const hasSale = computed(() =>
 }
 
 .ofn-btn.is-secondary {
-  background: var(--sa-chip-bg, #f1f5f9);
-  border-color: var(--sa-border, #cbd5e1);
-  color: var(--sa-heading, #334155);
+  background: var(--sa-surface-2);
+  border-color: var(--sa-border-strong);
+  color: var(--sa-heading);
+}
+
+.ofn-btn.is-secondary:hover {
+  background: var(--sa-pill-hover);
+  border-color: var(--sa-accent);
+}
+
+.sa-storefront.theme-dark .ofn-btn.is-secondary {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #f8fafc;
+}
+
+.sa-storefront.theme-dark .ofn-btn.is-secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--sa-accent);
 }
 
 .ofn-btn.is-primary {
@@ -28251,7 +29765,7 @@ const hasSale = computed(() =>
 
 .empty-menu-kw {
   font-weight: 800;
-  color: #059669;
+  color: var(--sa-price);
 }
 
 .empty-search-actions {
@@ -28268,9 +29782,9 @@ const hasSale = computed(() =>
   gap: 6px;
   padding: 8px 14px;
   border-radius: 999px;
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #334155;
+  border: 1px solid var(--sa-border-strong);
+  background: var(--sa-surface);
+  color: var(--sa-heading);
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -28278,17 +29792,18 @@ const hasSale = computed(() =>
 }
 
 .empty-search-btn:hover {
-  background: #f1f5f9;
+  background: var(--sa-surface-2);
+  border-color: var(--sa-accent);
 }
 
 .empty-search-btn.primary {
-  border-color: #059669;
-  background: #059669;
-  color: #ffffff;
+  border-color: var(--sa-accent);
+  background: var(--sa-accent);
+  color: var(--sa-on-accent, #ffffff);
 }
 
 .empty-search-btn.primary:hover {
-  background: #047857;
+  background: var(--sa-accent-hover);
 }
 
 .empty-quick-tags {
@@ -28302,16 +29817,16 @@ const hasSale = computed(() =>
 
 .empty-quick-label {
   font-size: 12.5px;
-  color: #64748b;
+  color: var(--sa-muted);
   font-weight: 600;
 }
 
 .empty-quick-chip {
   padding: 5px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(5, 150, 105, 0.25);
-  background: rgba(16, 185, 129, 0.08);
-  color: #047857;
+  border: 1px solid var(--sa-border-green);
+  background: var(--sa-surface-soft);
+  color: var(--sa-price);
   font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
@@ -28319,7 +29834,7 @@ const hasSale = computed(() =>
 }
 
 .empty-quick-chip:hover {
-  background: rgba(16, 185, 129, 0.18);
+  background: rgba(var(--sa-primary-bright-rgb), 0.22);
   transform: translateY(-1px);
 }
 
@@ -28327,28 +29842,565 @@ const hasSale = computed(() =>
   margin-left: 8px;
   padding: 4px 10px;
   border-radius: 999px;
-  border: 1px solid #059669;
-  background: rgba(16, 185, 129, 0.12);
-  color: #047857;
+  border: 1px solid var(--sa-border-green);
+  background: var(--sa-surface-soft);
+  color: var(--sa-price);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
 }
 
 .srl-all-btn:hover {
-  background: #059669;
-  color: #ffffff;
+  background: var(--sa-accent);
+  border-color: var(--sa-accent);
+  color: var(--sa-on-accent, #ffffff);
 }
 
-/* ===== HIGH-CONTRAST TEXT ON TELEPORTED / UNSCOPED ACCENT BUTTONS (AUTO LIGHT/DARK) ===== */
+/* ===== HIGH-CONTRAST TEXT ON ACCENT SURFACES (AUTO LIGHT/DARK & ALL PRESETS) ===== */
+.sct-cat-pill:not(.sale):not(.is-parent-cat).active,
+.pagination button.active,
+.filter-btn.active,
+.search-wrapper .filter-cat-btn.active,
+.sub-cat-tree.is-modal .sub-cat-tree-item.active,
+.mcb-action-cta:not(.is-update-red),
+.save-btn,
+.ck-btn,
+.ck-amount,
+.send-btn,
+.copy-btn,
+.lob-new-btn,
+.join-group-btn,
+.host-members-progress .hmp-count.all,
+.dp-stepper button.dp-qty-plus,
+.btn-qty:hover,
+.modal-qty button:hover,
+.fcm-step-btn:hover,
+.dpt-step-btn:hover,
+.ugm-nudge-again-btn:hover,
 .gsm-copy-btn,
 .ugm-proceed-btn,
 .exm-channel-btn,
 .exm-copy-inline-btn:hover,
 .exm-copy-inline-btn.copied,
 .dt24-col-opt.selected,
-.dt24-now-btn:hover {
+.dt24-now-btn:hover,
+.dt24-preset-chip:active {
   color: var(--sa-on-accent, #ffffff);
+}
+
+/* ===== PRO VIP MEDALLION -> BEZIER COMET -> PROGRESS LOCK-ON ANIMATION ===== */
+.sa-submit-fx-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 100050;
+  pointer-events: none;
+  user-select: none;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 16px 6vh;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.sa-submit-fx-backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 44%, rgba(16, 185, 129, 0.16) 0%, transparent 42%),
+    radial-gradient(circle at 50% 46%, rgba(15, 23, 42, 0.42) 0%, rgba(2, 6, 23, 0.74) 100%);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  opacity: 1;
+  animation: saSfxBackdropIn 0.28s ease-out;
+  transition: opacity 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity;
+}
+
+.sa-submit-fx-backdrop.is-fading {
+  opacity: 0;
+}
+
+.sfx-hero-stage {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.sfx-medallion {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform;
+}
+
+.sfx-medallion.is-entering {
+  animation: saSfxMedallionPop 0.56s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sfx-aurora-halo {
+  position: absolute;
+  inset: -26px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(16, 185, 129, 0.52) 0%,
+    rgba(250, 204, 21, 0.24) 44%,
+    transparent 72%
+  );
+  filter: blur(12px);
+  animation: saSfxHaloPulse 1.1s ease-in-out infinite alternate;
+}
+
+.sfx-sonar-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.8px solid rgba(110, 231, 183, 0.75);
+  opacity: 0;
+  animation: saSfxSonar 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.08s forwards;
+}
+
+.sfx-sonar-ring.r2 {
+  border-color: rgba(250, 204, 21, 0.65);
+  animation-delay: 0.22s;
+}
+
+.sfx-medallion.is-condensing .sfx-sonar-ring,
+.sfx-medallion.is-condensing .sfx-sparks {
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+
+.sfx-sparks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.sfx-spark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 3.5px;
+  margin-left: -6px;
+  margin-top: -1.75px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6ee7b7, #10b981);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
+  opacity: 0;
+  animation: saSfxSparkShoot 0.68s cubic-bezier(0.16, 1, 0.3, 1) 0.14s forwards;
+}
+
+.sfx-spark.is-gold {
+  width: 9px;
+  margin-left: -4.5px;
+  background: linear-gradient(90deg, #fef08a, #f59e0b);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.85);
+  animation-delay: 0.18s;
+}
+
+.sfx-orbit-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  padding: 2.5px;
+  background: conic-gradient(
+    from 0deg,
+    rgba(16, 185, 129, 0.15),
+    #6ee7b7,
+    #fde047,
+    #10b981,
+    rgba(16, 185, 129, 0.15)
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: saSfxOrbitSpin 1.4s linear infinite;
+}
+
+.sfx-core-sphere {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.42) 0%, transparent 42%),
+    linear-gradient(145deg, #34d399 0%, #059669 54%, #047857 100%);
+  border: 2px solid rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 18px 42px rgba(5, 150, 105, 0.52),
+    0 0 28px rgba(16, 185, 129, 0.45),
+    inset 0 2px 6px rgba(255, 255, 255, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.25s ease, box-shadow 0.25s ease;
+}
+
+.sfx-medallion.is-condensing .sfx-core-sphere {
+  background:
+    radial-gradient(circle at 35% 30%, #ffffff 0%, #fef08a 28%, #10b981 68%, #059669 100%);
+  box-shadow:
+    0 0 32px rgba(250, 204, 21, 0.85),
+    0 0 54px rgba(16, 185, 129, 0.85);
+}
+
+.sfx-check-svg {
+  width: 58px;
+  height: 58px;
+  overflow: visible;
+  filter: drop-shadow(0 3px 8px rgba(4, 120, 87, 0.45));
+}
+
+.sfx-svg-ring {
+  stroke-dasharray: 172;
+  stroke-dashoffset: 172;
+  transform-origin: 32px 32px;
+  transform: rotate(-90deg);
+  animation: saSfxDrawRing 0.44s cubic-bezier(0.22, 1, 0.36, 1) 0.05s forwards;
+}
+
+.sfx-svg-tick {
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: saSfxDrawTick 0.38s cubic-bezier(0.22, 1, 0.36, 1) 0.2s forwards;
+}
+
+/* Frameless floating glass caption */
+.sfx-float-caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  text-align: center;
+  animation: saSfxCaptionRise 0.46s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
+  transition: opacity 0.22s ease, transform 0.24s cubic-bezier(0.4, 0, 1, 1);
+}
+
+.sfx-float-caption.is-dissolving {
+  opacity: 0;
+  transform: translate3d(0, -20px, 0) scale(0.84);
+}
+
+.sfx-caption-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow:
+    0 14px 34px rgba(2, 6, 23, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+.sfx-title {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+  text-shadow: 0 1px 4px rgba(2, 6, 23, 0.45);
+}
+
+.sfx-code-pill {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(250, 204, 21, 0.24), rgba(16, 185, 129, 0.28));
+  border: 1px solid rgba(253, 224, 71, 0.55);
+  color: #fef08a;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.sfx-sub {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgba(241, 245, 249, 0.88);
+  text-shadow: 0 2px 8px rgba(2, 6, 23, 0.65);
+  letter-spacing: 0.01em;
+}
+
+/* 60fps Bezier Comet Tail Dots */
+.sfx-comet-dot {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffffff 0%, #6ee7b7 45%, rgba(16, 185, 129, 0) 100%);
+  box-shadow: 0 0 14px rgba(52, 211, 153, 0.9);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.sfx-comet-dot.is-gold {
+  background: radial-gradient(circle, #ffffff 0%, #fde047 45%, rgba(245, 158, 11, 0) 100%);
+  box-shadow: 0 0 14px rgba(250, 204, 21, 0.9);
+}
+
+/* Exact-coordinate Impact Starburst on Progress Node */
+.sfx-impact-burst {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 5;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.sfx-impact-ring {
+  position: absolute;
+  left: -32px;
+  top: -32px;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2.5px solid #10b981;
+  animation: saSfxImpactRing 0.54s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.sfx-impact-ring.r2 {
+  border-color: #facc15;
+  border-width: 2px;
+  animation-delay: 0.07s;
+}
+
+.sfx-impact-flash {
+  position: absolute;
+  left: -26px;
+  top: -26px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0%, rgba(52, 211, 153, 0.55) 45%, transparent 72%);
+  animation: saSfxImpactFlash 0.38s ease-out forwards;
+}
+
+/* Pre-drop hold & landing impact on Export Modal progress bar */
+.grab-status-card.in-export-modal {
+  position: relative;
+  overflow: hidden;
+}
+
+.grab-status-card.in-export-modal.is-pre-drop .gs-rail-fill {
+  width: 0% !important;
+  transition: none !important;
+}
+
+.grab-status-card.in-export-modal.is-pre-drop .gs-step.is-current .gs-node {
+  transform: scale(0.92);
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.22);
+}
+
+.grab-status-card.in-export-modal.is-drop-hit {
+  animation: saProgressCardCatch 0.76s cubic-bezier(0.22, 1, 0.36, 1);
+  border-color: #10b981 !important;
+}
+
+.grab-status-card.in-export-modal.is-drop-hit::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    108deg,
+    transparent 12%,
+    rgba(52, 211, 153, 0.24) 44%,
+    rgba(250, 204, 21, 0.26) 54%,
+    transparent 86%
+  );
+  transform: translateX(-110%);
+  animation: saProgressCardSweep 0.78s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.grab-status-card.in-export-modal.is-drop-hit .gs-step.is-current .gs-node {
+  animation: saProgressNodePop 0.62s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.exm-saved-pill.is-pop {
+  animation: saProgressNodePop 0.54s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes saSfxBackdropIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes saSfxMedallionPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.42) translate3d(0, 18px, 0);
+  }
+  58% {
+    opacity: 1;
+    transform: scale(1.08) translate3d(0, -2px, 0);
+  }
+  80% {
+    opacity: 1;
+    transform: scale(0.97) translate3d(0, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+}
+
+@keyframes saSfxHaloPulse {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.75;
+  }
+  100% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+}
+
+@keyframes saSfxSonar {
+  0% {
+    transform: scale(0.88);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.88);
+    opacity: 0;
+  }
+}
+
+@keyframes saSfxSparkShoot {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--sfx-ang)) translateX(30px) scaleX(0.3);
+  }
+  28% {
+    opacity: 1;
+    transform: rotate(var(--sfx-ang)) translateX(52px) scaleX(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--sfx-ang)) translateX(74px) scaleX(0.2);
+  }
+}
+
+@keyframes saSfxOrbitSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes saSfxDrawRing {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes saSfxDrawTick {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes saSfxCaptionRise {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes saSfxImpactRing {
+  0% {
+    transform: scale(0.25);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+}
+
+@keyframes saSfxImpactFlash {
+  0% {
+    transform: scale(0.35);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+
+@keyframes saProgressCardCatch {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.56);
+  }
+  28% {
+    transform: scale(1.028);
+    box-shadow:
+      0 12px 30px rgba(16, 185, 129, 0.26),
+      0 0 0 5px rgba(16, 185, 129, 0.24);
+  }
+  65% {
+    transform: scale(0.995);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+@keyframes saProgressCardSweep {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(115%);
+  }
+}
+
+@keyframes saProgressNodePop {
+  0% {
+    transform: scale(0.8);
+  }
+  45% {
+    transform: scale(1.38);
+  }
+  100% {
+    transform: scale(1.06);
+  }
 }
 </style>
 

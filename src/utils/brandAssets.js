@@ -9,6 +9,7 @@ export const DEFAULT_SEO_CONFIG = {
     'Thực đơn đa dạng từ cơm văn phòng, lẩu, món nhậu bình dân đến dịch vụ đi chợ hộ — giao hàng nhanh 24/24 khu vực Manila, Pasay, Makati, Philippines.',
   seoKeywords:
     'sakitchen, sa kitchen, sa kitchen manila, đồ ăn việt manila, ẩm thực việt tại philippines, quán ăn việt philippines, ship đồ ăn manila, món nhậu manila',
+  shopAddress: 'Manila · Pasay · Makati, Philippines',
 }
 
 export function toCloudinaryTransform(rawUrl, transform) {
@@ -62,6 +63,11 @@ export function resolveBrandAssets(logoRow = null, fallbackName = 'SA KITCHEN') 
       : DEFAULT_SEO_CONFIG.seoIntro
   const seoKeywords =
     String(row.SEO_Keywords || '').trim() || DEFAULT_SEO_CONFIG.seoKeywords
+  const shopAddress =
+    row.Shop_Address !== undefined && row.Shop_Address !== null
+      ? String(row.Shop_Address).trim()
+      : DEFAULT_SEO_CONFIG.shopAddress
+  const mapUrl = String(row.Map_URL || '').trim()
 
   return {
     name,
@@ -76,6 +82,8 @@ export function resolveBrandAssets(logoRow = null, fallbackName = 'SA KITCHEN') 
     seoH1,
     seoIntro,
     seoKeywords,
+    shopAddress,
+    mapUrl,
     updatedAt,
   }
 }
@@ -83,6 +91,7 @@ export function resolveBrandAssets(logoRow = null, fallbackName = 'SA KITCHEN') 
 export function buildSeoJsonLdGraph(brand, origin = 'https://sakitchen.shop') {
   const cleanOrigin = String(origin || 'https://sakitchen.shop').replace(/\/+$/, '')
   const siteName = brand?.siteName || brand?.name || 'SA KITCHEN'
+  const verSuffix = brand?.updatedAt ? `?v=${encodeURIComponent(brand.updatedAt)}` : ''
   return {
     '@context': 'https://schema.org',
     '@graph': [
@@ -100,14 +109,16 @@ export function buildSeoJsonLdGraph(brand, origin = 'https://sakitchen.shop') {
         '@id': `${cleanOrigin}/#restaurant`,
         name: brand?.seoTitle || DEFAULT_SEO_CONFIG.seoTitle,
         url: `${cleanOrigin}/`,
-        logo: `${cleanOrigin}/favicon-192.png`,
-        image: `${cleanOrigin}/og-share.jpg`,
+        logo: `${cleanOrigin}/favicon-192.png${verSuffix}`,
+        image: `${cleanOrigin}/og-share.jpg${verSuffix}`,
         description: brand?.seoDescription || DEFAULT_SEO_CONFIG.seoDescription,
         address: {
           '@type': 'PostalAddress',
+          ...(brand?.shopAddress ? { streetAddress: brand.shopAddress } : {}),
           addressLocality: 'Manila',
           addressCountry: 'PH',
         },
+        ...(brand?.mapUrl ? { hasMap: brand.mapUrl } : {}),
         servesCuisine: 'Vietnamese',
         priceRange: '$$',
       },

@@ -83,6 +83,16 @@ const router = createRouter({
       },
     },
     { path: '/login', name: 'login', component: Login },
+    {
+      path: '/blog',
+      name: 'blog-list',
+      component: () => import('@/views/BlogList.vue'),
+    },
+    {
+      path: '/blog/:slug',
+      name: 'blog-detail',
+      component: () => import('@/views/BlogDetail.vue'),
+    },
 
     {
       path: '/admin',
@@ -115,6 +125,11 @@ const router = createRouter({
         { path: 'cau-hinh-hien-thi', name: 'admin-cau-hinh-hien-thi', component: CauHinhHienThi },
         { path: 'thong-bao', name: 'admin-thong-bao', component: Thongbao },
         { path: 'logo', name: 'admin-logo', component: Logo },
+        {
+          path: 'bai-viet',
+          name: 'admin-blog',
+          component: () => import('@/views/AdminBlog.vue'),
+        },
         { path: 'khuyen-mai', name: 'admin-khuyen-mai', component: Khuyenmai },
         { path: 'open-time', name: 'admin-open-time', component: OpenTime },
         { path: 'contact-shop', name: 'admin-contact-shop', component: ContactShop },

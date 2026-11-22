@@ -26,6 +26,14 @@ import {
 import { buildUniqueProductCode } from '../utils/productCode'
 import { normalizeThemeConfig } from '../utils/storefrontTheme'
 import { normalizeBannerAction, normalizeBannerLink } from '../utils/bannerLink'
+import {
+  slugifyVi,
+  normalizeBlogPost,
+  normalizeBlogCategory,
+  analyzePostSeo,
+  sanitizeBlogHtml,
+  parseTags,
+} from '../utils/blogSeo'
 
 export const CLOUDINARY_CLOUD_NAME = 'dsmtq5rbh'
 export const CLOUDINARY_SIGN_ENDPOINT = '/api/cloudinary-sign'
@@ -51,6 +59,8 @@ export const SHEETS = [
   'thong_tin_chuyen_khoan',
   'display_config',
   'chiet_khau_doi_soat',
+  'blog_posts',
+  'blog_categories',
   'Login',
 ]
 
@@ -58,7 +68,9 @@ export const DATA_SHEETS = SHEETS.filter(
   (sName) =>
     sName !== 'Login' &&
     sName !== 'live_orders' &&
-    sName !== 'chiet_khau_doi_soat',
+    sName !== 'chiet_khau_doi_soat' &&
+    sName !== 'blog_posts' &&
+    sName !== 'blog_categories',
 )
 
 export const STOREFRONT_SHEETS = [
@@ -4130,6 +4142,8 @@ function buildLogoRowPayload(d = {}, existing = null) {
     SEO_H1: d.SEO_H1 !== undefined ? s(d.SEO_H1) : s(existing?.SEO_H1),
     SEO_Intro: d.SEO_Intro !== undefined ? s(d.SEO_Intro) : s(existing?.SEO_Intro),
     SEO_Keywords: d.SEO_Keywords !== undefined ? s(d.SEO_Keywords) : s(existing?.SEO_Keywords),
+    Shop_Address: d.Shop_Address !== undefined ? s(d.Shop_Address) : s(existing?.Shop_Address),
+    Map_URL: d.Map_URL !== undefined ? s(d.Map_URL) : s(existing?.Map_URL),
     Updated_at: Date.now(),
   })
 }
@@ -4446,6 +4460,212 @@ async function deleteThongTinChuyenKhoan(body) {
   return deleteById('thong_tin_chuyen_khoan', body.ID)
 }
 
+// --- blog_categories & blog_posts (WordPress-style SEO Blog CMS) ---
+function genUniqueSlug(baseSlug, existingSlugs = [], fallbackPrefix = 'item') {
+  const cleanBase = slugifyVi(baseSlug) || `${fallbackPrefix}-${genShortId().slice(0, 5)}`
+  const existingSet = new Set(existingSlugs.map((x) => s(x).trim().toLowerCase()).filter(Boolean))
+  if (!existingSet.has(cleanBase)) return cleanBase
+  let i = 2
+  while (existingSet.has(`${cleanBase}-${i}`)) {
+    i += 1
+  }
+  return `${cleanBase}-${i}`
+}
+
+async function upsertBlogCategory(body) {
+  const d = body.data || {}
+  const name = s(d.Name).trim()
+  if (!name) {
+    return { success: false, message: 'Vui lòng nhập tên chuyên mục' }
+  }
+
+  const entries = await readSheetEntries('blog_categories')
+  const target = d.ID ? entries.find((e) => s(e.row.ID) === s(d.ID)) : null
+  const otherSlugs = entries
+    .filter((e) => !target || e.key !== target.key)
+    .map((e) => e.row?.Slug)
+
+  const requestedSlug = s(d.Slug).trim() || name
+  const uniqueSlug = genUniqueSlug(requestedSlug, otherSlugs, 'chuyen-muc')
+  const now = Date.now()
+
+  const payload = sanitizeRow(
+    normalizeBlogCategory({
+      ID: s(d.ID || target?.row?.ID || `CAT-${genShortId().toUpperCase()}`),
+      Name: name,
+      Slug: uniqueSlug,
+      Description: s(d.Description ?? target?.row?.Description).trim(),
+      Order: d.Order !== undefined ? n(d.Order, 0) : n(target?.row?.Order, entries.length),
+      Updated_at: now,
+    }),
+  )
+
+  if (target) {
+    const updates = {
+      [`blog_categories/${target.key}`]: payload,
+    }
+    // Cascade renamed category to posts referencing it
+    const oldId = s(target.row.ID)
+    const oldSlug = s(target.row.Slug)
+    const postEntries = await readSheetEntries('blog_posts')
+    for (const p of postEntries) {
+      if (
+        (oldId && s(p.row.Category_ID) === oldId) ||
+        (oldSlug && s(p.row.Category_Slug) === oldSlug)
+      ) {
+        updates[`blog_posts/${p.key}/Category_ID`] = payload.ID
+        updates[`blog_posts/${p.key}/Category_Name`] = payload.Name
+        updates[`blog_posts/${p.key}/Category_Slug`] = payload.Slug
+      }
+    }
+    await update(dbRef(db), updates)
+    return { success: true, type: 'update', data: payload }
+  }
+
+  await set(dbRef(db, `blog_categories/${createRowKey()}`), payload)
+  return { success: true, type: 'insert', data: payload }
+}
+
+async function deleteBlogCategory(body) {
+  const targetId = s(body?.ID).trim()
+  if (!targetId) return { success: false, message: 'Thiếu ID chuyên mục' }
+  const entries = await readSheetEntries('blog_categories')
+  const target = entries.find((e) => s(e.row.ID) === targetId)
+  if (!target) return { success: false, message: 'Không tìm thấy chuyên mục' }
+
+  const updates = {
+    [`blog_categories/${target.key}`]: null,
+  }
+  const postEntries = await readSheetEntries('blog_posts')
+  for (const p of postEntries) {
+    if (s(p.row.Category_ID) === targetId || (target.row.Slug && s(p.row.Category_Slug) === s(target.row.Slug))) {
+      updates[`blog_posts/${p.key}/Category_ID`] = ''
+      updates[`blog_posts/${p.key}/Category_Name`] = ''
+      updates[`blog_posts/${p.key}/Category_Slug`] = ''
+    }
+  }
+  await update(dbRef(db), updates)
+  return { success: true }
+}
+
+async function upsertBlogPost(body) {
+  const d = body.data || {}
+  const title = s(d.Title).trim()
+  if (!title) {
+    return { success: false, message: 'Vui lòng nhập tiêu đề bài viết' }
+  }
+
+  const [postEntries, catEntries] = await Promise.all([
+    readSheetEntries('blog_posts'),
+    readSheetEntries('blog_categories'),
+  ])
+
+  const target = d.ID ? postEntries.find((e) => s(e.row.ID) === s(d.ID)) : null
+  const otherSlugs = postEntries
+    .filter((e) => !target || e.key !== target.key)
+    .map((e) => e.row?.Slug)
+
+  const uniqueSlug = genUniqueSlug(s(d.Slug).trim() || title, otherSlugs, 'bai-viet')
+
+  // Resolve category metadata cleanly
+  let categoryId = s(d.Category_ID ?? target?.row?.Category_ID).trim()
+  let categoryName = s(d.Category_Name ?? target?.row?.Category_Name).trim()
+  let categorySlug = s(d.Category_Slug ?? target?.row?.Category_Slug).trim()
+  if (categoryId) {
+    const matchedCat = catEntries.find((e) => s(e.row.ID) === categoryId)
+    if (matchedCat) {
+      categoryName = s(matchedCat.row.Name).trim()
+      categorySlug = s(matchedCat.row.Slug).trim()
+    }
+  } else if (categoryName) {
+    const matchedByName = catEntries.find(
+      (e) => s(e.row.Name).trim().toLowerCase() === categoryName.toLowerCase(),
+    )
+    if (matchedByName) {
+      categoryId = s(matchedByName.row.ID)
+      categoryName = s(matchedByName.row.Name).trim()
+      categorySlug = s(matchedByName.row.Slug).trim()
+    } else {
+      categorySlug = slugifyVi(categorySlug || categoryName)
+    }
+  } else {
+    categorySlug = ''
+  }
+
+  const now = Date.now()
+  const existingRow = target?.row || {}
+  const nextStatus = s(d.Status || existingRow.Status || 'draft').trim().toLowerCase()
+  const cleanHtml = sanitizeBlogHtml(d.Content_HTML ?? existingRow.Content_HTML ?? '')
+  const createdAt = n(d.Created_at || existingRow.Created_at, now) || now
+  const publishedAt =
+    d.Published_at !== undefined && n(d.Published_at, 0) > 0
+      ? n(d.Published_at)
+      : nextStatus === 'published'
+        ? n(existingRow.Published_at, now) || now
+        : n(existingRow.Published_at, 0)
+
+  const draftForNormalize = {
+    ...existingRow,
+    ...d,
+    ID: s(d.ID || existingRow.ID || `POST-${genShortId().toUpperCase()}`),
+    Title: title,
+    Slug: uniqueSlug,
+    Category_ID: categoryId,
+    Category_Name: categoryName,
+    Category_Slug: categorySlug,
+    Tags: parseTags(d.Tags !== undefined ? d.Tags : existingRow.Tags).join(', '),
+    Content_HTML: cleanHtml,
+    Status: nextStatus,
+    Created_at: createdAt,
+    Updated_at: now,
+    Published_at: publishedAt,
+  }
+
+  const normalized = normalizeBlogPost(draftForNormalize)
+  const seoReport = analyzePostSeo(normalized)
+
+  const rowPayload = sanitizeRow({
+    ID: normalized.ID,
+    Title: normalized.Title,
+    Slug: normalized.Slug,
+    Category_ID: normalized.Category_ID,
+    Category_Name: normalized.Category_Name,
+    Category_Slug: normalized.Category_Slug,
+    Tags: normalized.Tags,
+    Excerpt: normalized.Excerpt,
+    Content_HTML: normalized.Content_HTML,
+    Featured_Image: normalized.Featured_Image,
+    Featured_Alt: normalized.Featured_Alt,
+    Status: normalized.Status,
+    Author: normalized.Author,
+    Focus_Keyword: normalized.Focus_Keyword,
+    SEO_Title: normalized.SEO_Title,
+    SEO_Description: normalized.SEO_Description,
+    Canonical_URL: normalized.Canonical_URL,
+    Robots: normalized.Robots,
+    TOC_Enabled: normalized.TOC_Enabled,
+    TOC_Max_Level: normalized.TOC_Max_Level,
+    TOC_Default_Open: normalized.TOC_Default_Open,
+    TOC_Title: normalized.TOC_Title,
+    SEO_Score: seoReport.score,
+    Created_at: normalized.Created_at,
+    Updated_at: normalized.Updated_at,
+    Published_at: normalized.Published_at,
+  })
+
+  if (target) {
+    await set(dbRef(db, `blog_posts/${target.key}`), rowPayload)
+    return { success: true, type: 'update', data: rowPayload }
+  }
+
+  await set(dbRef(db, `blog_posts/${createRowKey()}`), rowPayload)
+  return { success: true, type: 'insert', data: rowPayload }
+}
+
+async function deleteBlogPost(body) {
+  return deleteById('blog_posts', body.ID)
+}
+
 /* =========================================================
  * UNIFIED ACTION DISPATCHER
  * ========================================================= */
@@ -4499,6 +4719,10 @@ const ACTION_HANDLERS = {
   addThongTinChuyenKhoan,
   updateThongTinChuyenKhoan,
   deleteThongTinChuyenKhoan,
+  upsertBlogPost,
+  deleteBlogPost,
+  upsertBlogCategory,
+  deleteBlogCategory,
 }
 
 export async function saveDiscountSettlementPeriod(payload = {}) {

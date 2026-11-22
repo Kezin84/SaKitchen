@@ -182,6 +182,9 @@
     "title": "订单内容",
     "subtitle": "核对您的订单明细并通过下方渠道发送给商家",
     "savedWeb": "已同步至系统",
+    "submitSuccessTitle": "订单提交成功！",
+    "updateSuccessTitle": "订单已更新！",
+    "submitSuccessSub": "已同步至订单进度条",
     "messageLabel": "订单文本明细",
     "sendChannelTitle": "快捷发送至",
     "copy": "复制订单",
@@ -267,5 +270,15 @@
     "finalCancelledTitle": "订单 #{code} 已取消",
     "finalNewOrderBtn": "创建新订单",
     "finalCloseBtn": "关闭"
+  },
+  "footer": {
+    "exploreTitle": "快速导航",
+    "blogLink": "美食博客与攻略",
+    "welcomeLink": "品牌介绍",
+    "safetyTitle": "安全与认证",
+    "locationLabel": "配送区域",
+    "viewMap": "查看地图",
+    "backToTop": "回到顶部",
+    "rights": "在线点餐，极速送达。"
   }
 }

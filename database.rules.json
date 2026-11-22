@@ -77,6 +77,24 @@
       ".write": true,
       ".indexOn": ["ID"]
     },
+    "display_config": {
+      ".read": true,
+      ".write": true
+    },
+    "chiet_khau_doi_soat": {
+      ".read": true,
+      ".write": true
+    },
+    "blog_posts": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["ID", "Slug", "Status", "Category_Slug"]
+    },
+    "blog_categories": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["ID", "Slug"]
+    },
     "Login": {
       ".read": true,
       ".write": "!data.exists()",

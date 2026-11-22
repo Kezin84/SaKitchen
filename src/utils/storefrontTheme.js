@@ -556,7 +556,7 @@ export function buildStorefrontThemeVars(rawConfig, colorScheme = 'light') {
 
   // Effective accent for active light/dark state
   const activeAccent = isDark ? darkAccent : basePrimary
-  const onAccent = getRelativeLuminance(activeAccent) > 0.28 ? '#0b1724' : '#ffffff'
+  const onAccent = getRelativeLuminance(activeAccent) > 0.44 ? '#0b1724' : '#ffffff'
   const activeAccentHover = isDark
     ? onAccent === '#0b1724'
       ? mixHex(darkAccent, basePrimary, 0.25)
@@ -609,9 +609,19 @@ export function buildStorefrontThemeVars(rawConfig, colorScheme = 'light') {
     '--sa-surface-2': isDark ? surface2Dark : surface2Light,
     '--sa-surface-soft': isDark ? `rgba(${primaryBrightRgb}, 0.14)` : primarySoftLight,
     '--sa-img-bg': isDark ? '#172030' : '#f8fafc',
+    '--sa-text': isDark ? '#cbd5e1' : '#334155',
+    '--sa-heading': isDark ? '#f8fafc' : '#0f172a',
+    '--sa-muted': isDark ? '#94a3b8' : '#64748b',
+    '--sa-border': isDark ? 'rgba(255, 255, 255, 0.08)' : '#e5e7eb',
+    '--sa-border-strong': isDark ? 'rgba(255, 255, 255, 0.14)' : '#cbd5e1',
     '--sa-border-green': isDark
       ? `rgba(${darkBorderRgb}, 0.28)`
       : `rgba(${primaryBrightRgb}, 0.28)`,
+    '--sa-pill-bg': isDark ? surfaceDark : '#ffffff',
+    '--sa-pill-text': isDark ? '#94a3b8' : '#475569',
+    '--sa-pill-hover': isDark ? surface2Dark : '#f8fafc',
+    '--sa-input-bg': isDark ? '#0f1521' : '#ffffff',
+    '--sa-input-border': isDark ? 'rgba(255, 255, 255, 0.12)' : '#dbe2ea',
     '--sa-accent': activeAccent,
     '--sa-accent-hover': activeAccentHover,
     '--sa-on-accent': onAccent,

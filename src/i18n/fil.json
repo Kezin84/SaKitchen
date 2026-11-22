@@ -182,6 +182,9 @@
     "title": "NILALAMAN NG ORDER",
     "subtitle": "Suriin ang detalye ng order at ipadala sa shop sa ibaba",
     "savedWeb": "Nai-save sa system",
+    "submitSuccessTitle": "Naipadala na ang order!",
+    "updateSuccessTitle": "Na-update na ang order!",
+    "submitSuccessSub": "Naka-sync na sa order progress",
     "messageLabel": "Buod ng order",
     "sendChannelTitle": "Mabilisang ipadala sa",
     "copy": "Kopyahin ang order",
@@ -267,5 +270,15 @@
     "finalCancelledTitle": "Kinansela ang order #{code}",
     "finalNewOrderBtn": "Gumawa ng bagong order",
     "finalCloseBtn": "Isara"
+  },
+  "footer": {
+    "exploreTitle": "Tuklasin",
+    "blogLink": "Food Blog at Gabay",
+    "welcomeLink": "Tungkol sa Amin",
+    "safetyTitle": "Tiwala at Seguridad",
+    "locationLabel": "Lugar ng Serbisyo",
+    "viewMap": "Tingnan sa Mapa",
+    "backToTop": "Balik sa taas",
+    "rights": "Mabilis na online food delivery."
   }
 }

@@ -611,7 +611,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onActivated, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { getOneSheet, dispatchAction } from '@/config/api'
 import { productMatchesKeyword, normalizeProductI18n, DATA_LANG_CODES } from '@/utils/i18nData'
@@ -900,15 +900,13 @@ function computeTreeSnapshot(tree, pI18n = {}) {
 function hydrateDraftFromSaved() {
   productSortMode.value = savedProductSortMode.value
   parentI18nDraft.value = JSON.parse(JSON.stringify(savedParentI18n.value || {}))
-  customParentKeysDraft.value = Object.keys(savedParentI18n.value || {}).filter((k) =>
-    Object.values(savedParentMap.value || {}).includes(k),
-  )
+  customParentKeysDraft.value = []
   categoryTreeDraft.value = buildCategoryTreeEntries(
     rawProducts.value,
     savedCategoryOrder.value,
     savedParentMap.value,
     parentI18nDraft.value,
-    customParentKeysDraft.value,
+    [],
   )
   const nextExpanded = {}
   for (const node of categoryTreeDraft.value) {
@@ -943,14 +941,6 @@ async function loadAll() {
     savedParentMap.value = { ...harvestedParentMap }
     savedParentI18n.value = JSON.parse(JSON.stringify(harvestedParentI18n))
 
-    const initialTree = buildCategoryTreeEntries(
-      products,
-      cfg.categoryOrder,
-      savedParentMap.value,
-      savedParentI18n.value,
-    )
-    savedCategorySnapshot.value = computeTreeSnapshot(initialTree, savedParentI18n.value)
-
     const sortedByRank = sortProductsByRankOnly(products)
     savedBaseOrderCodes.value = sortedByRank.map((p) => p.Ma_hang)
 
@@ -963,6 +953,10 @@ async function loadAll() {
     savedTopAtByCode.value = topMap
 
     hydrateDraftFromSaved()
+    savedCategorySnapshot.value = computeTreeSnapshot(
+      categoryTreeDraft.value,
+      parentI18nDraft.value,
+    )
   } catch (err) {
     console.error('Load SapXepHienThi error:', err)
     showToast('Không thể tải dữ liệu sắp xếp', 'error')
@@ -973,6 +967,17 @@ async function loadAll() {
 
 onMounted(() => {
   loadAll()
+})
+
+let hasMountedSortOnce = false
+onActivated(() => {
+  if (!hasMountedSortOnce) {
+    hasMountedSortOnce = true
+    return
+  }
+  if (!hasAnyChanges.value && !savingAll.value) {
+    loadAll()
+  }
 })
 
 watch([selectedCategoryFilter, productSearch], () => {

@@ -1,7 +1,8 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 import { getOneSheet, dispatchAction } from '@/config/api'
 import { uploadImageToCloudinary } from '@/utils/imageUpload.js'
+import { DEFAULT_SEO_CONFIG } from '@/utils/brandAssets.js'
 
 /* ================= CONFIG ================= */
 
@@ -11,6 +12,20 @@ const contacts = ref([])
 const loading = ref(false)
 const tableLoading = ref(true)
 const togglingId = ref('')
+
+/* SHOP LOCATION / ADDRESS (SYNCED WITH FOOTER & LOCAL SEO) */
+const logoRowRef = ref(null)
+const locationAddress = ref('')
+const locationMapUrl = ref('')
+const savedLocation = ref({ address: '', mapUrl: '' })
+const savingLocation = ref(false)
+const locationSavedMsg = ref('')
+
+const hasLocationChanges = computed(
+  () =>
+    locationAddress.value.trim() !== savedLocation.value.address ||
+    locationMapUrl.value.trim() !== savedLocation.value.mapUrl,
+)
 
 /* ADD FORM */
 const form = ref({
@@ -71,10 +86,53 @@ async function uploadContactImage(file) {
 async function loadData() {
   tableLoading.value = true
   try {
-    const json = await getOneSheet('shop_contact')
+    const [json, logoJson] = await Promise.all([
+      getOneSheet('shop_contact'),
+      getOneSheet('logo'),
+    ])
     contacts.value = [...(json.data || [])]
+    const lRow = logoJson?.data?.[0] || null
+    logoRowRef.value = lRow
+    const addr =
+      lRow?.Shop_Address !== undefined && lRow?.Shop_Address !== null
+        ? String(lRow.Shop_Address).trim()
+        : DEFAULT_SEO_CONFIG.shopAddress
+    const mUrl = String(lRow?.Map_URL || '').trim()
+    savedLocation.value = { address: addr, mapUrl: mUrl }
+    locationAddress.value = addr
+    locationMapUrl.value = mUrl
   } finally {
     tableLoading.value = false
+  }
+}
+
+async function saveShopLocation() {
+  if (savingLocation.value) return
+  savingLocation.value = true
+  locationSavedMsg.value = ''
+  try {
+    const res = await dispatchAction({
+      action: 'upsertLogo',
+      data: {
+        ID: logoRowRef.value?.ID || '',
+        Shop_Address: locationAddress.value.trim(),
+        Map_URL: locationMapUrl.value.trim(),
+      },
+    })
+    if (!res?.success) throw new Error(res?.message || 'Lỗi lưu vị trí')
+    clearStorefrontCache()
+    savedLocation.value = {
+      address: locationAddress.value.trim(),
+      mapUrl: locationMapUrl.value.trim(),
+    }
+    locationSavedMsg.value = 'Đã lưu vị trí hiển thị ở Footer!'
+    setTimeout(() => {
+      locationSavedMsg.value = ''
+    }, 3000)
+  } catch {
+    alert('Lỗi lưu vị trí quán')
+  } finally {
+    savingLocation.value = false
   }
 }
 
@@ -264,6 +322,17 @@ async function deleteContact(id) {
 
 /* ================= INIT ================= */
 onMounted(loadData)
+
+let hasMountedContactOnce = false
+onActivated(() => {
+  if (!hasMountedContactOnce) {
+    hasMountedContactOnce = true
+    return
+  }
+  if (!hasLocationChanges.value && !savingLocation.value) {
+    loadData()
+  }
+})
 </script>
 
 <template>
@@ -273,9 +342,54 @@ onMounted(loadData)
       <div class="header-content">
         
         <div>
-          <h1 style="color: rgb(134, 239, 172); text-shadow: 0 0 10px rgba(34, 197, 94, 0.5);font-weight: bold;">QUẢN LÝ THÔNG TIN LIÊN HỆ SHOP</h1>
-          <p class="page-subtitle">Thêm, chỉnh sửa thông tin liên hệ shop</p>
+          <h1 style="color: rgb(134, 239, 172); text-shadow: 0 0 10px rgba(34, 197, 94, 0.5);font-weight: bold;">QUẢN LÝ THÔNG TIN LIÊN HỆ &amp; VỊ TRÍ SHOP</h1>
+          <p class="page-subtitle">Cài đặt vị trí quán (Footer PC &amp; Google Maps) và các kênh liên hệ đặt món</p>
         </div>
+      </div>
+    </div>
+
+    <!-- LOCATION / ADDRESS CARD -->
+    <div class="card add-card" style="margin-bottom: 22px;">
+      <div class="card-header">
+        <h3 class="card-title"><i class="ri-map-pin-2-fill" style="color: #34d399;"></i> Vị trí / Địa chỉ Quán (Hiển thị ở Footer Web)</h3>
+        <span v-if="locationSavedMsg" class="msg-active-pill">
+          <i class="ri-checkbox-circle-fill"></i>
+          <span>{{ locationSavedMsg }}</span>
+        </span>
+      </div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div class="form-field">
+            <label class="form-label">Địa chỉ / Khu vực phục vụ</label>
+            <input
+              v-model="locationAddress"
+              placeholder="VD: Manila · Pasay · Makati, Philippines (để trống nếu muốn ẩn)"
+              class="form-input"
+            />
+          </div>
+          <div class="form-field">
+            <label class="form-label">Link Google Maps (không bắt buộc)</label>
+            <input
+              v-model="locationMapUrl"
+              placeholder="VD: https://maps.app.goo.gl/..."
+              class="form-input"
+            />
+          </div>
+        </div>
+        <button
+          type="button"
+          class="btn btn-primary"
+          :disabled="savingLocation || !hasLocationChanges"
+          @click="saveShopLocation"
+        >
+          <span v-if="savingLocation" class="btn-loading">
+            <span class="spinner"></span>
+            Đang lưu...
+          </span>
+          <span v-else>
+            <i class="ri-save-3-line"></i> Lưu vị trí quán
+          </span>
+        </button>
       </div>
     </div>
 

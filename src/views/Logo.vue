@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue'
 import { getOneSheet, dispatchAction } from '@/config/api'
 import { uploadImageToCloudinary } from '@/utils/imageUpload.js'
 import { DEFAULT_SEO_CONFIG, resolveBrandAssets } from '@/utils/brandAssets.js'
@@ -12,6 +12,8 @@ const logoRow = ref(null)
 const savedState = ref({
   name: '',
   shortName: '',
+  shopAddress: '',
+  mapUrl: '',
   logoUrl: '',
   faviconUrl: '',
   mobileIconUrl: '',
@@ -26,6 +28,8 @@ const savedState = ref({
 // Editable text & SEO fields
 const nameInput = ref('')
 const shortNameInput = ref('')
+const shopAddressInput = ref('')
+const mapUrlInput = ref('')
 const seoTitleInput = ref('')
 const seoDescInput = ref('')
 const seoH1Input = ref('')
@@ -112,6 +116,8 @@ function resetDraft() {
   }
   nameInput.value = savedState.value.name
   shortNameInput.value = savedState.value.shortName
+  shopAddressInput.value = savedState.value.shopAddress
+  mapUrlInput.value = savedState.value.mapUrl
   seoTitleInput.value = savedState.value.seoTitle
   seoDescInput.value = savedState.value.seoDescription
   seoH1Input.value = savedState.value.seoH1
@@ -194,6 +200,9 @@ const effectiveSeoTitle = computed(
 const effectiveSeoDesc = computed(
   () => seoDescInput.value.trim() || DEFAULT_SEO_CONFIG.seoDescription,
 )
+const effectiveSeoH1 = computed(
+  () => seoH1Input.value.trim() || DEFAULT_SEO_CONFIG.seoH1,
+)
 const seoTitleMeter = computed(() => getSeoMeter(seoTitleInput.value.trim().length, 30, 60, 70))
 const seoDescMeter = computed(() => getSeoMeter(seoDescInput.value.trim().length, 100, 160, 180))
 const seoH1Meter = computed(() => getSeoMeter(seoH1Input.value.trim().length, 20, 70, 90))
@@ -210,6 +219,8 @@ const hasChanges = computed(() => {
   return (
     nameInput.value.trim() !== savedState.value.name ||
     shortNameInput.value.trim() !== savedState.value.shortName ||
+    shopAddressInput.value.trim() !== savedState.value.shopAddress ||
+    mapUrlInput.value.trim() !== savedState.value.mapUrl ||
     seoTitleInput.value.trim() !== savedState.value.seoTitle ||
     seoDescInput.value.trim() !== savedState.value.seoDescription ||
     seoH1Input.value.trim() !== savedState.value.seoH1 ||
@@ -237,6 +248,11 @@ async function loadData() {
     savedState.value = {
       name: String(row?.Name || '').trim(),
       shortName: String(row?.Short_Name || '').trim(),
+      shopAddress:
+        row?.Shop_Address !== undefined && row?.Shop_Address !== null
+          ? String(row.Shop_Address).trim()
+          : DEFAULT_SEO_CONFIG.shopAddress,
+      mapUrl: String(row?.Map_URL || '').trim(),
       logoUrl: String(row?.URL || '').trim(),
       faviconUrl: String(row?.Favicon_URL || '').trim(),
       mobileIconUrl: String(row?.Mobile_Icon_URL || '').trim(),
@@ -327,6 +343,8 @@ async function saveAll() {
         URL: mainUrl,
         Name: nameInput.value.trim(),
         Short_Name: shortNameInput.value.trim(),
+        Shop_Address: shopAddressInput.value.trim(),
+        Map_URL: mapUrlInput.value.trim(),
         Favicon_URL: faviconUrl,
         Mobile_Icon_URL: mobileIconUrl,
         Share_Image_URL: shareImageUrl,
@@ -353,6 +371,17 @@ async function saveAll() {
 }
 
 onMounted(loadData)
+
+let hasMountedLogoOnce = false
+onActivated(() => {
+  if (!hasMountedLogoOnce) {
+    hasMountedLogoOnce = true
+    return
+  }
+  if (!hasChanges.value && !saving.value) {
+    loadData()
+  }
+})
 
 onUnmounted(() => {
   if (toastTimer) clearTimeout(toastTimer)
@@ -464,6 +493,30 @@ onUnmounted(() => {
                 class="form-input"
                 placeholder="VD: SA KITCHEN (để trống tự lấy Tên Shop)"
                 maxlength="32"
+              />
+            </div>
+
+            <div class="form-group no-margin">
+              <label class="form-label" for="brand-shop-address">Vị trí / Khu vực phục vụ (Footer PC &amp; Local SEO)</label>
+              <input
+                id="brand-shop-address"
+                v-model="shopAddressInput"
+                type="text"
+                class="form-input"
+                placeholder="VD: Manila · Pasay · Makati, Philippines"
+                maxlength="200"
+              />
+            </div>
+
+            <div class="form-group no-margin">
+              <label class="form-label" for="brand-map-url">Link Google Maps (không bắt buộc)</label>
+              <input
+                id="brand-map-url"
+                v-model="mapUrlInput"
+                type="url"
+                class="form-input"
+                placeholder="VD: https://maps.app.goo.gl/..."
+                maxlength="300"
               />
             </div>
           </div>
@@ -749,7 +802,7 @@ onUnmounted(() => {
                 ></div>
               </div>
               <div class="seo-field-hint">
-                Chuẩn Google: <strong>50 – 60 ký tự</strong>. Chứa tên thương hiệu + từ khóa chính.
+                Chuẩn Google: <strong>30 – 60 ký tự</strong>. Chứa tên thương hiệu + từ khóa chính.
               </div>
             </div>
 
@@ -779,7 +832,7 @@ onUnmounted(() => {
                 ></div>
               </div>
               <div class="seo-field-hint">
-                Chuẩn Google: <strong>120 – 160 ký tự</strong>. Hiện ngay bên dưới tiêu đề trên kết quả tìm kiếm Google &amp; thẻ gửi link Telegram/Zalo.
+                Chuẩn Google: <strong>100 – 160 ký tự</strong>. Hiện ngay bên dưới tiêu đề trên kết quả tìm kiếm Google &amp; thẻ gửi link Telegram/Zalo.
               </div>
             </div>
 
@@ -919,6 +972,13 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- 5. Homepage Bottom H1 + Intro Preview -->
+          <div class="mock-h1-box">
+            <div class="pt-label"><i class="ri-h-1"></i> Hộp thẻ &lt;h1&gt; chuẩn SEO cuối trang chủ</div>
+            <div class="mh1-title">{{ effectiveSeoH1 }}</div>
+            <div v-if="seoIntroInput.trim()" class="mh1-intro">{{ seoIntroInput.trim() }}</div>
           </div>
 
           <div class="cache-tip">
@@ -1766,6 +1826,32 @@ onUnmounted(() => {
   display: block;
 }
 
+.mock-h1-box {
+  margin-top: 16px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.mh1-title {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.mh1-intro {
+  max-width: 680px;
+  font-size: 12.5px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
 .cache-tip {
   margin-top: 16px;
   display: flex;
@@ -1879,7 +1965,7 @@ onUnmounted(() => {
 
 @media (max-width: 768px) {
   .admin-page {
-    padding: 16px;
+    padding: 16px 16px calc(96px + env(safe-area-inset-bottom));
   }
   .brand-page-title {
     font-size: 20px;

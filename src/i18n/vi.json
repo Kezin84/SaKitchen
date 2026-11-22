@@ -182,6 +182,9 @@
     "title": "NỘI DUNG ĐƠN HÀNG",
     "subtitle": "Kiểm tra lại đơn hàng và gửi cho quán qua kênh liên hệ bên dưới",
     "savedWeb": "Đã ghi nhận trên hệ thống",
+    "submitSuccessTitle": "Gửi đơn thành công!",
+    "updateSuccessTitle": "Đã cập nhật đơn hàng!",
+    "submitSuccessSub": "Đã ghi nhận vào thanh tiến trình",
     "messageLabel": "Nội dung tin nhắn đơn",
     "sendChannelTitle": "Gửi đơn nhanh qua",
     "copy": "Copy đơn hàng",
@@ -267,5 +270,15 @@
     "finalCancelledTitle": "Đơn #{code} đã bị hủy",
     "finalNewOrderBtn": "Đặt đơn mới",
     "finalCloseBtn": "Đóng"
+  },
+  "footer": {
+    "exploreTitle": "Khám phá",
+    "blogLink": "Blog & Cẩm nang ẩm thực",
+    "welcomeLink": "Giới thiệu quán",
+    "safetyTitle": "Xác thực & An toàn",
+    "locationLabel": "Khu vực phục vụ",
+    "viewMap": "Xem bản đồ",
+    "backToTop": "Lên đầu trang",
+    "rights": "Đặt món trực tuyến giao nhanh tận nơi."
   }
 }

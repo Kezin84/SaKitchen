@@ -182,6 +182,9 @@
     "title": "ORDER CONTENT",
     "subtitle": "Review your order summary and send it to the shop below",
     "savedWeb": "Saved on system",
+    "submitSuccessTitle": "Order submitted!",
+    "updateSuccessTitle": "Order updated!",
+    "submitSuccessSub": "Synced to order progress",
     "messageLabel": "Order summary text",
     "sendChannelTitle": "Quick send via",
     "copy": "Copy order",
@@ -267,5 +270,15 @@
     "finalCancelledTitle": "Order #{code} cancelled",
     "finalNewOrderBtn": "Start new order",
     "finalCloseBtn": "Close"
+  },
+  "footer": {
+    "exploreTitle": "Explore",
+    "blogLink": "Food Blog & Guides",
+    "welcomeLink": "About Us",
+    "safetyTitle": "Trust & Safety",
+    "locationLabel": "Service Area",
+    "viewMap": "View Map",
+    "backToTop": "Back to top",
+    "rights": "Fast online food ordering & delivery."
   }
 }

@@ -8114,13 +8114,6 @@ watch(
   },
 )
 
-watch(
-  () => [cartItems.value.length, isOrderLocked.value],
-  ([len, locked]) => {
-    setTelegramClosingConfirmation(Number(len) > 0 && !locked)
-  },
-)
-
 function onWindowScroll() {
   if (isMobile.value) {
     updateScrollTopVisibility()
@@ -8920,6 +8913,13 @@ const cartCurrency = computed(
 
 const cartQtyTotal = computed(() =>
   cartItems.value.reduce((sum, i) => sum + i.qty, 0)
+)
+
+watch(
+  () => [cartItems.value.length, isOrderLocked.value],
+  ([len, locked]) => {
+    setTelegramClosingConfirmation(Number(len) > 0 && !locked)
+  },
 )
 
 

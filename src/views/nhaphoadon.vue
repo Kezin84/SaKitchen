@@ -2834,6 +2834,7 @@
     <div class="hd-footer-note">
       <div class="footer-line">Cảm ơn quý khách đã mua hàng!</div>
       <div class="footer-line">Vui lòng kiểm tra kỹ hàng trước khi nhận.</div>
+      <div class="footer-web">WEBSITE : SAKITCHEN.SHOP</div>
     </div>
   </div>
 
@@ -9937,6 +9938,7 @@ function buildIsolatedInvoiceStyles() {
     .hd-promo-next-text { font-size: 12px; font-weight: 700; color: #b45309; line-height: 1.35; }
     .hd-footer-note { text-align: center; padding-top: 20px; border-top: 2px solid #e5e7eb; }
     .footer-line { font-size: 12px; color: #6b7280; font-weight: 500; margin: 4px 0; font-style: italic; }
+    .footer-web { font-size: 12px; color: #1f2937; font-weight: 800; letter-spacing: 0.6px; margin-top: 6px; }
   `
 }
 
@@ -14052,6 +14054,14 @@ textarea:focus {
   font-weight: 500;
   margin: 4px 0;
   font-style: italic;
+}
+
+.footer-web {
+  font-size: 12px;
+  color: #1f2937;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  margin-top: 6px;
 }
 
 /* ============================================

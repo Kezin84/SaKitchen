@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin/
+Disallow: /login
+Disallow: /crm
+Disallow: /api/
+
+Sitemap: https://sakitchen.shop/sitemap.xml

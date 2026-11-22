@@ -180,15 +180,76 @@ async function requestCloudinarySignature(folder) {
   return json
 }
 
+function toPngFileName(name) {
+  const raw = String(name || 'icon').trim() || 'icon'
+  const base = raw.replace(/\.[^/.]+$/, '') || 'icon'
+  return `${base}.png`
+}
+
+function encodeCanvasToPng(img, width, height) {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(width))
+    canvas.height = Math.max(1, Math.round(height))
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) {
+      reject(new Error('Trình duyệt không hỗ trợ xử lý ảnh Canvas'))
+      return
+    }
+
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error('Không thể xuất ảnh PNG'))
+          return
+        }
+        resolve(blob)
+      },
+      'image/png',
+    )
+  })
+}
+
+export async function compressImageToPng(file, options = {}) {
+  if (!file || (file.type && !file.type.startsWith('image/'))) {
+    throw new Error('Vui lòng chọn file hình ảnh hợp lệ')
+  }
+
+  const maxWidth = options.maxWidth ?? 512
+  const maxHeight = options.maxHeight ?? 512
+  const originalName = 'name' in file ? file.name : 'icon.png'
+  const pngName = toPngFileName(originalName)
+
+  const img = await loadImageElement(file)
+  const scale = Math.min(1, maxWidth / img.naturalWidth, maxHeight / img.naturalHeight)
+  const width = Math.max(1, Math.round(img.naturalWidth * scale))
+  const height = Math.max(1, Math.round(img.naturalHeight * scale))
+  const blob = await encodeCanvasToPng(img, width, height)
+  return new File([blob], pngName, { type: 'image/png', lastModified: Date.now() })
+}
+
 /**
- * Compress an image to ~100KB JPG and upload it to Cloudinary, returning the hosted HTTPS URL.
+ * Compress an image to ~100KB JPG (or transparent PNG when preserveTransparency is true)
+ * and upload it to Cloudinary, returning the hosted HTTPS URL.
  * @param {File|Blob} file
  * @param {Object} [options]
  * @param {string} [options.folder='sakitchen']
+ * @param {boolean} [options.preserveTransparency=false]
  * @returns {Promise<string>}
  */
 export async function uploadImageToCloudinary(file, options = {}) {
-  const compressedFile = await compressImageToJpg(file, options)
+  const keepPng =
+    Boolean(options.preserveTransparency) &&
+    (file?.type === 'image/png' || file?.type === 'image/webp' || file?.type === 'image/svg+xml')
+  const compressedFile = keepPng
+    ? await compressImageToPng(file, options)
+    : await compressImageToJpg(file, options)
   const folder = options.folder || DEFAULT_CLOUDINARY_FOLDER
   const sign = await requestCloudinarySignature(folder)
   const cloudName = sign.cloudName || CLOUDINARY_CLOUD_NAME

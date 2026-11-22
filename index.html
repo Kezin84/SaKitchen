@@ -7,6 +7,23 @@
   <meta name="viewport"
     content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-PGQ3HTNH');</script>
+  <!-- End Google Tag Manager -->
+
+  <!-- Google tag (gtag.js) - GA4 (sakitchen.shop) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-8W9RJ3WEY4"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-8W9RJ3WEY4');
+  </script>
+
   <!-- Google Fonts: Be Vietnam Pro -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -26,12 +43,17 @@
 
   <meta property="og:title" content="SA KITCHEN - Ẩm Thực Việt Tại Philippines" />
   <meta property="og:description" content="Khám phá ngay thực đơn đa dạng từ cơm văn phòng, món nhậu bình dân đến dịch vụ đi chợ hộ. Đặt món Online 24/24 tại Manila!" />
-  <meta property="og:image" content="https://sakitchen.shop/logo-sa.jpg" />
+  <meta property="og:site_name" content="SA KITCHEN" />
+  <meta property="og:image" content="https://sakitchen.shop/og-share.jpg" />
   <meta property="og:url" content="https://sakitchen.shop/" />
   <meta property="og:type" content="restaurant" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="SA KITCHEN - Ẩm Thực Việt Tại Philippines" />
+  <meta name="twitter:description" content="Khám phá ngay thực đơn đa dạng từ cơm văn phòng, món nhậu bình dân đến dịch vụ đi chợ hộ. Đặt món Online 24/24 tại Manila!" />
+  <meta name="twitter:image" content="https://sakitchen.shop/og-share.jpg" />
 
-  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
-  <link rel="icon" href="/logo-sa.jpg" type="image/jpeg" />
+  <link rel="icon" href="/favicon.ico" sizes="48x48" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -39,76 +61,63 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="SA KITCHEN" />
   <meta name="theme-color" content="#059669" />
-  <title id="page-title">SA KITCHEN - ẨM THỰC VIỆT TẠI PHILIPPINES</title>
+  <title id="page-title">SA KITCHEN - Ẩm Thực Việt Tại Philippines</title>
 
-  <!-- Schema.org JSON-LD (Định danh Website cho Google SEO) -->
-  <script type="application/ld+json">
+  <!-- Schema.org JSON-LD (Định danh Website + Logo + Nhà hàng cho Google SEO) -->
+  <script id="sa-seo-jsonld" type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "Restaurant",
-    "name": "SA KITCHEN - Ẩm Thực Việt Tại Philippines",
-    "image": "https://sakitchen.shop/logo-sa.jpg",
-    "description": "Quán ăn chuyên đồ ăn Việt, cơm văn phòng, món nhậu và dịch vụ đi chợ hộ giao tận nơi tại Manila, Philippines. Mở cửa 24/24.",
-    "address": {
-      "@type": "PostalAddress",
-      "addressLocality": "Manila",
-      "addressCountry": "PH"
-    },
-    "servesCuisine": "Vietnamese",
-    "priceRange": "$$",
-    "url": "https://sakitchen.shop/"
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://sakitchen.shop/#website",
+        "url": "https://sakitchen.shop/",
+        "name": "SA KITCHEN",
+        "alternateName": "sakitchen.shop",
+        "description": "SA KITCHEN chuyên cung cấp ẩm thực chuẩn vị Việt Nam, cơm văn phòng, món nhậu và dịch vụ đi chợ hộ giao nhanh 24/24 tại Manila, Philippines.",
+        "inLanguage": "vi"
+      },
+      {
+        "@type": "Restaurant",
+        "@id": "https://sakitchen.shop/#restaurant",
+        "name": "SA KITCHEN - Ẩm Thực Việt Tại Philippines",
+        "url": "https://sakitchen.shop/",
+        "logo": "https://sakitchen.shop/favicon-192.png",
+        "image": "https://sakitchen.shop/og-share.jpg",
+        "description": "SA KITCHEN chuyên cung cấp ẩm thực chuẩn vị Việt Nam, cơm văn phòng, món nhậu và dịch vụ đi chợ hộ giao nhanh 24/24 tại Manila, Philippines.",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Manila",
+          "addressCountry": "PH"
+        },
+        "servesCuisine": "Vietnamese",
+        "priceRange": "$$"
+      }
+    ]
   }
   </script>
 
   <script>
     (function () {
       try {
-        const params = new URLSearchParams(window.location.search);
-        const ncc = params.get('ncc');
-
-        if (ncc) {
-          const cachedTitle = localStorage.getItem('SHOP_TITLE_' + ncc);
-          const cachedIcon = localStorage.getItem('SHOP_ICON_' + ncc);
-
-          if (cachedTitle) {
-            document.title = cachedTitle;
-          } else {
-            document.title = 'SA KITCHEN';
-          }
-
-          if (cachedIcon) {
-            var link = document.querySelector("link[rel~='icon']");
-            if (!link) {
-              link = document.createElement('link');
-              link.rel = 'icon';
-              link.type = 'image/jpeg';
-              document.head.appendChild(link);
-            }
-            link.href = cachedIcon;
-          } else {
-            var link = document.querySelector("link[rel~='icon']");
-            if (!link) {
-              link = document.createElement('link');
-              link.rel = 'icon';
-              link.type = 'image/jpeg';
-              document.head.appendChild(link);
-            }
-            link.href = '/logo-sa.jpg';
-          }
-        } else {
-          document.title = 'SA KITCHEN';
+        var params = new URLSearchParams(window.location.search);
+        var ncc = params.get('ncc');
+        if (!ncc) return;
+        var cachedTitle = localStorage.getItem('SHOP_TITLE_' + ncc);
+        var cachedIcon = localStorage.getItem('SHOP_ICON_' + ncc);
+        if (cachedTitle) {
+          document.title = cachedTitle;
+        }
+        if (cachedIcon) {
           var link = document.querySelector("link[rel~='icon']");
           if (!link) {
             link = document.createElement('link');
             link.rel = 'icon';
-            link.type = 'image/jpeg';
             document.head.appendChild(link);
           }
-          link.href = '/logo-sa.jpg';
+          link.href = cachedIcon;
         }
-      } catch (e) {
-        document.title = 'SA KITCHEN';
-      }
+      } catch (e) {}
     })();
   </script>
 
@@ -184,6 +193,11 @@
 </head>
 
 <body>
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PGQ3HTNH"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+
   <!-- LOADING SCREEN -->
   <div id="app-loader">
     <div class="loader-spinner"></div>

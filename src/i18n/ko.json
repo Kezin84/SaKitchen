@@ -1,7 +1,7 @@
 {
   "menu": {
     "category": "카테고리",
-    "allCategories": "전체 카테고리",
+    "allCategories": "전체 메뉴",
     "itemsUnit": "개",
     "clearFilter": "초기화",
     "detail": "상세 보기",
@@ -47,7 +47,10 @@
     "all": "전체",
     "asc": "가격 오름차순",
     "desc": "가격 내림차순",
-    "changeLang": "언어 변경"
+    "changeLang": "언어 변경",
+    "viewModeLabel": "보기 모드",
+    "viewCard": "상세 보기",
+    "viewMenu": "빠른 선택"
   },
   "empty": {
     "menu": "검색어에 맞는 메뉴가 없습니다"
@@ -220,7 +223,8 @@
     "scrollTop": "맨 위로",
     "ok": "확인",
     "lightMode": "라이트 모드",
-    "darkMode": "다크 모드"
+    "darkMode": "다크 모드",
+    "openLink": "링크 열기"
   },
   "promo": {
     "freeshipLabel": "무료 배달",

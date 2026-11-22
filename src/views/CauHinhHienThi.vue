@@ -9,6 +9,7 @@ import {
   CARD_RADIUS_OPTIONS,
   SEASONAL_EFFECT_OPTIONS,
   INTRO_SPLASH_MODE_OPTIONS,
+  MENU_VIEW_MODE_OPTIONS,
   normalizeThemeConfig,
   buildStorefrontThemeVars,
   sanitizeHexColor,
@@ -60,9 +61,10 @@ const shopBrand = ref({
 const savedTheme = ref({ ...DEFAULT_STOREFRONT_THEME })
 const draft = ref({ ...DEFAULT_STOREFRONT_THEME })
 
-// Local preview toggles (so admin can test both Light/Dark and Mobile/Desktop)
+// Local preview toggles (so admin can test Light/Dark, Mobile/Desktop, and View Mode)
 const previewDevice = ref('mobile') // 'desktop' | 'mobile'
 const previewColorScheme = ref('light') // 'light' | 'dark'
+const previewMenuViewMode = ref('card') // 'card' | 'board'
 const showSplashPreview = ref(false)
 const splashPreviewKey = ref(0)
 
@@ -148,6 +150,7 @@ function themeComparableKey(cfg) {
     primaryColor: cfg.primaryColor,
     secondaryColor: cfg.secondaryColor,
     defaultColorScheme: cfg.defaultColorScheme,
+    defaultMenuViewMode: cfg.defaultMenuViewMode,
     surfaceStyle: cfg.surfaceStyle,
     cardRadius: cfg.cardRadius,
     seasonalEffect: cfg.seasonalEffect,
@@ -231,15 +234,22 @@ function setDefaultScheme(scheme) {
   previewColorScheme.value = draft.value.defaultColorScheme
 }
 
+function setDefaultMenuViewMode(mode) {
+  draft.value.defaultMenuViewMode = mode === 'board' ? 'board' : 'card'
+  previewMenuViewMode.value = draft.value.defaultMenuViewMode
+}
+
 function resetToDefault() {
   draft.value = { ...DEFAULT_STOREFRONT_THEME }
   previewColorScheme.value = DEFAULT_STOREFRONT_THEME.defaultColorScheme
+  previewMenuViewMode.value = DEFAULT_STOREFRONT_THEME.defaultMenuViewMode
   showAlert('Đã đặt lại về giao diện mặc định (Xanh Ngọc – Vàng). Nhấn "Lưu & Áp dụng" để đồng bộ.', 'info')
 }
 
 function discardDraftChanges() {
   draft.value = { ...normalizedSaved.value }
   previewColorScheme.value = normalizedSaved.value.defaultColorScheme || 'light'
+  previewMenuViewMode.value = normalizedSaved.value.defaultMenuViewMode || 'card'
 }
 
 async function loadConfig() {
@@ -254,6 +264,7 @@ async function loadConfig() {
     savedTheme.value = { ...theme }
     draft.value = { ...theme }
     previewColorScheme.value = theme.defaultColorScheme || 'light'
+    previewMenuViewMode.value = theme.defaultMenuViewMode || 'card'
 
     const logoRows = Array.isArray(logoRes?.data) ? logoRes.data : []
     const mainLogo = logoRows.find((r) => r?.URL) || logoRows[0]
@@ -556,62 +567,98 @@ onMounted(() => {
           </div>
         </section>
 
-        <!-- 2. CHẾ ĐỘ SÁNG / TỐI MẶC ĐỊNH -->
+        <!-- 2. CHẾ ĐỘ SÁNG / TỐI & KIỂU THỰC ĐƠN MẶC ĐỊNH -->
         <section class="cfg-card">
           <div class="cfg-card-head">
             <div>
               <h2 class="cfg-card-title">
                 <i class="ri-contrast-2-fill"></i>
-                <span>2. Chế độ Sáng / Tối mặc định</span>
+                <span>2. Chế độ Sáng / Tối & Kiểu thực đơn mặc định</span>
               </h2>
               <p class="cfg-card-desc">
-                Áp dụng cho khách truy cập lần đầu. Khách hàng vẫn luôn có nút tự chuyển Sáng/Tối trên thanh tiêu đề.
+                Áp dụng mặc định khi khách vào trang Order. Khách hàng vẫn luôn có thể tự chuyển đổi theo ý thích.
               </p>
             </div>
           </div>
 
-          <div class="scheme-grid">
-            <button
-              type="button"
-              class="option-card"
-              :class="{ active: draft.defaultColorScheme === 'light' }"
-              @click="setDefaultScheme('light')"
-            >
-              <div class="option-icon is-light"><i class="ri-sun-fill"></i></div>
-              <div class="option-text">
-                <div class="option-title">Giao diện Sáng (Light)</div>
-                <div class="option-desc">Tươi sáng, rõ ảnh món ăn, phù hợp ban ngày</div>
-              </div>
-              <i
-                class="option-radio"
-                :class="
-                  draft.defaultColorScheme === 'light'
-                    ? 'ri-radio-button-fill'
-                    : 'ri-checkbox-blank-circle-line'
-                "
-              ></i>
-            </button>
+          <div class="sub-group">
+            <div class="sub-group-label">Chế độ màu mặc định</div>
+            <div class="scheme-grid">
+              <button
+                type="button"
+                class="option-card"
+                :class="{ active: draft.defaultColorScheme === 'light' }"
+                @click="setDefaultScheme('light')"
+              >
+                <div class="option-icon is-light"><i class="ri-sun-fill"></i></div>
+                <div class="option-text">
+                  <div class="option-title">Giao diện Sáng (Light)</div>
+                  <div class="option-desc">Tươi sáng, rõ ảnh món ăn, phù hợp ban ngày</div>
+                </div>
+                <i
+                  class="option-radio"
+                  :class="
+                    draft.defaultColorScheme === 'light'
+                      ? 'ri-radio-button-fill'
+                      : 'ri-checkbox-blank-circle-line'
+                  "
+                ></i>
+              </button>
 
-            <button
-              type="button"
-              class="option-card"
-              :class="{ active: draft.defaultColorScheme === 'dark' }"
-              @click="setDefaultScheme('dark')"
-            >
-              <div class="option-icon is-dark"><i class="ri-moon-clear-fill"></i></div>
-              <div class="option-text">
-                <div class="option-title">Giao diện Tối (Dark)</div>
-                <div class="option-desc">Dịu mắt ban đêm, nổi bật tông màu sang trọng</div>
-              </div>
-              <i
-                class="option-radio"
-                :class="
-                  draft.defaultColorScheme === 'dark'
-                    ? 'ri-radio-button-fill'
-                    : 'ri-checkbox-blank-circle-line'
-                "
-              ></i>
-            </button>
+              <button
+                type="button"
+                class="option-card"
+                :class="{ active: draft.defaultColorScheme === 'dark' }"
+                @click="setDefaultScheme('dark')"
+              >
+                <div class="option-icon is-dark"><i class="ri-moon-clear-fill"></i></div>
+                <div class="option-text">
+                  <div class="option-title">Giao diện Tối (Dark)</div>
+                  <div class="option-desc">Dịu mắt ban đêm, nổi bật tông màu sang trọng</div>
+                </div>
+                <i
+                  class="option-radio"
+                  :class="
+                    draft.defaultColorScheme === 'dark'
+                      ? 'ri-radio-button-fill'
+                      : 'ri-checkbox-blank-circle-line'
+                  "
+                ></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="sub-group">
+            <div class="sub-group-label">Kiểu hiển thị thực đơn mặc định</div>
+            <div class="scheme-grid">
+              <button
+                v-for="opt in MENU_VIEW_MODE_OPTIONS"
+                :key="opt.id"
+                type="button"
+                class="option-card"
+                :class="{ active: draft.defaultMenuViewMode === opt.id }"
+                @click="setDefaultMenuViewMode(opt.id)"
+              >
+                <div
+                  class="option-icon"
+                  :class="opt.id === 'board' ? 'is-quick-mode' : 'is-detail-mode'"
+                >
+                  <i :class="opt.icon"></i>
+                </div>
+                <div class="option-text">
+                  <div class="option-title">{{ opt.label }}</div>
+                  <div class="option-desc">{{ opt.desc }}</div>
+                </div>
+                <i
+                  class="option-radio"
+                  :class="
+                    draft.defaultMenuViewMode === opt.id
+                      ? 'ri-radio-button-fill'
+                      : 'ri-checkbox-blank-circle-line'
+                  "
+                ></i>
+              </button>
+            </div>
           </div>
         </section>
 
@@ -998,6 +1045,25 @@ onMounted(() => {
               <div class="seg-toggle">
                 <button
                   type="button"
+                  :class="{ active: previewMenuViewMode === 'card' }"
+                  @click="previewMenuViewMode = 'card'"
+                  title="Xem thử Dạng Chi Tiết"
+                >
+                  <i class="ri-layout-grid-line"></i>
+                </button>
+                <button
+                  type="button"
+                  :class="{ active: previewMenuViewMode === 'board' }"
+                  @click="previewMenuViewMode = 'board'"
+                  title="Xem thử Dạng Chọn Nhanh"
+                >
+                  <i class="ri-flashlight-line"></i>
+                </button>
+              </div>
+
+              <div class="seg-toggle">
+                <button
+                  type="button"
                   :class="{ active: previewColorScheme === 'light' }"
                   @click="previewColorScheme = 'light'"
                   title="Xem thử chế độ Sáng"
@@ -1068,8 +1134,34 @@ onMounted(() => {
                   <span class="mk-cat">Đồ Uống</span>
                 </div>
 
-                <!-- Product Grid -->
-                <div class="mk-grid" :class="{ 'is-3col': previewDevice === 'desktop' }">
+                <!-- Centered View Switcher Preview -->
+                <div class="mk-view-bar">
+                  <div class="mk-view-switcher">
+                    <span
+                      class="mk-vs-pill"
+                      :class="{ active: previewMenuViewMode === 'card' }"
+                      @click="previewMenuViewMode = 'card'"
+                    >
+                      <i class="ri-layout-grid-line"></i>
+                      <span>Dạng Chi Tiết</span>
+                    </span>
+                    <span
+                      class="mk-vs-pill"
+                      :class="{ active: previewMenuViewMode === 'board' }"
+                      @click="previewMenuViewMode = 'board'"
+                    >
+                      <i class="ri-flashlight-line"></i>
+                      <span>Dạng Chọn Nhanh</span>
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Product Grid (Dạng Chi Tiết) -->
+                <div
+                  v-if="previewMenuViewMode === 'card'"
+                  class="mk-grid"
+                  :class="{ 'is-3col': previewDevice === 'desktop' }"
+                >
                   <div class="mk-card">
                     <div class="mk-thumb">
                       <span class="mk-badge-sale">-15%</span>
@@ -1116,6 +1208,42 @@ onMounted(() => {
                       <button type="button" class="mk-add-btn">
                         <i class="ri-add-line"></i> Thêm vào giỏ
                       </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Quick Pick Menu Board Preview (Dạng Chọn Nhanh) -->
+                <div v-else class="mk-board">
+                  <div class="mk-board-sec">
+                    <div class="mk-board-head">
+                      <span class="mk-board-title">LẨU &amp; MÓN NHẬU</span>
+                      <span class="mk-board-cnt">4</span>
+                    </div>
+                    <div class="mk-board-grid" :class="{ 'is-2col': previewDevice === 'desktop' }">
+                      <div class="mk-board-row">
+                        <span class="mk-board-name">Lẩu Thái Hải Sản</span>
+                        <span class="mk-board-dots"></span>
+                        <strong class="mk-board-price">850₱<small>/Nồi</small></strong>
+                        <span class="mk-board-plus"><i class="ri-add-line"></i></span>
+                      </div>
+                      <div class="mk-board-row">
+                        <span class="mk-board-name">Dê Tái Chanh</span>
+                        <span class="mk-board-dots"></span>
+                        <strong class="mk-board-price">1.200₱<small>/Phần</small></strong>
+                        <span class="mk-board-plus"><i class="ri-add-line"></i></span>
+                      </div>
+                      <div class="mk-board-row">
+                        <span class="mk-board-name">Gà Ta Ủ Muối</span>
+                        <span class="mk-board-dots"></span>
+                        <strong class="mk-board-price">1.550₱<small>/Con</small></strong>
+                        <span class="mk-board-plus"><i class="ri-add-line"></i></span>
+                      </div>
+                      <div class="mk-board-row">
+                        <span class="mk-board-name">Ếch Chiên Mắm</span>
+                        <span class="mk-board-dots"></span>
+                        <strong class="mk-board-price">1.350₱<small>/Phần</small></strong>
+                        <span class="mk-board-plus"><i class="ri-add-line"></i></span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1679,6 +1807,14 @@ onMounted(() => {
 .option-icon.is-dark {
   background: #1e293b;
   color: #facc15;
+}
+.option-icon.is-detail-mode {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.option-icon.is-quick-mode {
+  background: #d1fae5;
+  color: #047857;
 }
 .option-text {
   flex: 1;
@@ -2645,5 +2781,134 @@ onMounted(() => {
   .ims-badges {
     justify-content: flex-start;
   }
+}
+
+/* Mock View Switcher & Quick Pick Preview */
+.mk-view-bar {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.mk-view-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--sa-surface-2);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.mk-vs-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #64748b;
+  cursor: pointer;
+  user-select: none;
+}
+
+.mk-vs-pill.active {
+  background: var(--sa-accent);
+  color: var(--sa-on-accent, #ffffff);
+}
+
+.mk-board-sec {
+  background: var(--sa-surface);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: var(--sa-radius-card, 12px);
+  overflow: hidden;
+}
+
+.mk-board-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--sa-top-header-bg);
+  color: var(--sa-on-primary, #ffffff);
+}
+
+.mk-board-title {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+
+.mk-board-cnt {
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 9.5px;
+  font-weight: 800;
+}
+
+.mk-board-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  padding: 4px 8px 6px;
+}
+
+.mk-board-grid.is-2col {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 10px;
+}
+
+.mk-board-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 2px;
+  border-bottom: 1px dashed rgba(148, 163, 184, 0.25);
+  font-size: 10.5px;
+}
+
+.mk-board-name {
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mock-storefront.is-dark .mk-board-name {
+  color: #f8fafc;
+}
+
+.mk-board-dots {
+  flex: 1;
+  min-width: 8px;
+  border-bottom: 1px dotted rgba(148, 163, 184, 0.45);
+}
+
+.mk-board-price {
+  font-weight: 800;
+  color: var(--sa-price);
+  white-space: nowrap;
+}
+
+.mk-board-price small {
+  font-weight: 600;
+  opacity: 0.72;
+  font-size: 9px;
+}
+
+.mk-board-plus {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--sa-accent);
+  color: var(--sa-on-accent, #ffffff);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
 }
 </style>

@@ -1,7 +1,7 @@
 {
   "menu": {
     "category": "Danh mục",
-    "allCategories": "Tất cả danh mục",
+    "allCategories": "MENU TỔNG",
     "itemsUnit": "món",
     "clearFilter": "Đặt lại",
     "detail": "Xem chi tiết",
@@ -47,7 +47,10 @@
     "all": "Tất cả",
     "asc": "Giá tăng dần",
     "desc": "Giá giảm dần",
-    "changeLang": "Đổi ngôn ngữ"
+    "changeLang": "Đổi ngôn ngữ",
+    "viewModeLabel": "Chế độ hiển thị",
+    "viewCard": "Dạng Chi Tiết",
+    "viewMenu": "Dạng Chọn Nhanh"
   },
   "empty": {
     "menu": "Không có món phù hợp với từ khóa"
@@ -220,7 +223,8 @@
     "scrollTop": "Lên đầu trang",
     "ok": "ĐÃ HIỂU",
     "lightMode": "Giao diện Sáng",
-    "darkMode": "Giao diện Tối"
+    "darkMode": "Giao diện Tối",
+    "openLink": "Mở liên kết"
   },
   "promo": {
     "freeshipLabel": "Freeship",

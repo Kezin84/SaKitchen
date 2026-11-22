@@ -1,7 +1,7 @@
 {
   "menu": {
     "category": "Kategorya",
-    "allCategories": "Lahat ng kategorya",
+    "allCategories": "BUONG MENU",
     "itemsUnit": "item",
     "clearFilter": "I-reset",
     "detail": "Tingnan ang detalye",
@@ -47,7 +47,10 @@
     "all": "Lahat",
     "asc": "Pataas ang presyo",
     "desc": "Pababa ang presyo",
-    "changeLang": "Palitan ang wika"
+    "changeLang": "Palitan ang wika",
+    "viewModeLabel": "Paraan ng pagtingin",
+    "viewCard": "Detalyado",
+    "viewMenu": "Mabilisang Pili"
   },
   "empty": {
     "menu": "Walang tumutugmang pagkain"
@@ -220,7 +223,8 @@
     "scrollTop": "Bumalik sa itaas",
     "ok": "NAINTINDIHAN",
     "lightMode": "Light Mode",
-    "darkMode": "Dark Mode"
+    "darkMode": "Dark Mode",
+    "openLink": "Buksan ang link"
   },
   "promo": {
     "freeshipLabel": "Libreng Shipping",

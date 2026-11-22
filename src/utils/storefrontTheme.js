@@ -112,6 +112,21 @@ export const INTRO_SPLASH_MODE_OPTIONS = [
   },
 ]
 
+export const MENU_VIEW_MODE_OPTIONS = [
+  {
+    id: 'card',
+    label: 'Dạng Chi Tiết',
+    icon: 'ri-layout-grid-line',
+    desc: 'Thẻ ảnh lớn từng món, mô tả & chọn số lượng trực quan',
+  },
+  {
+    id: 'board',
+    label: 'Dạng Chọn Nhanh',
+    icon: 'ri-flashlight-line',
+    desc: 'Bảng thực đơn theo danh mục gồm tên món, giá/ĐVT & nút + chọn lẹ',
+  },
+]
+
 export const STOREFRONT_THEME_PRESETS = [
   {
     id: 'sa-emerald',
@@ -211,6 +226,7 @@ export const DEFAULT_STOREFRONT_THEME = {
   primaryColor: '#059669',
   secondaryColor: '#facc15',
   defaultColorScheme: 'light',
+  defaultMenuViewMode: 'card',
   surfaceStyle: 'clean',
   cardRadius: 'rounded',
   seasonalEffect: 'none',
@@ -266,6 +282,7 @@ export function normalizeThemeConfig(raw) {
       : sanitizeHexColor(raw.secondaryColor, secondaryFallback)
 
   const defaultColorScheme = raw.defaultColorScheme === 'dark' ? 'dark' : 'light'
+  const defaultMenuViewMode = raw.defaultMenuViewMode === 'board' ? 'board' : 'card'
   const surfaceStyle = VALID_SURFACE_STYLES.has(raw.surfaceStyle)
     ? raw.surfaceStyle
     : DEFAULT_STOREFRONT_THEME.surfaceStyle
@@ -300,6 +317,7 @@ export function normalizeThemeConfig(raw) {
     primaryColor,
     secondaryColor,
     defaultColorScheme,
+    defaultMenuViewMode,
     surfaceStyle,
     cardRadius,
     seasonalEffect,
@@ -538,7 +556,12 @@ export function buildStorefrontThemeVars(rawConfig, colorScheme = 'light') {
 
   // Effective accent for active light/dark state
   const activeAccent = isDark ? darkAccent : basePrimary
-  const activeAccentHover = isDark ? basePrimary : primaryHover
+  const onAccent = getRelativeLuminance(activeAccent) > 0.28 ? '#0b1724' : '#ffffff'
+  const activeAccentHover = isDark
+    ? onAccent === '#0b1724'
+      ? mixHex(darkAccent, basePrimary, 0.25)
+      : basePrimary
+    : primaryHover
   const activePrice = isDark ? darkPrice : isLowSatDark ? secDark : basePrimary
 
   return {
@@ -591,6 +614,7 @@ export function buildStorefrontThemeVars(rawConfig, colorScheme = 'light') {
       : `rgba(${primaryBrightRgb}, 0.28)`,
     '--sa-accent': activeAccent,
     '--sa-accent-hover': activeAccentHover,
+    '--sa-on-accent': onAccent,
     '--sa-price': activePrice,
     '--sa-card-hover-shadow': isDark
       ? `0 16px 36px rgba(0, 0, 0, 0.65), 0 4px 14px rgba(${primaryBrightRgb}, 0.2)`

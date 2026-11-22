@@ -25,6 +25,7 @@ import {
 } from '../utils/nccDiscount'
 import { buildUniqueProductCode } from '../utils/productCode'
 import { normalizeThemeConfig } from '../utils/storefrontTheme'
+import { normalizeBannerAction, normalizeBannerLink } from '../utils/bannerLink'
 
 export const CLOUDINARY_CLOUD_NAME = 'dsmtq5rbh'
 export const CLOUDINARY_SIGN_ENDPOINT = '/api/cloudinary-sign'
@@ -3997,6 +3998,8 @@ async function addBanner(body) {
       ID: s(d.ID || genShortId()),
       URL: s(d.URL),
       is_Important: s(d.is_Important),
+      Click_action: normalizeBannerAction(d.Click_action),
+      Link_url: normalizeBannerLink(d.Link_url),
       Thu_tu: insertIdx + 1,
     },
   }
@@ -4030,6 +4033,14 @@ async function updateBanner(body) {
     ID: s(d.ID),
     URL: d.URL !== undefined ? s(d.URL) : s(target.row.URL),
     is_Important: d.is_Important !== undefined ? s(d.is_Important) : s(target.row.is_Important),
+    Click_action:
+      d.Click_action !== undefined
+        ? normalizeBannerAction(d.Click_action)
+        : normalizeBannerAction(target.row.Click_action),
+    Link_url:
+      d.Link_url !== undefined
+        ? normalizeBannerLink(d.Link_url)
+        : normalizeBannerLink(target.row.Link_url),
     Thu_tu: currentIdx + 1,
   }
 
@@ -4102,16 +4113,30 @@ async function deleteBanner(body) {
 }
 
 // --- logo ---
+function buildLogoRowPayload(d = {}, existing = null) {
+  return sanitizeRow({
+    ID: s(d.ID || existing?.ID || genShortId()),
+    URL: d.URL !== undefined ? s(d.URL) : s(existing?.URL),
+    Name: d.Name !== undefined ? s(d.Name) : s(existing?.Name),
+    Short_Name: d.Short_Name !== undefined ? s(d.Short_Name) : s(existing?.Short_Name),
+    Favicon_URL: d.Favicon_URL !== undefined ? s(d.Favicon_URL) : s(existing?.Favicon_URL),
+    Mobile_Icon_URL:
+      d.Mobile_Icon_URL !== undefined ? s(d.Mobile_Icon_URL) : s(existing?.Mobile_Icon_URL),
+    Share_Image_URL:
+      d.Share_Image_URL !== undefined ? s(d.Share_Image_URL) : s(existing?.Share_Image_URL),
+    SEO_Title: d.SEO_Title !== undefined ? s(d.SEO_Title) : s(existing?.SEO_Title),
+    SEO_Description:
+      d.SEO_Description !== undefined ? s(d.SEO_Description) : s(existing?.SEO_Description),
+    SEO_H1: d.SEO_H1 !== undefined ? s(d.SEO_H1) : s(existing?.SEO_H1),
+    SEO_Intro: d.SEO_Intro !== undefined ? s(d.SEO_Intro) : s(existing?.SEO_Intro),
+    SEO_Keywords: d.SEO_Keywords !== undefined ? s(d.SEO_Keywords) : s(existing?.SEO_Keywords),
+    Updated_at: Date.now(),
+  })
+}
+
 async function addLogo(body) {
   const d = body.data || {}
-  await set(
-    dbRef(db, `logo/${createRowKey()}`),
-    sanitizeRow({
-      ID: s(d.ID || genShortId()),
-      URL: s(d.URL),
-      Name: s(d.Name),
-    }),
-  )
+  await set(dbRef(db, `logo/${createRowKey()}`), buildLogoRowPayload(d))
   return { success: true }
 }
 
@@ -4122,12 +4147,8 @@ async function updateLogo(body) {
   const target = entries.find((e) => s(e.row.ID) === s(d.ID))
   if (!target) return { success: false }
 
-  target.row = {
-    ID: s(d.ID),
-    URL: s(d.URL),
-    Name: s(d.Name),
-  }
-  await set(dbRef(db, `logo/${target.key}`), sanitizeRow(target.row))
+  target.row = buildLogoRowPayload(d, target.row)
+  await set(dbRef(db, `logo/${target.key}`), target.row)
   return { success: true }
 }
 
@@ -4141,11 +4162,7 @@ async function upsertLogo(body) {
   const target =
     (d.ID && entries.find((e) => s(e.row.ID) === s(d.ID))) || entries[0] || null
 
-  const rowPayload = sanitizeRow({
-    ID: s(d.ID || target?.row?.ID || genShortId()),
-    URL: s(d.URL),
-    Name: s(d.Name),
-  })
+  const rowPayload = buildLogoRowPayload(d, target?.row || null)
 
   if (target) {
     await set(dbRef(db, `logo/${target.key}`), rowPayload)

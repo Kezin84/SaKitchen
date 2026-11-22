@@ -1,7 +1,7 @@
 {
   "menu": {
     "category": "分类",
-    "allCategories": "全部分类",
+    "allCategories": "总菜单",
     "itemsUnit": "项",
     "clearFilter": "重置",
     "detail": "查看详情",
@@ -47,7 +47,10 @@
     "all": "全部",
     "asc": "价格升序",
     "desc": "价格降序",
-    "changeLang": "切换语言"
+    "changeLang": "切换语言",
+    "viewModeLabel": "显示模式",
+    "viewCard": "详情视图",
+    "viewMenu": "快速点餐"
   },
   "empty": {
     "menu": "没有找到符合的菜品"
@@ -220,7 +223,8 @@
     "scrollTop": "返回顶部",
     "ok": "确定",
     "lightMode": "浅色模式",
-    "darkMode": "深色模式"
+    "darkMode": "深色模式",
+    "openLink": "打开链接"
   },
   "promo": {
     "freeshipLabel": "免配送费",

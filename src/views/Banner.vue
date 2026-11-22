@@ -2,6 +2,14 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { getOneSheet, dispatchAction } from '@/config/api'
 import { uploadImageToCloudinary } from '@/utils/imageUpload.js'
+import {
+  BANNER_CLICK_ACTIONS,
+  normalizeBannerAction,
+  normalizeBannerLink,
+  isValidBannerLink,
+  formatBannerLinkShort,
+  openBannerLinkInNewTab,
+} from '@/utils/bannerLink'
 /* ======================
    CONFIG
 ====================== */
@@ -15,6 +23,9 @@ const banners = ref([])
 const file = ref(null)
 const fileInput = ref(null)
 const previewUrl = ref('')
+const bannerClickAction = ref(BANNER_CLICK_ACTIONS.POPUP)
+const bannerLinkUrl = ref('')
+const addLinkError = ref('')
 
 const editingBanner = ref(null)
 const loading = ref(false)
@@ -24,17 +35,76 @@ const editBannerFile = ref(null)
 const editBannerPreview = ref('')
 const editBannerOrder = ref(1)
 const originalEditOrder = ref(1)
+const editBannerAction = ref(BANNER_CLICK_ACTIONS.POPUP)
+const editBannerLink = ref('')
+const originalEditAction = ref(BANNER_CLICK_ACTIONS.POPUP)
+const originalEditLink = ref('')
+const editLinkError = ref('')
 
 const isMobile = ref(typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
 const dragIndex = ref(-1)
 const dragOverIndex = ref(-1)
 const reordering = ref(false)
 
-const hasEditChanges = computed(
-  () =>
+const hasEditChanges = computed(() => {
+  if (!editingBanner.value) return false
+  const trimmedLink = String(editBannerLink.value || '').trim()
+  const normalizedLink = trimmedLink ? normalizeBannerLink(trimmedLink) || trimmedLink : ''
+  return (
     Boolean(editBannerFile.value) ||
-    (Boolean(editingBanner.value) && editBannerOrder.value !== originalEditOrder.value),
-)
+    editBannerOrder.value !== originalEditOrder.value ||
+    editBannerAction.value !== originalEditAction.value ||
+    normalizedLink !== originalEditLink.value
+  )
+})
+
+function validateBannerLinkConfig(action, rawLink) {
+  const normalizedAction = normalizeBannerAction(action)
+  const trimmed = String(rawLink || '').trim()
+
+  if (normalizedAction === BANNER_CLICK_ACTIONS.LINK) {
+    if (!trimmed) {
+      return {
+        ok: false,
+        error: 'Vui lòng nhập đường dẫn khi chọn chế độ Mở link',
+        url: '',
+      }
+    }
+    if (!isValidBannerLink(trimmed)) {
+      return {
+        ok: false,
+        error: 'Đường dẫn chưa hợp lệ (VD: https://t.me/... hoặc https://sakitchen.shop)',
+        url: '',
+      }
+    }
+    return { ok: true, error: '', url: normalizeBannerLink(trimmed) }
+  }
+
+  if (!trimmed) {
+    return { ok: true, error: '', url: '' }
+  }
+  if (!isValidBannerLink(trimmed)) {
+    return {
+      ok: false,
+      error: 'Đường dẫn kèm theo chưa hợp lệ (để trống nếu không cần gắn link)',
+      url: '',
+    }
+  }
+  return { ok: true, error: '', url: normalizeBannerLink(trimmed) }
+}
+
+function getBannerAction(b) {
+  return normalizeBannerAction(b?.Click_action)
+}
+
+function getBannerLink(b) {
+  return normalizeBannerLink(b?.Link_url)
+}
+
+function testBannerLink(raw) {
+  if (!isValidBannerLink(raw)) return
+  openBannerLinkInNewTab(raw)
+}
 
 function updateIsMobile() {
   if (typeof window !== 'undefined') {
@@ -176,6 +246,12 @@ async function addBanner() {
     return
   }
 
+  const check = validateBannerLinkConfig(bannerClickAction.value, bannerLinkUrl.value)
+  addLinkError.value = check.error
+  if (!check.ok) {
+    return
+  }
+
   loading.value = true
   try {
     const imgUrl = await uploadBannerImage(file.value)
@@ -185,6 +261,8 @@ async function addBanner() {
       data: {
         ID: genBannerId(),
         URL: imgUrl,
+        Click_action: normalizeBannerAction(bannerClickAction.value),
+        Link_url: check.url,
       },
     })
 
@@ -218,6 +296,13 @@ function startEdit(banner, index = 0) {
   const pos = index >= 0 ? index + 1 : 1
   editBannerOrder.value = pos
   originalEditOrder.value = pos
+  const action = normalizeBannerAction(banner.Click_action)
+  const link = normalizeBannerLink(banner.Link_url)
+  editBannerAction.value = action
+  originalEditAction.value = action
+  editBannerLink.value = link
+  originalEditLink.value = link
+  editLinkError.value = ''
   showEditBannerModal.value = true
 }
 
@@ -225,6 +310,12 @@ function startEdit(banner, index = 0) {
 async function saveEdit() {
   if (!hasEditChanges.value) {
     alert('Chưa có thay đổi nào để lưu')
+    return
+  }
+
+  const check = validateBannerLinkConfig(editBannerAction.value, editBannerLink.value)
+  editLinkError.value = check.error
+  if (!check.ok) {
     return
   }
 
@@ -240,6 +331,8 @@ async function saveEdit() {
         ID: editingBanner.value.ID,
         URL: imgUrl,
         Thu_tu: editBannerOrder.value,
+        Click_action: normalizeBannerAction(editBannerAction.value),
+        Link_url: check.url,
       },
     })
 
@@ -263,6 +356,11 @@ function closeEditBannerModal() {
   editBannerPreview.value = ''
   editBannerOrder.value = 1
   originalEditOrder.value = 1
+  editBannerAction.value = BANNER_CLICK_ACTIONS.POPUP
+  originalEditAction.value = BANNER_CLICK_ACTIONS.POPUP
+  editBannerLink.value = ''
+  originalEditLink.value = ''
+  editLinkError.value = ''
   loading.value = false
 }
 
@@ -291,6 +389,9 @@ function resetForm() {
   editingBanner.value = null
   file.value = null
   previewUrl.value = ''
+  bannerClickAction.value = BANNER_CLICK_ACTIONS.POPUP
+  bannerLinkUrl.value = ''
+  addLinkError.value = ''
   if (fileInput.value) fileInput.value.value = ''
   loading.value = false
 }
@@ -352,6 +453,86 @@ onUnmounted(() => {
             <div class="preview-label">Xem trước</div>
             <div class="preview-container">
               <img :src="previewUrl" alt="Preview" class="preview-image" />
+            </div>
+          </div>
+
+          <!-- CLICK BEHAVIOR & LINK CONFIG -->
+          <div class="banner-behavior-box">
+            <div class="behavior-field">
+              <label class="behavior-label">Hành động khi khách bấm vào banner</label>
+              <div class="behavior-segment" role="radiogroup" aria-label="Hành động khi bấm banner">
+                <button
+                  type="button"
+                  class="segment-btn"
+                  :class="{ active: bannerClickAction === BANNER_CLICK_ACTIONS.POPUP }"
+                  @click="bannerClickAction = BANNER_CLICK_ACTIONS.POPUP; addLinkError = ''"
+                >
+                  <i class="ri-image-2-line"></i>
+                  <span>Mở popup ảnh</span>
+                </button>
+                <button
+                  type="button"
+                  class="segment-btn is-link-mode"
+                  :class="{ active: bannerClickAction === BANNER_CLICK_ACTIONS.LINK }"
+                  @click="bannerClickAction = BANNER_CLICK_ACTIONS.LINK; addLinkError = ''"
+                >
+                  <i class="ri-external-link-line"></i>
+                  <span>Mở link (tab mới)</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="behavior-field">
+              <label class="behavior-label" for="add-banner-link-input">
+                {{
+                  bannerClickAction === BANNER_CLICK_ACTIONS.LINK
+                    ? 'Đường dẫn mở khi bấm *'
+                    : 'Đường dẫn gắn kèm (không bắt buộc)'
+                }}
+              </label>
+              <div class="link-input-row">
+                <div class="link-input-wrap" :class="{ 'has-error': Boolean(addLinkError) }">
+                  <i class="ri-link link-input-icon"></i>
+                  <input
+                    id="add-banner-link-input"
+                    v-model="bannerLinkUrl"
+                    type="url"
+                    placeholder="VD: https://t.me/sakitchen hoặc https://..."
+                    class="link-input"
+                    @input="addLinkError = ''"
+                  />
+                  <button
+                    v-if="bannerLinkUrl"
+                    type="button"
+                    class="link-clear-btn"
+                    title="Xóa link"
+                    @click="bannerLinkUrl = ''; addLinkError = ''"
+                  >
+                    <i class="ri-close-line"></i>
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  class="btn-test-link"
+                  :disabled="!isValidBannerLink(bannerLinkUrl)"
+                  title="Mở thử đường dẫn ở tab mới"
+                  @click="testBannerLink(bannerLinkUrl)"
+                >
+                  <i class="ri-external-link-line"></i>
+                  <span>Mở thử</span>
+                </button>
+              </div>
+              <p v-if="addLinkError" class="behavior-error">
+                <i class="ri-error-warning-line"></i>
+                <span>{{ addLinkError }}</span>
+              </p>
+              <p v-else class="behavior-hint">
+                {{
+                  bannerClickAction === BANNER_CLICK_ACTIONS.LINK
+                    ? 'Khi khách bấm vào banner, đường dẫn này sẽ tự động mở ở tab mới.'
+                    : 'Nếu có nhập link, popup phóng to ảnh sẽ hiển thị thêm nút "Mở liên kết" ở bên dưới.'
+                }}
+              </p>
             </div>
           </div>
 
@@ -428,6 +609,7 @@ onUnmounted(() => {
               <tr>
                 <th class="th-index">Vị trí hiển thị</th>
                 <th class="th-image">Hình ảnh Banner</th>
+                <th class="th-behavior">Khi bấm vào</th>
                 <th class="th-action">Thao tác</th>
               </tr>
             </thead>
@@ -463,6 +645,46 @@ onUnmounted(() => {
                 <td class="td-image" data-label="Hình ảnh Banner">
                   <div class="image-wrapper">
                     <img :src="b.URL" alt="Banner" class="banner-thumb" draggable="false" />
+                  </div>
+                </td>
+                <td class="td-behavior" data-label="Khi bấm vào">
+                  <div class="behavior-cell">
+                    <span
+                      class="behavior-badge"
+                      :class="{
+                        'is-link': getBannerAction(b) === BANNER_CLICK_ACTIONS.LINK && getBannerLink(b),
+                        'is-popup-link': getBannerAction(b) === BANNER_CLICK_ACTIONS.POPUP && getBannerLink(b),
+                      }"
+                    >
+                      <i
+                        :class="
+                          getBannerAction(b) === BANNER_CLICK_ACTIONS.LINK && getBannerLink(b)
+                            ? 'ri-external-link-line'
+                            : 'ri-image-2-line'
+                        "
+                      ></i>
+                      <span>
+                        {{
+                          getBannerAction(b) === BANNER_CLICK_ACTIONS.LINK && getBannerLink(b)
+                            ? 'Mở link (tab mới)'
+                            : getBannerLink(b)
+                              ? 'Popup + nút mở link'
+                              : 'Mở popup ảnh'
+                        }}
+                      </span>
+                    </span>
+                    <a
+                      v-if="getBannerLink(b)"
+                      :href="getBannerLink(b)"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="behavior-link-preview"
+                      :title="getBannerLink(b)"
+                      @click.stop
+                    >
+                      <i class="ri-link"></i>
+                      <span>{{ formatBannerLinkShort(getBannerLink(b), 34) }}</span>
+                    </a>
                   </div>
                 </td>
                 <td class="td-action" data-label="Thao tác">
@@ -530,6 +752,85 @@ onUnmounted(() => {
                   #{{ pos }}{{ pos === 1 ? ' (Hiển thị đầu tiên)' : '' }}
                 </option>
               </select>
+            </div>
+
+            <div class="banner-behavior-box is-modal">
+              <div class="behavior-field">
+                <label class="behavior-label">Hành động khi khách bấm vào banner</label>
+                <div class="behavior-segment" role="radiogroup" aria-label="Chỉnh sửa hành động banner">
+                  <button
+                    type="button"
+                    class="segment-btn"
+                    :class="{ active: editBannerAction === BANNER_CLICK_ACTIONS.POPUP }"
+                    @click="editBannerAction = BANNER_CLICK_ACTIONS.POPUP; editLinkError = ''"
+                  >
+                    <i class="ri-image-2-line"></i>
+                    <span>Mở popup ảnh</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="segment-btn is-link-mode"
+                    :class="{ active: editBannerAction === BANNER_CLICK_ACTIONS.LINK }"
+                    @click="editBannerAction = BANNER_CLICK_ACTIONS.LINK; editLinkError = ''"
+                  >
+                    <i class="ri-external-link-line"></i>
+                    <span>Mở link (tab mới)</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="behavior-field">
+                <label class="behavior-label" for="edit-banner-link-input">
+                  {{
+                    editBannerAction === BANNER_CLICK_ACTIONS.LINK
+                      ? 'Đường dẫn mở khi bấm *'
+                      : 'Đường dẫn gắn kèm (không bắt buộc)'
+                  }}
+                </label>
+                <div class="link-input-row">
+                  <div class="link-input-wrap" :class="{ 'has-error': Boolean(editLinkError) }">
+                    <i class="ri-link link-input-icon"></i>
+                    <input
+                      id="edit-banner-link-input"
+                      v-model="editBannerLink"
+                      type="url"
+                      placeholder="VD: https://t.me/sakitchen hoặc https://..."
+                      class="link-input"
+                      @input="editLinkError = ''"
+                    />
+                    <button
+                      v-if="editBannerLink"
+                      type="button"
+                      class="link-clear-btn"
+                      title="Xóa link"
+                      @click="editBannerLink = ''; editLinkError = ''"
+                    >
+                      <i class="ri-close-line"></i>
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn-test-link"
+                    :disabled="!isValidBannerLink(editBannerLink)"
+                    title="Mở thử đường dẫn ở tab mới"
+                    @click="testBannerLink(editBannerLink)"
+                  >
+                    <i class="ri-external-link-line"></i>
+                    <span>Mở thử</span>
+                  </button>
+                </div>
+                <p v-if="editLinkError" class="behavior-error">
+                  <i class="ri-error-warning-line"></i>
+                  <span>{{ editLinkError }}</span>
+                </p>
+                <p v-else class="behavior-hint">
+                  {{
+                    editBannerAction === BANNER_CLICK_ACTIONS.LINK
+                      ? 'Bấm banner sẽ mở thẳng đường dẫn này ở tab mới.'
+                      : 'Nếu có điền link, popup ảnh sẽ có thêm nút "Mở liên kết" bên dưới ảnh.'
+                  }}
+                </p>
+              </div>
             </div>
 
             <label class="modal-file-upload">
@@ -1437,5 +1738,278 @@ onUnmounted(() => {
 
 .modal-order-select:focus {
   border-color: #3b82f6;
+}
+
+/* BANNER CLICK BEHAVIOR & LINK CONTROLS */
+.banner-behavior-box {
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.banner-behavior-box.is-modal {
+  margin-bottom: 16px;
+  padding: 14px;
+}
+
+.behavior-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.behavior-label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #e2e8f0;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.behavior-segment {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.segment-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(51, 65, 85, 0.45);
+  color: #cbd5e1;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.segment-btn:hover {
+  background: rgba(51, 65, 85, 0.72);
+  color: #ffffff;
+}
+
+.segment-btn.active {
+  background: rgba(59, 130, 246, 0.24);
+  border-color: rgba(96, 165, 250, 0.75);
+  color: #ffffff;
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.25);
+}
+
+.segment-btn.is-link-mode.active {
+  background: rgba(16, 185, 129, 0.24);
+  border-color: rgba(52, 211, 153, 0.78);
+  color: #ecfdf5;
+  box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.25);
+}
+
+.link-input-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.link-input-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(51, 65, 85, 0.65);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.link-input-wrap:focus-within {
+  border-color: #34d399;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.18);
+}
+
+.link-input-wrap.has-error {
+  border-color: #f87171;
+  box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.18);
+}
+
+.link-input-icon {
+  font-size: 16px;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.link-input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  padding: 10px 0;
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  font-size: 13.5px;
+  outline: none;
+}
+
+.link-input::placeholder {
+  color: #94a3b8;
+}
+
+.link-clear-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(148, 163, 184, 0.18);
+  color: #e2e8f0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.link-clear-btn:hover {
+  background: rgba(239, 68, 68, 0.35);
+  color: #ffffff;
+}
+
+.btn-test-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  background: rgba(16, 185, 129, 0.16);
+  color: #a7f3d0;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-test-link:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.3);
+  color: #ffffff;
+}
+
+.btn-test-link:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.behavior-hint {
+  font-size: 12px;
+  color: #93c5fd;
+  line-height: 1.45;
+}
+
+.behavior-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #fca5a5;
+  line-height: 1.4;
+}
+
+.th-behavior {
+  width: 230px;
+}
+
+.td-behavior {
+  text-align: center;
+}
+
+.behavior-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.behavior-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(148, 163, 184, 0.16);
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  color: #e2e8f0;
+  white-space: nowrap;
+}
+
+.behavior-badge.is-link {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(52, 211, 153, 0.5);
+  color: #6ee7b7;
+}
+
+.behavior-badge.is-popup-link {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(96, 165, 250, 0.5);
+  color: #93c5fd;
+}
+
+.behavior-link-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 210px;
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  color: #93c5fd;
+  font-size: 12px;
+  text-decoration: none;
+  overflow: hidden;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.behavior-link-preview span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.behavior-link-preview:hover {
+  border-color: rgba(96, 165, 250, 0.55);
+  color: #ffffff;
+}
+
+@media (max-width: 768px) {
+  .behavior-segment {
+    grid-template-columns: 1fr;
+  }
+
+  .link-input-row {
+    flex-direction: column;
+  }
+
+  .btn-test-link {
+    min-height: 38px;
+  }
+
+  .behavior-link-preview {
+    max-width: 100%;
+  }
 }
 </style>

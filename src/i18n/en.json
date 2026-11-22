@@ -1,7 +1,7 @@
 {
   "menu": {
     "category": "Category",
-    "allCategories": "All categories",
+    "allCategories": "FULL MENU",
     "itemsUnit": "items",
     "clearFilter": "Reset",
     "detail": "View detail",
@@ -47,7 +47,10 @@
     "all": "All",
     "asc": "Price ascending",
     "desc": "Price descending",
-    "changeLang": "Change language"
+    "changeLang": "Change language",
+    "viewModeLabel": "View mode",
+    "viewCard": "Detailed View",
+    "viewMenu": "Quick Pick"
   },
   "empty": {
     "menu": "No matching items found"
@@ -220,7 +223,8 @@
     "scrollTop": "Scroll to top",
     "ok": "UNDERSTOOD",
     "lightMode": "Light Mode",
-    "darkMode": "Dark Mode"
+    "darkMode": "Dark Mode",
+    "openLink": "Open link"
   },
   "promo": {
     "freeshipLabel": "Free Shipping",

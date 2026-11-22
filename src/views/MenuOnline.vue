@@ -5,7 +5,7 @@
       themeMode === 'dark' ? 'theme-dark' : 'theme-light',
       `sa-radius-${activeStorefrontTheme.cardRadius}`,
       `sa-surface-${activeStorefrontTheme.surfaceStyle}`,
-      { 'is-mobile-view': isMobile },
+      { 'is-mobile-view': isMobile, 'is-splash-active': showCookingSplash },
     ]"
     :style="[pcLayoutStyle, storefrontThemeVars]"
   >
@@ -870,8 +870,41 @@
         </div>
       </div>
 
-      <!-- MENU GRID -->
-      <div class="menu" ref="menuRef" :key="menuKey" v-if="pagedMenu.length > 0">
+      <!-- STANDALONE VIEW MODE SWITCHER (RIGHT ABOVE FIRST MENU GROUP) -->
+      <div v-if="filteredMenu.length > 0" class="menu-view-bar">
+        <div
+          class="menu-view-switcher"
+          role="group"
+          :aria-label="$t('filter.viewModeLabel')"
+        >
+          <button
+            type="button"
+            class="mvs-btn"
+            :class="{ active: menuViewMode === 'card' }"
+            @click="setMenuViewMode('card')"
+          >
+            <i class="ri-layout-grid-line"></i>
+            <span>{{ $t('filter.viewCard') }}</span>
+          </button>
+          <button
+            type="button"
+            class="mvs-btn"
+            :class="{ active: menuViewMode === 'board' }"
+            @click="setMenuViewMode('board')"
+          >
+            <i class="ri-flashlight-line"></i>
+            <span>{{ $t('filter.viewMenu') }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- MENU GRID (CARD MODE) -->
+      <div
+        v-if="menuViewMode === 'card' && pagedMenu.length > 0"
+        class="menu"
+        ref="menuRef"
+        :key="menuKey"
+      >
         <div v-if="keyword" class="search-result-line">
           <span>
             {{ filteredMenuMeta.usedFuzzy ? $t('search.fuzzyHint') : 'Kết quả tìm kiếm cho:' }}
@@ -886,10 +919,11 @@
             {{ $t('search.searchAllMenu') }} ({{ searchGlobalMatchesCount }})
           </button>
         </div>
-        <template v-for="entry in menuDisplayEntries" :key="entry.rowKey">
+        <template v-for="(entry, entryIdx) in menuDisplayEntries" :key="entry.rowKey">
           <div
             v-if="entry.type === 'heading'"
             class="menu-group-heading"
+            :style="!isMobile ? { '--card-stagger': Math.min(entryIdx % 12, 10) } : undefined"
             @click="selectParentAndSub(entry.parentLabel, entry.subLabel)"
           >
             <span class="mgh-title">
@@ -904,6 +938,7 @@
             v-else
             class="card-border"
             :class="{ out: entry.item.Trang_thai === 'Hết hàng' }"
+            :style="!isMobile ? { '--card-stagger': Math.min(entryIdx % 12, 10) } : undefined"
           >
             <div
               class="card"
@@ -1034,6 +1069,155 @@
         </template>
       </div>
 
+      <!-- MENU BOARD (CLASSIC CATEGORY PRICE-LIST MENU MODE) -->
+      <div
+        v-else-if="menuViewMode === 'board' && menuBoardSections.length > 0"
+        class="menu-board"
+        ref="menuRef"
+        :key="'board-' + menuKey"
+      >
+        <div v-if="keyword" class="search-result-line mb-search-line">
+          <span>
+            {{ filteredMenuMeta.usedFuzzy ? $t('search.fuzzyHint') : 'Kết quả tìm kiếm cho:' }}
+            "<strong>{{ keyword }}</strong>" ({{ filteredMenu.length }})
+          </span>
+          <button
+            v-if="searchGlobalMatchesCount > filteredMenu.length"
+            type="button"
+            class="srl-all-btn"
+            @click="searchAcrossAllMenu"
+          >
+            {{ $t('search.searchAllMenu') }} ({{ searchGlobalMatchesCount }})
+          </button>
+        </div>
+
+        <section
+          v-for="(sec, secIdx) in menuBoardSections"
+          :key="sec.key"
+          class="mb-section"
+          :style="!isMobile ? { '--card-stagger': Math.min(secIdx, 8) } : undefined"
+        >
+          <header
+            class="mb-sec-header"
+            :class="{ 'has-thumbs': sec.thumbs.length > 0 }"
+            @click="selectParentAndSub(sec.parentLabel, sec.subLabel)"
+          >
+            <div v-if="!isMobile && sec.thumbs.length" class="mb-sec-thumbs is-left" aria-hidden="true">
+              <img
+                v-for="(thumb, tIdx) in sec.thumbs.slice(0, 2)"
+                :key="'mb-tl-' + sec.key + '-' + tIdx"
+                :src="thumb"
+                loading="lazy"
+                decoding="async"
+                class="mb-sec-thumb"
+                alt=""
+              />
+            </div>
+
+            <div class="mb-sec-title-wrap">
+              <div v-if="isMobile && sec.thumbs.length" class="mb-sec-thumbs is-mobile-cluster" aria-hidden="true">
+                <img
+                  v-for="(thumb, tIdx) in sec.thumbs.slice(0, 3)"
+                  :key="'mb-tm-' + sec.key + '-' + tIdx"
+                  :src="thumb"
+                  loading="lazy"
+                  decoding="async"
+                  class="mb-sec-thumb"
+                  alt=""
+                />
+              </div>
+
+              <div class="mb-sec-title-texts">
+                <span v-if="sec.parentTag" class="mb-sec-parent">{{ sec.parentTag }}</span>
+                <h2 class="mb-sec-title">{{ sec.title }}</h2>
+              </div>
+
+              <span class="mb-sec-count">{{ sec.items.length }}</span>
+            </div>
+
+            <div v-if="!isMobile && sec.thumbs.length > 2" class="mb-sec-thumbs is-right" aria-hidden="true">
+              <img
+                v-for="(thumb, tIdx) in sec.thumbs.slice(2, 4)"
+                :key="'mb-tr-' + sec.key + '-' + tIdx"
+                :src="thumb"
+                loading="lazy"
+                decoding="async"
+                class="mb-sec-thumb"
+                alt=""
+              />
+            </div>
+          </header>
+
+          <div
+            class="mb-items-grid"
+            :class="{ 'is-single-col': sec.items.length === 1 }"
+          >
+            <div
+              v-for="item in sec.items"
+              :key="'mb-item-' + item.Ma_hang"
+              class="mb-row"
+              :class="{
+                'is-out': item.Trang_thai === 'Hết hàng',
+                'is-in-cart': (cartQtyByCode[item.Ma_hang] || 0) > 0,
+              }"
+              @click="openDetail(item)"
+            >
+              <div class="mb-name-wrap">
+                <span class="mb-name">
+                  <template v-if="keyword">
+                    <template v-for="(seg, sIdx) in getSearchHighlights(item.Ten_hang, keyword)" :key="sIdx">
+                      <mark v-if="seg.match" class="mb-hl">{{ seg.text }}</mark>
+                      <template v-else>{{ seg.text }}</template>
+                    </template>
+                  </template>
+                  <template v-else>{{ item.Ten_hang }}</template>
+                </span>
+                <span v-if="isDiscount(item)" class="mb-sale-tag">
+                  -{{ discountPercent(item) }}%
+                </span>
+                <span v-if="item.Trang_thai === 'Hết hàng'" class="mb-out-tag">
+                  {{ $t('status.out_stock') }}
+                </span>
+                <span
+                  v-if="cartQtyByCode[item.Ma_hang]"
+                  class="mb-incart-pill"
+                  :class="{ 'is-pop': addedMap[item.Ma_hang] }"
+                >
+                  x{{ cartQtyByCode[item.Ma_hang] }}
+                </span>
+              </div>
+
+              <span class="mb-leader" aria-hidden="true"></span>
+
+              <div class="mb-right">
+                <div class="mb-price-wrap">
+                  <span v-if="isDiscount(item)" class="mb-old-price">
+                    {{ formatPrice(item.Gia_ban, item.Don_vi_tien_te) }}
+                  </span>
+                  <div class="mb-price-line">
+                    <strong class="mb-price">{{ formatPrice(finalPrice(item), item.Don_vi_tien_te) }}</strong>
+                    <span v-if="item.Dvt" class="mb-unit">/{{ item.Dvt }}</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  class="mb-add-btn"
+                  :class="{ added: addedMap[item.Ma_hang] }"
+                  :disabled="item.Trang_thai === 'Hết hàng'"
+                  :title="item.Trang_thai === 'Hết hàng' ? $t('status.outOfStock') : $t('menu.add')"
+                  :aria-label="item.Ten_hang"
+                  @click.stop="addToCart(item, $event, { overrideQty: 1 })"
+                >
+                  <i v-if="addedMap[item.Ma_hang]" class="ri-check-line"></i>
+                  <i v-else class="ri-add-line"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
       <!-- EMPTY STATE -->
       <div
         v-else
@@ -1081,7 +1265,7 @@
 
       <!-- LAZY LOAD SENTINEL (AUTO LOAD ON SCROLL) -->
       <div
-        v-if="hasMoreItems"
+        v-if="menuViewMode === 'card' && hasMoreItems"
         ref="loadMoreSentinelRef"
         class="lazy-load-sentinel"
         aria-hidden="true"
@@ -1089,6 +1273,23 @@
         <i class="ri-loader-4-line lazy-spin-ico"></i>
         <span>{{ pagedMenu.length }} / {{ filteredMenu.length }}</span>
       </div>
+
+      <!-- SEO STOREFRONT INTRO BOX (SINGLE HOMEPAGE H1 ABOVE FOOTER) -->
+      <section
+        v-if="brandAssets.seoH1 || brandAssets.seoIntro"
+        class="storefront-seo-box"
+        aria-label="Storefront overview"
+      >
+        <h1 v-if="!selectedItem && brandAssets.seoH1" class="seo-box-h1">
+          {{ brandAssets.seoH1 }}
+        </h1>
+        <p v-else-if="brandAssets.seoH1" class="seo-box-h1">
+          {{ brandAssets.seoH1 }}
+        </p>
+        <p v-if="brandAssets.seoIntro" class="seo-box-intro">
+          {{ brandAssets.seoIntro }}
+        </p>
+      </section>
 
       <!-- FOOTER CHECK SCAM BUTTONS (3 SEPARATE LARGER BUTTONS) -->
       <div class="footer-checkscam-group">
@@ -1416,17 +1617,22 @@
       @click="closeCart"
     ></div>
     <div
-      v-if="!isMobile && showCart"
+      v-if="!isMobile"
       class="pc-sidebar-resizer"
-      :class="{ active: isResizingSidebar }"
+      :class="{ active: isResizingSidebar, 'is-hidden': !showCart }"
       title="Kéo để chỉnh độ rộng giỏ hàng • Double-click để đặt lại mặc định"
       @mousedown.prevent="startSidebarResize"
       @dblclick="resetSidebarWidth"
     >
       <span class="pc-sidebar-resizer-grip"></span>
     </div>
-    <aside class="sidebar-right" :class="{ collapsed: !showCart }" @wheel="forwardWheelToMain">
-      <div v-if="showCart" class="sidebar-content cart-box">
+    <aside
+      class="sidebar-right"
+      :class="{ collapsed: !showCart }"
+      :aria-hidden="!showCart"
+      @wheel="forwardWheelToMain"
+    >
+      <div class="sidebar-content cart-box">
         <!-- ===== LAYER 1 & 2 HEADER: ĐƠN HÀNG + GHÉP ĐƠN CÙNG HÀNG ===== -->
         <div class="cart-header-zone">
           <div class="cart-top-header">
@@ -1496,7 +1702,12 @@
             </div>
 
             <!-- SOLO MODE: DANH SÁCH PHẲNG -->
-            <div v-else-if="!activeOrderId" class="cart-solo-items">
+            <TransitionGroup
+              v-else-if="!activeOrderId"
+              name="cart-item-slide"
+              tag="div"
+              class="cart-solo-items"
+            >
               <div
                 v-for="(i, idx) in cartItems"
                 :key="i.lineId"
@@ -1551,7 +1762,7 @@
                   </div>
                 </div>
               </div>
-            </div>
+            </TransitionGroup>
 
             <!-- GROUP MODE (1B): MẶC ĐỊNH MỞ CỦA BẠN, ĐÓNG CỦA NGƯỜI KHÁC -->
             <template v-else>
@@ -1634,7 +1845,12 @@
                     {{ $t('group.emptyMemberItems') }}
                   </div>
 
-                  <div v-else class="cart-member-items">
+                  <TransitionGroup
+                    v-else
+                    name="cart-item-slide"
+                    tag="div"
+                    class="cart-member-items"
+                  >
                     <div
                       v-for="(i, idx) in grp.items"
                       :key="i.lineId"
@@ -1689,7 +1905,7 @@
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </TransitionGroup>
                 </div>
               </div>
             </template>
@@ -3467,14 +3683,30 @@
     class="modal-overlay image-modal"
     @click="closeImageModal"
   >
-    <div class="image-modal-card" @click.stop>
-      <button class="modal-close" @click="closeImageModal">✕</button>
+    <div
+      class="image-modal-card"
+      :class="{ 'has-link': Boolean(previewImageLink) }"
+      @click.stop
+    >
+      <button type="button" class="modal-close" @click="closeImageModal">✕</button>
 
       <img
         :src="previewImage"
         class="image-preview"
         alt=""
       />
+
+      <a
+        v-if="previewImageLink"
+        :href="previewImageLink"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="image-modal-link-btn"
+        @click="closeImageModal"
+      >
+        <span>{{ $t('common.openLink') }}</span>
+        <i class="ri-external-link-line"></i>
+      </a>
     </div>
   </div>
 </Teleport>
@@ -5269,6 +5501,17 @@ import {
   DISPLAY_MODE_BY_CATEGORY,
 } from '@/utils/displayOrder'
 import { bindOrderBellUnlock, playOrderBell } from '@/utils/orderBell'
+import {
+  BANNER_CLICK_ACTIONS,
+  normalizeBannerAction,
+  normalizeBannerLink,
+  openBannerLinkInNewTab,
+} from '@/utils/bannerLink'
+import {
+  resolveBrandAssets,
+  toFaviconAssetUrl,
+  toMobileIconAssetUrl,
+} from '@/utils/brandAssets'
 const route = useRoute()
 const router = useRouter()
 const { locale, t } = useI18n()
@@ -5445,6 +5688,33 @@ const activeStorefrontTheme = computed(() =>
     : cachedStorefrontTheme.value,
 )
 const themeMode = ref(activeStorefrontTheme.value.defaultColorScheme || 'light')
+const SA_MENU_VIEW_MODE_KEY = 'SA_MENU_VIEW_MODE_V1'
+const SA_MENU_VIEW_MODE_AT_KEY = 'SA_MENU_VIEW_MODE_AT_V1'
+const menuViewMode = ref(
+  activeStorefrontTheme.value.defaultMenuViewMode === 'board' ? 'board' : 'card',
+)
+try {
+  const savedViewMode = localStorage.getItem(SA_MENU_VIEW_MODE_KEY)
+  const savedViewAt = Number(localStorage.getItem(SA_MENU_VIEW_MODE_AT_KEY) || 0)
+  const cachedThemeAt = Number(activeStorefrontTheme.value.updatedAt || 0)
+  if (
+    (savedViewMode === 'board' || savedViewMode === 'card') &&
+    savedViewAt > 0 &&
+    savedViewAt >= cachedThemeAt
+  ) {
+    menuViewMode.value = savedViewMode
+  }
+} catch {}
+
+function setMenuViewMode(mode) {
+  const next = mode === 'board' ? 'board' : 'card'
+  menuViewMode.value = next
+  try {
+    localStorage.setItem(SA_MENU_VIEW_MODE_KEY, next)
+    localStorage.setItem(SA_MENU_VIEW_MODE_AT_KEY, String(Date.now()))
+  } catch {}
+}
+
 const storefrontThemeVars = computed(() =>
   buildStorefrontThemeVars(activeStorefrontTheme.value, themeMode.value),
 )
@@ -5460,7 +5730,19 @@ watch(
       if (userSavedMode !== 'dark' && userSavedMode !== 'light') {
         themeMode.value = remoteTheme.defaultColorScheme || 'light'
       }
-    } catch {}
+      const userSavedView = localStorage.getItem(SA_MENU_VIEW_MODE_KEY)
+      const userSavedViewAt = Number(localStorage.getItem(SA_MENU_VIEW_MODE_AT_KEY) || 0)
+      const remoteUpdatedAt = Number(remoteTheme.updatedAt || 0)
+      const hasFreshUserChoice =
+        (userSavedView === 'card' || userSavedView === 'board') &&
+        userSavedViewAt > 0 &&
+        userSavedViewAt >= remoteUpdatedAt
+      if (!hasFreshUserChoice) {
+        menuViewMode.value = remoteTheme.defaultMenuViewMode === 'board' ? 'board' : 'card'
+      }
+    } catch {
+      menuViewMode.value = remoteTheme.defaultMenuViewMode === 'board' ? 'board' : 'card'
+    }
   },
   { immediate: true, deep: true },
 )
@@ -7039,6 +7321,7 @@ const isMobile = ref(false)
 const closingDetailSidebar = ref(false)
 const showImageModal = ref(false)
 const previewImage = ref('')
+const previewImageLink = ref('')
 // ===== THÔNG TIN CHUYỂN KHOẢN =====
 const thongTinChuyenKhoan = ref([])
 const showCKModal = ref(false)
@@ -7223,7 +7506,7 @@ try {
 } catch {}
 
 const pcLayoutStyle = computed(() => {
-  if (isMobile.value || !showCart.value || pcSidebarWidth.value === null) return undefined
+  if (isMobile.value || pcSidebarWidth.value === null) return undefined
   return { '--pc-sidebar-w': `${Math.round(pcSidebarWidth.value)}px` }
 })
 
@@ -8015,6 +8298,53 @@ const menuDisplayEntries = computed(() => {
   return entries
 })
 
+const menuBoardSections = computed(() => {
+  const rawList = filteredMenu.value || []
+  if (!rawList.length) return []
+
+  const activeLocale = locale.value || 'vi'
+  const ordered = sortProductsByCategoryOrder(rawList, displayConfig.value, activeLocale)
+
+  const sectionMap = new Map()
+  for (const item of ordered) {
+    const parentLabel = getEffectiveParentCategory(item, displayConfig.value, activeLocale)
+    const subLabel = String(item?.Danh_muc || '').trim()
+    const hasChild = Boolean(subLabel && subLabel !== parentLabel)
+    const title = hasChild ? subLabel : parentLabel || subLabel || t('menu.category')
+    const parentTag = hasChild ? parentLabel : ''
+    const key = `${parentLabel}::${subLabel}`
+
+    if (!sectionMap.has(key)) {
+      sectionMap.set(key, {
+        key,
+        title,
+        parentTag,
+        parentLabel: parentLabel || subLabel,
+        subLabel: hasChild ? subLabel : '',
+        items: [],
+        thumbs: [],
+      })
+    }
+
+    const sec = sectionMap.get(key)
+    sec.items.push(item)
+    if (sec.thumbs.length < 4) {
+      const img = getCardImage(item)
+      if (img && !sec.thumbs.includes(img)) {
+        sec.thumbs.push(img)
+      }
+    }
+  }
+
+  const sections = Array.from(sectionMap.values())
+  if (priceSort.value === 'asc') {
+    sections.forEach((sec) => sec.items.sort((a, b) => finalPrice(a) - finalPrice(b)))
+  } else if (priceSort.value === 'desc') {
+    sections.forEach((sec) => sec.items.sort((a, b) => finalPrice(b) - finalPrice(a)))
+  }
+  return sections
+})
+
 let searchScrollTimer = null
 
 watch(keyword, () => {
@@ -8616,61 +8946,74 @@ watch(bannerList, () => {
 
 
 const logo = computed(() => logos.value?.[0] || null)
+const brandAssets = computed(() => resolveBrandAssets(logo.value, 'SA KITCHEN'))
 watch(
-  logo,
-  (val) => {
-    if (!val) return
-
-    setTitleAndFavicon(
-      val.Name || val.Ten_shop || 'Shop Online',
-      val.URL
-    )
+  brandAssets,
+  (assets) => {
+    setTitleAndFavicon(assets)
   },
   { immediate: true }
 )
 
-function toAppleTouchIconUrl(rawUrl) {
-  const url = String(rawUrl || '').trim()
-  if (!url) return '/apple-touch-icon.png'
-  // Convert Cloudinary URL to a crisp 180x180 PNG for iOS Home Screen compatibility
-  if (url.includes('res.cloudinary.com') && url.includes('/upload/')) {
-    return url.replace('/upload/', '/upload/c_fill,w_180,h_180,f_png/')
+function setMetaTagContent(selector, attrName, attrValue, content) {
+  if (!content) return
+  let el = document.querySelector(selector)
+  if (!el) {
+    el = document.createElement('meta')
+    el.setAttribute(attrName, attrValue)
+    document.head.appendChild(el)
   }
-  return url
+  el.setAttribute('content', content)
 }
 
-function setTitleAndFavicon(name, iconUrl) {
-  //  TITLE TAB
-  const resolvedName = name || 'SA KITCHEN'
-  document.title = resolvedName
+function setTitleAndFavicon(brandOrName, legacyIconUrl) {
+  const assets =
+    brandOrName && typeof brandOrName === 'object'
+      ? brandOrName
+      : resolveBrandAssets({ Name: brandOrName, URL: legacyIconUrl }, 'SA KITCHEN')
 
-  //  FAVICON TAB
+  // SEO TITLE TAB (keeps full SEO Title instead of shortening to bare shop name)
+  const resolvedSeoTitle = assets.seoTitle || assets.name || 'SA KITCHEN'
+  const resolvedShortName = assets.shortName || assets.name || 'SA KITCHEN'
+  document.title = resolvedSeoTitle
+
+  // SYNC META DESCRIPTION & KEYWORDS FOR SPA NAVIGATION
+  setMetaTagContent('meta[name="description"]', 'name', 'description', assets.seoDescription)
+  setMetaTagContent('meta[name="keywords"]', 'name', 'keywords', assets.seoKeywords)
+  setMetaTagContent('meta[property="og:title"]', 'property', 'og:title', resolvedSeoTitle)
+  setMetaTagContent(
+    'meta[property="og:description"]',
+    'property',
+    'og:description',
+    assets.seoDescription,
+  )
+
+  // FAVICON TAB (prefers dedicated Favicon_URL, falls back to Logo URL)
   let link =
+    document.querySelector("link[rel='icon'][type='image/png']") ||
     document.querySelector("link[rel~='icon']") ||
     document.createElement('link')
-
   link.rel = 'icon'
   link.type = 'image/png'
-  link.href = iconUrl || '/icon-192.png'
+  link.href = toFaviconAssetUrl(assets.faviconUrl, 192) || '/favicon-192.png'
   document.head.appendChild(link)
 
-  //  IOS HOME SCREEN ICON (APPLE TOUCH ICON)
+  // IOS HOME SCREEN ICON (prefers dedicated Mobile_Icon_URL, falls back to Logo URL)
   let appleLink =
     document.querySelector("link[rel='apple-touch-icon']") ||
     document.createElement('link')
   appleLink.rel = 'apple-touch-icon'
   appleLink.sizes = '180x180'
-  appleLink.href = toAppleTouchIconUrl(iconUrl)
+  appleLink.href = toMobileIconAssetUrl(assets.mobileIconUrl, 180) || '/apple-touch-icon.png'
   document.head.appendChild(appleLink)
 
-  //  IOS APP TITLE
-  let appleTitle = document.querySelector("meta[name='apple-mobile-web-app-title']")
-  if (!appleTitle) {
-    appleTitle = document.createElement('meta')
-    appleTitle.name = 'apple-mobile-web-app-title'
-    document.head.appendChild(appleTitle)
-  }
-  appleTitle.content = resolvedName
+  // IOS APP TITLE
+  setMetaTagContent(
+    "meta[name='apple-mobile-web-app-title']",
+    'name',
+    'apple-mobile-web-app-title',
+    resolvedShortName,
+  )
 }
 
 /* ===== METHODS ===== */
@@ -8839,9 +9182,18 @@ function getBannerCardClasses(idx) {
   return classes
 }
 
+let lastBannerSwipeAt = 0
+
 function onBannerCardClick(b, idx) {
+  if (Date.now() - lastBannerSwipeAt < 320) return
   if (idx === currentBannerIndex.value) {
-    openImageModal(b.URL)
+    const action = normalizeBannerAction(b?.Click_action)
+    const linkUrl = normalizeBannerLink(b?.Link_url)
+    if (action === BANNER_CLICK_ACTIONS.LINK && linkUrl) {
+      openBannerLinkInNewTab(linkUrl)
+      return
+    }
+    openImageModal(b.URL, linkUrl)
   } else {
     goToBanner(idx)
   }
@@ -8854,6 +9206,9 @@ function onBannerTouchStart(e) {
 function onBannerTouchEnd(e) {
   const endX = e.changedTouches?.[0]?.clientX || 0
   const diff = endX - bannerTouchStartX.value
+  if (Math.abs(diff) > 18) {
+    lastBannerSwipeAt = Date.now()
+  }
   if (Math.abs(diff) > 38) {
     if (diff < 0) nextBanner()
     else prevBanner()
@@ -10837,14 +11192,16 @@ function goHomeMobile() {
     scrollToTop()
   })
 }
-function openImageModal(src) {
+function openImageModal(src, linkUrl = '') {
   previewImage.value = src
+  previewImageLink.value = normalizeBannerLink(linkUrl)
   showImageModal.value = true
 }
 
 function closeImageModal() {
   showImageModal.value = false
   previewImage.value = ''
+  previewImageLink.value = ''
 }
 const times = ref([])
 
@@ -11093,6 +11450,7 @@ const hasSale = computed(() =>
   --sa-border-green: rgba(16, 185, 129, 0.28);
   --sa-accent: #059669;
   --sa-accent-hover: #047857;
+  --sa-on-accent: #ffffff;
   --sa-price: #059669;
   --sa-sale: #e11d48;
   --sa-qty-bg: #f1f5f9;
@@ -11172,7 +11530,8 @@ const hasSale = computed(() =>
   --sa-border-strong: rgba(255, 255, 255, 0.14);
   --sa-border-green: rgba(52, 211, 153, 0.28);
   --sa-accent: #10b981;
-  --sa-accent-hover: #059669;
+  --sa-accent-hover: #0ea472;
+  --sa-on-accent: #0b1724;
   --sa-price: #34d399;
   --sa-sale: #fb7185;
   --sa-qty-bg: #1c2536;
@@ -12153,10 +12512,16 @@ const hasSale = computed(() =>
   width: 100%;
   max-width: 100vw;
   overflow-x: hidden;
-  transition: grid-template-columns 0.24s ease;
+  transition: grid-template-columns 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .layout.is-resizing-sidebar {
+  transition: none !important;
+}
+
+.layout.is-resizing-sidebar .sidebar-right,
+.layout.is-resizing-sidebar .sidebar-right .sidebar-content,
+.layout.is-resizing-sidebar .pc-sidebar-resizer {
   transition: none !important;
 }
 
@@ -12168,7 +12533,7 @@ const hasSale = computed(() =>
 
 .layout.hide-right,
 .layout.hide-left.hide-right {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 0px 0px;
 }
 
 .pc-sidebar-resizer {
@@ -12183,6 +12548,14 @@ const hasSale = computed(() =>
   z-index: 25;
   background: var(--sa-bg);
   touch-action: none;
+  overflow: hidden;
+  transition: opacity 0.22s ease, width 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.pc-sidebar-resizer.is-hidden {
+  width: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .pc-sidebar-resizer-grip {
@@ -13552,7 +13925,7 @@ const hasSale = computed(() =>
     var(--sa-accent) 55%,
     var(--sa-accent-hover) 100%
   );
-  color: var(--sa-on-primary, #ffffff);
+  color: var(--sa-on-accent, var(--sa-on-primary, #ffffff));
   font-size: 13.5px;
   font-weight: 700;
   letter-spacing: 0;
@@ -13641,8 +14014,8 @@ const hasSale = computed(() =>
 }
 
 .add-btn.added {
-  background: linear-gradient(135deg, var(--sa-accent) 0%, var(--sa-primary-dark) 100%);
-  color: var(--sa-on-primary, #ffffff);
+  background: linear-gradient(135deg, var(--sa-accent) 0%, var(--sa-accent-hover) 100%);
+  color: var(--sa-on-accent, var(--sa-on-primary, #ffffff));
   animation: saAddBtnPop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -13914,8 +14287,46 @@ const hasSale = computed(() =>
 }
 
 @media (min-width: 769px) {
+  .sidebar-right {
+    overflow: hidden;
+    transition:
+      background-color 0.22s ease,
+      border-color 0.22s ease,
+      opacity 0.26s ease,
+      visibility 0s linear 0s;
+  }
+
+  .sidebar-right .sidebar-content {
+    width: var(--pc-sidebar-w, clamp(336px, 24.5vw, 368px));
+    transition:
+      transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.24s ease;
+    will-change: transform, opacity;
+  }
+
   .sidebar-right.collapsed {
-    display: none;
+    border-left-color: transparent;
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+    transition:
+      background-color 0.22s ease,
+      border-color 0.22s ease,
+      opacity 0.22s ease,
+      visibility 0s linear 0.32s;
+  }
+
+  .sidebar-right.collapsed .sidebar-content {
+    transform: translateX(28px);
+    opacity: 0;
+  }
+
+  .scroll-top-fab {
+    transition:
+      right 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.2s ease,
+      background 0.2s ease,
+      box-shadow 0.2s ease;
   }
 }
 
@@ -14022,8 +14433,7 @@ const hasSale = computed(() =>
   margin-bottom: 6px;
 }
 
-.sidebar-left.collapsed .sidebar-content,
-.sidebar-right.collapsed .sidebar-content {
+.sidebar-left.collapsed .sidebar-content {
   display: none;
 }
 
@@ -15159,7 +15569,7 @@ const hasSale = computed(() =>
   border: none;
   border-radius: 12px;
   background: var(--sa-accent);
-  color: #ffffff;
+  color: var(--sa-on-accent, #ffffff);
   font-size: 15px;
   font-weight: 700;
   display: inline-flex;
@@ -16619,10 +17029,10 @@ const hasSale = computed(() =>
   border: none;
   border-radius: 11px;
   background: var(--sa-accent);
-  color: #ffffff;
+  color: var(--sa-on-accent, #ffffff);
   font-family: inherit;
   font-size: 14.5px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0;
   text-transform: none;
   cursor: pointer;
@@ -16633,7 +17043,7 @@ const hasSale = computed(() =>
 
 .finish-btn:hover:not(:disabled) {
   background: var(--sa-accent-hover);
-  color: #ffffff;
+  color: var(--sa-on-accent, #ffffff);
   transform: translateY(-1px);
   box-shadow: 0 6px 16px rgba(var(--sa-primary-rgb), 0.28);
 }
@@ -19149,8 +19559,17 @@ const hasSale = computed(() =>
 
   .image-modal-card {
     max-width: 92vw;
-    max-height: 70vh;
+    max-height: 80vh;
     padding: 8px;
+  }
+
+  .image-modal-card.has-link .image-preview {
+    max-height: calc(76vh - 64px);
+  }
+
+  .image-modal-link-btn {
+    width: 100%;
+    justify-content: center;
   }
 }
 
@@ -19309,7 +19728,11 @@ const hasSale = computed(() =>
 
   .layout.hide-right,
   .layout.hide-left.hide-right {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 0px 0px;
+  }
+
+  .sidebar-right .sidebar-content {
+    width: var(--pc-sidebar-w, clamp(296px, 31vw, 326px));
   }
 
   .scroll-top-fab {
@@ -19609,16 +20032,23 @@ const hasSale = computed(() =>
 }
 
 .image-modal-card {
+  position: relative;
   max-width: min(820px, 92vw);
-  max-height: min(640px, 86vh);
+  max-height: min(680px, 86vh);
   padding: 10px;
   background: var(--sa-surface);
   border: 1px solid var(--sa-border);
   border-radius: 16px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 10px;
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.45);
+}
+
+.image-modal-card .modal-close {
+  z-index: 2;
 }
 
 .image-preview {
@@ -19626,6 +20056,42 @@ const hasSale = computed(() =>
   max-height: 80vh;
   object-fit: contain;
   border-radius: 10px;
+  display: block;
+}
+
+.image-modal-card.has-link .image-preview {
+  max-height: calc(80vh - 66px);
+}
+
+.image-modal-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 9px 20px;
+  border-radius: 999px;
+  background: var(--sa-top-header-bg);
+  color: var(--sa-on-primary, #ffffff);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 6px 18px rgba(var(--sa-primary-dark-rgb), 0.28);
+  transition: transform 0.16s ease, filter 0.16s ease;
+  flex-shrink: 0;
+}
+
+.image-modal-link-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+
+.image-modal-link-btn:active {
+  transform: scale(0.98);
+}
+
+.image-modal-link-btn i {
+  font-size: 16px;
 }
 
 .clickable {
@@ -20735,11 +21201,552 @@ const hasSale = computed(() =>
     box-shadow: 0 0 0 3px rgba(var(--sa-primary-rgb), 0.28);
   }
 }
+
+/* ===== HIGH-CONTRAST TEXT ON SOLID ACCENT BUTTONS & ACTIVE PILLS (AUTO LIGHT/DARK) ===== */
+.sct-cat-pill.active,
+.pagination button.active,
+.filter-btn.active,
+.search-wrapper .filter-cat-btn.active,
+.send-btn,
+.copy-btn,
+.save-btn,
+.ck-btn,
+.mcb-action-cta,
+.dp-stepper button.dp-qty-plus,
+.sub-cat-tree.is-modal .sub-cat-tree-item.active {
+  color: var(--sa-on-accent, #ffffff);
+}
+
+/* =========================================================
+   MENU BOARD VIEW (CATEGORY PRICE-LIST MENU — STYLE 1 THEME)
+   ========================================================= */
+.menu-view-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 12px;
+  width: 100%;
+}
+
+.menu-view-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--sa-surface-2);
+  border: 1px solid var(--sa-border-strong);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}
+
+.mvs-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--sa-muted);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, transform 0.12s ease;
+}
+
+.mvs-btn i {
+  font-size: 15px;
+}
+
+.mvs-btn:hover:not(.active) {
+  color: var(--sa-heading);
+  background: rgba(var(--sa-primary-rgb), 0.06);
+}
+
+.mvs-btn.active {
+  background: var(--sa-accent);
+  color: var(--sa-on-accent, #ffffff);
+  box-shadow: 0 3px 10px rgba(var(--sa-primary-rgb), 0.24);
+}
+
+.mvs-btn:active {
+  transform: scale(0.97);
+}
+
+.menu-board {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+  width: 100%;
+}
+
+.mb-search-line {
+  margin-bottom: 0;
+}
+
+.mb-section {
+  background: var(--sa-surface);
+  border: 1px solid var(--sa-border-strong);
+  border-radius: var(--sa-radius-card, 16px);
+  box-shadow: var(--sa-card-shadow);
+  overflow: hidden;
+  min-width: 0;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.mb-sec-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 56px;
+  padding: 9px 16px;
+  background: var(--sa-top-header-bg);
+  color: var(--sa-on-primary, #ffffff);
+  cursor: pointer;
+  position: relative;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.mb-sec-thumbs {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.mb-sec-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  background: var(--sa-img-bg);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s ease;
+}
+
+.mb-sec-thumbs .mb-sec-thumb + .mb-sec-thumb {
+  margin-left: -10px;
+}
+
+.mb-sec-header:hover .mb-sec-thumb {
+  transform: scale(1.06);
+}
+
+.mb-sec-title-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+
+.mb-sec-title-texts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+.sa-storefront .mb-sec-parent,
+.mb-sec-parent {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  opacity: 0.85;
+  line-height: 1.15;
+}
+
+.mb-sec-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--sa-on-primary, #ffffff);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  line-height: 1.25;
+  text-align: center;
+  word-break: break-word;
+}
+
+.sa-storefront .mb-sec-count,
+.mb-sec-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: var(--sa-on-primary, #ffffff);
+  font-size: 11.5px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.mb-items-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 24px;
+  row-gap: 2px;
+  padding: 10px 16px 12px;
+}
+
+.mb-items-grid.is-single-col {
+  grid-template-columns: 1fr;
+}
+
+.mb-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border-bottom: 1px dashed var(--sa-border);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  min-width: 0;
+}
+
+.mb-row:hover {
+  background: var(--sa-surface-soft);
+}
+
+.mb-row.is-in-cart {
+  background: rgba(var(--sa-primary-rgb), 0.06);
+}
+
+.sa-storefront.theme-dark .mb-row.is-in-cart {
+  background: rgba(var(--sa-primary-bright-rgb), 0.1);
+}
+
+.mb-row.is-out {
+  opacity: 0.56;
+}
+
+.mb-name-wrap {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+  max-width: 60%;
+}
+
+.sa-storefront .mb-name,
+.mb-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--sa-heading);
+  line-height: 1.32;
+  word-break: break-word;
+}
+
+.mb-row.is-out .mb-name {
+  text-decoration: line-through;
+}
+
+.mb-hl {
+  background: rgba(var(--sa-secondary-rgb), 0.36);
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
+.sa-storefront .mb-sale-tag,
+.mb-sale-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(225, 29, 72, 0.14);
+  color: var(--sa-sale);
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1.3;
+  flex-shrink: 0;
+}
+
+.sa-storefront .mb-out-tag,
+.mb-out-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--sa-surface-2);
+  color: var(--sa-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  flex-shrink: 0;
+}
+
+.sa-storefront .mb-incart-pill,
+.mb-incart-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--sa-accent);
+  color: var(--sa-on-accent, #ffffff);
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1.3;
+  flex-shrink: 0;
+}
+
+.mb-incart-pill.is-pop {
+  animation: saAddCountBump 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mb-leader {
+  flex: 1;
+  min-width: 10px;
+  border-bottom: 1.5px dotted var(--sa-border-strong);
+  opacity: 0.55;
+  align-self: center;
+  transform: translateY(2px);
+}
+
+.mb-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.mb-price-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+}
+
+.sa-storefront .mb-old-price,
+.mb-old-price {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--sa-muted);
+  text-decoration: line-through;
+  font-variant-numeric: tabular-nums;
+}
+
+.mb-price-line {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  white-space: nowrap;
+}
+
+.sa-storefront .mb-price,
+.mb-price {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--sa-price);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.15px;
+}
+
+.sa-storefront .mb-unit,
+.mb-unit {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sa-muted);
+}
+
+.mb-add-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: var(--sa-accent);
+  color: var(--sa-on-accent, #ffffff);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(var(--sa-primary-rgb), 0.24);
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mb-add-btn:hover:not(:disabled) {
+  background: var(--sa-accent-hover);
+  transform: scale(1.08);
+  box-shadow: 0 4px 12px rgba(var(--sa-primary-rgb), 0.34);
+}
+
+.mb-add-btn:active:not(:disabled) {
+  transform: scale(0.9);
+}
+
+.mb-add-btn.added {
+  animation: saAddBtnPop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mb-add-btn:disabled {
+  background: var(--sa-surface-2);
+  color: var(--sa-muted);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1120px) and (min-width: 769px) {
+  .mb-items-grid {
+    column-gap: 14px;
+    padding: 8px 12px 10px;
+  }
+
+  .mb-sec-thumb {
+    width: 34px;
+    height: 34px;
+  }
+}
+
+@media (max-width: 768px) {
+  .menu-view-bar {
+    margin: 2px 0 10px;
+  }
+
+  .menu-view-switcher {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mvs-btn {
+    height: 36px;
+    padding: 0 10px;
+    font-size: 12.5px;
+  }
+
+  .menu-board {
+    gap: 13px;
+  }
+
+  .mb-sec-header {
+    min-height: 48px;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .mb-sec-title-wrap {
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .mb-sec-title-texts {
+    align-items: flex-start;
+    flex: 1;
+  }
+
+  .mb-sec-title {
+    font-size: 14.5px;
+    text-align: left;
+  }
+
+  .mb-sec-thumbs.is-mobile-cluster .mb-sec-thumb {
+    width: 30px;
+    height: 30px;
+    border-width: 1.5px;
+  }
+
+  .mb-sec-thumbs.is-mobile-cluster .mb-sec-thumb + .mb-sec-thumb {
+    margin-left: -9px;
+  }
+
+  .mb-items-grid {
+    grid-template-columns: 1fr;
+    padding: 6px 8px 8px;
+  }
+
+  .mb-row {
+    padding: 9px 8px;
+    gap: 6px;
+  }
+
+  .mb-name-wrap {
+    max-width: 58%;
+  }
+
+  .sa-storefront .mb-name,
+  .mb-name {
+    font-size: 13.5px;
+  }
+
+  .sa-storefront .mb-price,
+  .mb-price {
+    font-size: 13.5px;
+  }
+
+  .sa-storefront .mb-unit,
+  .mb-unit {
+    font-size: 11.5px;
+  }
+
+  .mb-add-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 17px;
+  }
+}
+
+/* ===== STOREFRONT BOTTOM SEO H1 & INTRO BOX ===== */
+.storefront-seo-box {
+  margin: 22px 0 12px;
+  padding: 14px 18px;
+  border-radius: var(--sa-radius-card, 14px);
+  background: var(--sa-surface);
+  border: 1px solid var(--sa-border);
+  text-align: center;
+}
+
+.seo-box-h1 {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 800;
+  color: var(--sa-heading);
+  line-height: 1.4;
+}
+
+.seo-box-intro {
+  margin: 5px auto 0;
+  max-width: 680px;
+  font-size: 12.5px;
+  color: var(--sa-muted);
+  line-height: 1.55;
+}
+
+@media (max-width: 768px) {
+  .storefront-seo-box {
+    margin: 16px 0 10px;
+    padding: 12px 14px;
+  }
+
+  .seo-box-h1 {
+    font-size: 13.5px;
+  }
+
+  .seo-box-intro {
+    font-size: 12px;
+  }
+}
 </style>
 
 <style>
 /* ========================================================
-   SUBTLE FAST ENTRANCE (NO WATERFALL LAG)
+   SUBTLE FAST ENTRANCE (MOBILE) + SMOOTH STAGGERED PC ENTRANCE
    ======================================================== */
 @keyframes slideInUpMenu {
   0% {
@@ -20752,22 +21759,122 @@ const hasSale = computed(() =>
   }
 }
 
-.sidebar-right,
+@keyframes pcCardEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.982);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pcSidebarEnter {
+  0% {
+    opacity: 0;
+    transform: translateX(22px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 .mobile-header-clean,
 .notice-bar,
 .banner,
 .menu,
 .pagination {
-  animation: slideInUpMenu 0.22s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation: slideInUpMenu 0.24s cubic-bezier(0.16, 1, 0.3, 1) backwards;
   text-decoration: none;
 }
 
-.sidebar-right       { animation-delay: 0s; }
 .mobile-header-clean { animation-delay: 0s; }
 .notice-bar          { animation-delay: 0.02s; }
-.banner              { animation-delay: 0.03s; }
+.banner              { animation-delay: 0.04s; }
 .menu                { animation-delay: 0.05s; }
 .pagination          { animation-delay: 0.06s; }
+
+@media (min-width: 769px) {
+  .menu {
+    animation: none;
+  }
+
+  .menu .card-border,
+  .menu .menu-group-heading,
+  .menu-board .mb-section {
+    animation: pcCardEnter 0.36s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    animation-delay: calc(var(--card-stagger, 0) * 26ms);
+  }
+
+  .sidebar-right {
+    animation: pcSidebarEnter 0.38s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    animation-delay: 0.06s;
+  }
+
+  /* Hold entrance animations until CookingSplashIntro doors open */
+  .sa-storefront.is-splash-active .menu .card-border,
+  .sa-storefront.is-splash-active .menu .menu-group-heading,
+  .sa-storefront.is-splash-active .menu-board .mb-section,
+  .sa-storefront.is-splash-active .sidebar-right {
+    animation: none !important;
+    opacity: 0;
+  }
+}
+
+/* ===== SMOOTH CART ITEM ENTER / LEAVE / REORDER ===== */
+.cart-solo-items,
+.cart-member-items {
+  position: relative;
+}
+
+.cart-item-slide-enter-active {
+  transition:
+    opacity 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cart-item-slide-leave-active {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.2s ease,
+    transform 0.22s ease;
+}
+
+.cart-item-slide-move {
+  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cart-item-slide-enter-from {
+  opacity: 0;
+  transform: translateX(18px) scale(0.97);
+}
+
+.cart-item-slide-leave-to {
+  opacity: 0;
+  transform: translateX(22px) scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu .card-border,
+  .menu .menu-group-heading,
+  .menu-board .mb-section,
+  .sidebar-right,
+  .notice-bar,
+  .banner,
+  .pagination {
+    animation: none !important;
+  }
+  .cart-item-slide-enter-active,
+  .cart-item-slide-leave-active,
+  .cart-item-slide-move {
+    transition: none !important;
+  }
+}
 
 .main-skeleton {
   animation: none !important;
@@ -27231,6 +28338,17 @@ const hasSale = computed(() =>
 .srl-all-btn:hover {
   background: #059669;
   color: #ffffff;
+}
+
+/* ===== HIGH-CONTRAST TEXT ON TELEPORTED / UNSCOPED ACCENT BUTTONS (AUTO LIGHT/DARK) ===== */
+.gsm-copy-btn,
+.ugm-proceed-btn,
+.exm-channel-btn,
+.exm-copy-inline-btn:hover,
+.exm-copy-inline-btn.copied,
+.dt24-col-opt.selected,
+.dt24-now-btn:hover {
+  color: var(--sa-on-accent, #ffffff);
 }
 </style>
 

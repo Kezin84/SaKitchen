@@ -36,22 +36,44 @@ function getSavedLang() {
   return 'vi'
 }
 
+function normalizeOrderQueryFromTelegram(rawQuery: Record<string, unknown>) {
+  const { ncc: _ncc, tgWebAppStartParam, ...rest } = rawQuery || {}
+  if (
+    !rest.order &&
+    typeof tgWebAppStartParam === 'string' &&
+    tgWebAppStartParam.startsWith('order_')
+  ) {
+    const extracted = tgWebAppStartParam.slice('order_'.length).trim()
+    if (extracted) {
+      rest.order = extracted
+    }
+  }
+  return rest as Record<string, string>
+}
+
 function menuLangGuard(to: {
   name?: string | symbol | null
   params: Record<string, string | string[]>
   query: Record<string, unknown>
+  hash?: string
 }) {
   const lang = String(to.params.lang || '')
   if (!SUPPORTED_LANGS.includes(lang)) {
-    return { name: 'menu-online', params: { lang: 'vi' }, replace: true }
+    return {
+      name: 'menu-online',
+      params: { lang: 'vi' },
+      query: normalizeOrderQueryFromTelegram(to.query),
+      hash: to.hash,
+      replace: true,
+    }
   }
-  // Tương thích ngược: nếu khách mở link cũ có ?ncc=SA thì tự làm sạch URL
-  if ('ncc' in to.query) {
-    const { ncc: _ncc, ...cleanQuery } = to.query
+  // Tương thích ngược: nếu khách mở link cũ có ?ncc=SA hoặc ?tgWebAppStartParam=order_... thì chuẩn hóa URL
+  if ('ncc' in to.query || 'tgWebAppStartParam' in to.query) {
     return {
       name: typeof to.name === 'string' ? to.name : 'menu-online',
       params: to.params,
-      query: cleanQuery as Record<string, string>,
+      query: normalizeOrderQueryFromTelegram(to.query),
+      hash: to.hash,
       replace: true,
     }
   }
@@ -63,11 +85,11 @@ const router = createRouter({
     {
       path: '/',
       redirect: (to) => {
-        const { ncc: _ncc, ...cleanQuery } = to.query
         return {
           name: 'menu-online',
           params: { lang: getSavedLang() },
-          query: cleanQuery,
+          query: normalizeOrderQueryFromTelegram(to.query as Record<string, unknown>),
+          hash: to.hash,
         }
       },
     },

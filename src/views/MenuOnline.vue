@@ -5390,6 +5390,15 @@
           <span>{{ inviteCopied ? $t('group.copiedLink') : $t('group.copyLinkBtn') }}</span>
         </button>
       </div>
+      <button
+        v-if="activeOrderId"
+        type="button"
+        class="gsm-tg-share-btn"
+        @click="shareGroupOrderViaTelegram"
+      >
+        <i class="ri-telegram-fill"></i>
+        <span>{{ $t('group.shareTelegramBtn') }}</span>
+      </button>
     </div>
 
     <div v-if="!isOrderLocked" class="gsm-name-section">
@@ -5823,6 +5832,19 @@ import {
   toFaviconAssetUrl,
   toMobileIconAssetUrl,
 } from '@/utils/brandAssets'
+import {
+  initTelegramMiniApp,
+  syncTelegramMiniAppTheme,
+  setTelegramClosingConfirmation,
+  isTelegramMiniApp,
+  getTelegramUserProfile,
+  getTelegramInitData,
+  getTelegramStartOrderId,
+  mapTelegramLangToAppLang,
+  triggerTelegramHaptic,
+  buildTelegramGroupShareAppUrl,
+  openTelegramShareUrl,
+} from '@/utils/telegramMiniApp'
 const route = useRoute()
 const router = useRouter()
 const { locale, t } = useI18n()
@@ -7418,6 +7440,22 @@ async function startOrCopyGroupOrder() {
   await openGroupShareModal()
 }
 
+async function shareGroupOrderViaTelegram() {
+  try {
+    if (!activeOrderId.value && !isOrderLocked.value) {
+      await ensureGroupSessionActive()
+    }
+    const oid = activeOrderId.value
+    if (!oid) return
+    triggerTelegramHaptic('light')
+    const tgAppUrl = buildTelegramGroupShareAppUrl(oid)
+    const inviteText = `🍜 SA KITCHEN — #${oid}`
+    openTelegramShareUrl(tgAppUrl || groupShareUrl.value, inviteText)
+  } catch (err) {
+    console.warn('shareGroupOrderViaTelegram failed:', err)
+  }
+}
+
 function isMemberGroupOpen(grp) {
   if (!grp) return false
   const explicit = memberExpandedMap.value[grp.groupKey]
@@ -7911,7 +7949,23 @@ onMounted(() => {
   bindOrderBellUnlock()
   loadPersistedLocalState()
 
-  const qOrder = String(route.query?.order || '').trim()
+  initTelegramMiniApp({ isDark: themeMode.value === 'dark' })
+  if (isTelegramMiniApp()) {
+    const tgProfile = getTelegramUserProfile()
+    if (tgProfile) {
+      if (!tenKhach.value.trim() && tgProfile.fullName) {
+        tenKhach.value = tgProfile.fullName
+      }
+      if (!memberName.value.trim() && tgProfile.fullName) {
+        memberName.value = tgProfile.fullName
+      }
+      if (!sdt.value.trim() && tgProfile.username) {
+        sdt.value = `@${tgProfile.username}`
+      }
+    }
+  }
+
+  const qOrder = String(route.query?.order || getTelegramStartOrderId() || '').trim()
   if (qOrder) {
     connectLiveOrder(qOrder, { fromUrl: true, syncUrl: true })
   } else {
@@ -7957,6 +8011,21 @@ onMounted(() => {
     String(route.params.productId || route.params.productSlug || '').trim(),
   )
 
+  // Nếu mở từ Telegram Mini App lần đầu chưa lưu ngôn ngữ, tự khớp ngôn ngữ Telegram của khách
+  if (!savedLang && isTelegramMiniApp()) {
+    const tgMatchedLang = mapTelegramLangToAppLang(getTelegramUserProfile()?.languageCode)
+    if (tgMatchedLang) {
+      localStorage.setItem('APP_LANG', tgMatchedLang)
+      locale.value = tgMatchedLang
+      if (route.params.lang !== tgMatchedLang && !hasDeepProductLink) {
+        redirectToLang(tgMatchedLang)
+        return
+      }
+      reloadData()
+      return
+    }
+  }
+
   // Nếu mở trực tiếp link chi tiết sản phẩm mà chưa từng chọn ngôn ngữ, ưu tiên ngôn ngữ trên URL
   if (!savedLang && hasDeepProductLink && route.params.lang) {
     const urlLang = String(route.params.lang)
@@ -7989,6 +8058,20 @@ watch(
     if (clean && clean !== activeOrderId.value) {
       connectLiveOrder(clean, { fromUrl: true })
     }
+  },
+)
+
+watch(
+  () => themeMode.value,
+  (mode) => {
+    syncTelegramMiniAppTheme(mode === 'dark')
+  },
+)
+
+watch(
+  () => [cartItems.value.length, isOrderLocked.value],
+  ([len, locked]) => {
+    setTelegramClosingConfirmation(Number(len) > 0 && !locked)
   },
 )
 
@@ -9786,6 +9869,7 @@ async function addToCart(m, evt = null, opts = null) {
     : Math.max(1, Number(tempQty.value[m.Ma_hang] || 1))
   if (!opts?.silentEffects) {
     triggerAddToCartEffects(m, qty, evt)
+    triggerTelegramHaptic('light')
   }
 
   // Reset and re-trigger added spring state cleanly on rapid clicks
@@ -10954,10 +11038,12 @@ async function submitOrderToWebCore({ silentToast = false } = {}) {
       Added_at: i.addedTime || Date.now(),
     }))
 
+    const tgProfile = isTelegramMiniApp() ? getTelegramUserProfile() : null
     const res = await submitCustomerOrder({
       orderId: activeOrderId.value || undefined,
       hostId: memberId,
       hostName: memberName.value.trim() || recipientName,
+      telegramInitData: tgProfile?.initData || getTelegramInitData() || '',
       meta: {
         Ten_khach_hang: recipientName,
         So_dien_thoai: sdt.value.trim(),
@@ -10968,16 +11054,21 @@ async function submitOrderToWebCore({ silentToast = false } = {}) {
         Khuyen_mai_dat_duoc: earnedPromoViSummary.value,
         Submitted_sig: nextSubmittedSig,
         Don_vi_tien_te: cartCurrency.value,
+        ...(tgProfile?.id ? { Telegram_chat_id: tgProfile.id } : {}),
+        ...(tgProfile?.username ? { Telegram_username: tgProfile.username } : {}),
+        ...(isTelegramMiniApp() ? { Telegram_lang: currentLang.value || 'vi' } : {}),
       },
       items: payloadItems,
     })
 
     if (res?.locked) {
+      triggerTelegramHaptic('warning')
       triggerToast(t('group.lockedHint'), 'warn')
       return false
     }
 
     if (res?.success && res.orderId) {
+      triggerTelegramHaptic('success')
       lastSubmittedSig.value = nextSubmittedSig
       saveCustomerFormLocal()
       const prevLive = liveOrderData.value || {}
@@ -26356,6 +26447,39 @@ const hasSale = computed(() =>
   display: flex;
   align-items: stretch;
   gap: 6px;
+}
+
+.gsm-tg-share-btn {
+  margin-top: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(34, 158, 217, 0.36);
+  background: linear-gradient(135deg, #229ed9, #0088cc);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 136, 204, 0.24);
+  transition: transform 0.14s ease, filter 0.14s ease;
+}
+
+.gsm-tg-share-btn i {
+  font-size: 17px;
+}
+
+.gsm-tg-share-btn:hover {
+  filter: brightness(1.06);
+}
+
+.gsm-tg-share-btn:active {
+  transform: scale(0.985);
 }
 
 .gsm-link-input {

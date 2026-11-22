@@ -176,7 +176,8 @@
     "kickedModalTitle": "You were removed from the order",
     "kickedModalDesc": "The host removed your items and kicked you out of order #{code}. Would you like to rejoin this order or start a new one?",
     "rejoinOrderBtn": "Rejoin order",
-    "newOrderAfterKickBtn": "Place new order"
+    "newOrderAfterKickBtn": "Place new order",
+    "shareTelegramBtn": "Invite Friends via Telegram"
   },
   "export": {
     "title": "ORDER CONTENT",

@@ -35,6 +35,9 @@
   <!-- Remix Icon -->
   <link href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" rel="stylesheet" />
 
+  <!-- Telegram Mini App SDK (async so normal web browsers never block) -->
+  <script id="sa-tg-webapp-sdk" async src="https://telegram.org/js/telegram-web-app.js"></script>
+
   <meta name="description" content="SA KITCHEN chuyên cung cấp ẩm thực chuẩn vị Việt Nam, cơm văn phòng, món nhậu và dịch vụ đi chợ hộ tại Manila, Philippines." />
   <meta name="keywords" content="sakitchen, sa kitchen, sa kitchen manila, đồ ăn việt manila, ẩm thực việt tại philippines, quán ăn việt philippines, ship đồ ăn manila, món nhậu manila" />
   <meta name="author" content="SA KITCHEN" />
@@ -207,7 +210,8 @@
       try {
         var path = (window.location.pathname || '').toLowerCase();
         var params = new URLSearchParams(window.location.search);
-        var isStorefront = !path.startsWith('/admin') && !path.startsWith('/login') && !path.startsWith('/blog') && !params.get('order');
+        var tgStart = params.get('tgWebAppStartParam') || '';
+        var isStorefront = !path.startsWith('/admin') && !path.startsWith('/login') && !path.startsWith('/blog') && !params.get('order') && tgStart.indexOf('order_') !== 0;
         if (!isStorefront) return;
         var rawTheme = localStorage.getItem('SA_STOREFRONT_THEME_V1');
         var mode = 'once_session';

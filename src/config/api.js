@@ -1170,6 +1170,9 @@ export async function ensureLiveOrderSession({
       Tong_cong: tongCong,
       Host_id: s(hostId),
       Host_name: s(hostName),
+      ...(meta.Telegram_chat_id ? { Telegram_chat_id: s(meta.Telegram_chat_id) } : {}),
+      ...(meta.Telegram_username ? { Telegram_username: s(meta.Telegram_username) } : {}),
+      ...(meta.Telegram_lang ? { Telegram_lang: s(meta.Telegram_lang) } : {}),
       Created_at: Date.now(),
       Updated_at: Date.now(),
     }),
@@ -1664,12 +1667,20 @@ export async function sendAdminOrderMessage({ orderId, message } = {}) {
     return { success: false, message: 'Không tìm thấy phiên đơn web của khách' }
   }
 
+  const rawSnapVal = orderSnap.val() || {}
   const now = Date.now()
   await update(dbRef(db), {
     [`live_orders/${orderKey}/meta/Admin_message`]: cleanMsg,
     [`live_orders/${orderKey}/meta/Admin_message_at`]: now,
     [`live_orders/${orderKey}/meta/Updated_at`]: now,
   })
+  if (rawSnapVal.meta?.Telegram_chat_id) {
+    notifyCustomerTelegram({
+      orderId: cleanOrderId,
+      event: 'message',
+      adminMessage: cleanMsg,
+    })
+  }
   return { success: true, sentAt: now }
 }
 
@@ -1816,6 +1827,10 @@ export async function submitCustomerOrder(body = {}) {
     !dhTarget && (!existingOrderStatus || existingOrderStatus === 'Nháp')
   const webUpdateTs = isNewOrderNotification ? 0 : Date.now()
 
+  const tgChatId = s(metaIn.Telegram_chat_id || existingParsed?.meta?.Telegram_chat_id).trim()
+  const tgUsername = s(metaIn.Telegram_username || existingParsed?.meta?.Telegram_username).trim()
+  const tgLang = s(metaIn.Telegram_lang || existingParsed?.meta?.Telegram_lang).trim()
+
   const nextMeta = sanitizeRow({
     Ma_hoa_don: cleanOrderId,
     So_hoa_don: s(existingParsed?.meta?.So_hoa_don),
@@ -1835,6 +1850,9 @@ export async function submitCustomerOrder(body = {}) {
     Tong_cong: tongCong,
     Host_id: s(body.hostId || existingParsed?.meta?.Host_id),
     Host_name: s(body.hostName || existingParsed?.meta?.Host_name || tenKhach),
+    ...(tgChatId ? { Telegram_chat_id: tgChatId } : {}),
+    ...(tgUsername ? { Telegram_username: tgUsername } : {}),
+    ...(tgLang ? { Telegram_lang: tgLang } : {}),
     Created_at: n(existingParsed?.meta?.Created_at, Date.now()),
     Submitted_at: Date.now(),
     Updated_at: Date.now(),
@@ -1930,6 +1948,21 @@ export async function submitCustomerOrder(body = {}) {
     })
   } catch {}
 
+  if (tgChatId || body.telegramInitData) {
+    const totalItemQty = resolvedList.reduce((acc, it) => acc + Math.max(0, n(it.So_luong)), 0)
+    notifyCustomerTelegram({
+      orderId: cleanOrderId,
+      event: isNewOrderNotification ? 'submitted' : 'updated',
+      initData: s(body.telegramInitData),
+      lang: tgLang || 'vi',
+      tenKhach,
+      tongCong,
+      donViTienTe: currency,
+      itemCount: totalItemQty,
+      thoiGian,
+    })
+  }
+
   return {
     success: true,
     orderId: cleanOrderId,
@@ -2020,6 +2053,18 @@ function notifyNewOrderTelegram(payload) {
   if (typeof fetch !== 'function') return
   try {
     fetch('/api/telegram-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      body: JSON.stringify(payload),
+    }).catch(() => {})
+  } catch {}
+}
+
+function notifyCustomerTelegram(payload) {
+  if (typeof fetch !== 'function') return
+  try {
+    fetch('/api/telegram-customer-notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       keepalive: true,
@@ -2730,6 +2775,14 @@ export async function duyetDonHang(body = {}) {
   }
 
   await update(dbRef(db), updates)
+  if (!body.silentCustomerNotify && liveParsed?.meta?.Telegram_chat_id) {
+    notifyCustomerTelegram({
+      orderId: maHoaDon,
+      event: 'approved',
+      tongCong,
+      donViTienTe: currency,
+    })
+  }
   return {
     success: true,
     Ma_hoa_don: maHoaDon,
@@ -2755,7 +2808,7 @@ export async function shipDonHang(body = {}) {
   const initialDhEntries = await readSheetEntries('don_hang')
   const pendingDh = initialDhEntries.find((e) => s(e.row.Ma_hoa_don).trim() === maHoaDon)
   if (!pendingDh || s(pendingDh.row.Trang_thai).trim() === 'Chờ duyệt') {
-    const approved = await duyetDonHang({ Ma_hoa_don: maHoaDon })
+    const approved = await duyetDonHang({ Ma_hoa_don: maHoaDon, silentCustomerNotify: true })
     if (!approved.success) return approved
   }
 
@@ -2801,6 +2854,13 @@ export async function shipDonHang(body = {}) {
   }
 
   await update(dbRef(db), updates)
+  const shipMeta = liveSnap.exists() ? liveSnap.val()?.meta : null
+  if (shipMeta?.Telegram_chat_id) {
+    notifyCustomerTelegram({
+      orderId: maHoaDon,
+      event: 'shipping',
+    })
+  }
   return {
     success: true,
     Ma_hoa_don: maHoaDon,
@@ -2824,7 +2884,7 @@ async function hoanThanhTrangThaiDon(payload) {
   const initialDhEntries = await readSheetEntries('don_hang')
   const pendingDh = initialDhEntries.find((e) => s(e.row.Ma_hoa_don).trim() === maHoaDon)
   if (pendingDh && s(pendingDh.row.Trang_thai).trim() === 'Chờ duyệt') {
-    await duyetDonHang({ Ma_hoa_don: maHoaDon })
+    await duyetDonHang({ Ma_hoa_don: maHoaDon, silentCustomerNotify: true })
   }
 
   const [dhEntries, ctEntries, liveSnap] = await Promise.all([
@@ -2877,6 +2937,14 @@ async function hoanThanhTrangThaiDon(payload) {
   }
 
   await update(dbRef(db), updates)
+  const doneMeta = liveSnap.exists() ? liveSnap.val()?.meta : null
+  if (doneMeta?.Telegram_chat_id) {
+    notifyCustomerTelegram({
+      orderId: maHoaDon,
+      event: 'completed',
+      adminMessage: s(payload.Admin_message).trim(),
+    })
+  }
   return {
     success: true,
     updated: {
@@ -2971,6 +3039,14 @@ async function huyDonHang(body) {
 
   if (Object.keys(updates).length > 0) {
     await update(dbRef(db), updates)
+  }
+  const cancelMeta = liveSnap.exists() ? liveSnap.val()?.meta : null
+  if (cancelMeta?.Telegram_chat_id) {
+    notifyCustomerTelegram({
+      orderId: maHoaDon,
+      event: 'cancelled',
+      adminMessage: s(body.Admin_message).trim(),
+    })
   }
 
   return {

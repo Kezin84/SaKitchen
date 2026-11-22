@@ -176,7 +176,8 @@
     "kickedModalTitle": "Inalis ka sa order",
     "kickedModalDesc": "Binura ng host ang iyong mga item at inalis ka sa order #{code}. Gusto mo bang pumasok ulit sa order na ito o mag-bagong order?",
     "rejoinOrderBtn": "Pumasok ulit sa order",
-    "newOrderAfterKickBtn": "Mag-bagong order"
+    "newOrderAfterKickBtn": "Mag-bagong order",
+    "shareTelegramBtn": "Mag-imbita sa Telegram"
   },
   "export": {
     "title": "NILALAMAN NG ORDER",

@@ -176,7 +176,8 @@
     "kickedModalTitle": "Bạn đã bị đá ra khỏi đơn",
     "kickedModalDesc": "Trưởng nhóm đã xóa món và đưa bạn ra khỏi đơn #{code}. Bạn muốn vào lại đơn này hay đặt đơn mới?",
     "rejoinOrderBtn": "Vào lại đơn",
-    "newOrderAfterKickBtn": "Đặt đơn mới"
+    "newOrderAfterKickBtn": "Đặt đơn mới",
+    "shareTelegramBtn": "Mời bạn chọn chung qua Telegram"
   },
   "export": {
     "title": "NỘI DUNG ĐƠN HÀNG",

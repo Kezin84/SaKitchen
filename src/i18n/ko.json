@@ -176,7 +176,8 @@
     "kickedModalTitle": "주문에서 제외되었습니다",
     "kickedModalDesc": "방장이 담은 메뉴를 삭제하고 주문 #{code}에서 내보냈습니다. 다시 이 주문에 참여하거나 새 주문을 시작하시겠습니까?",
     "rejoinOrderBtn": "주문 다시 들어가기",
-    "newOrderAfterKickBtn": "새 주문하기"
+    "newOrderAfterKickBtn": "새 주문하기",
+    "shareTelegramBtn": "텔레그램으로 함께 주문 초대"
   },
   "export": {
     "title": "주문 내용",

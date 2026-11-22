@@ -176,7 +176,8 @@
     "kickedModalTitle": "您已被移出订单",
     "kickedModalDesc": "发起人已删除您的菜品并将您移出拼单 #{code}。您想重新加入该订单，还是创建新订单？",
     "rejoinOrderBtn": "重新加入订单",
-    "newOrderAfterKickBtn": "下新订单"
+    "newOrderAfterKickBtn": "下新订单",
+    "shareTelegramBtn": "通过 Telegram 邀请好友拼单"
   },
   "export": {
     "title": "订单内容",

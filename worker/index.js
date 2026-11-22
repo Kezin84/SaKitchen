@@ -1,4 +1,8 @@
 import { onRequest as handleTelegramOrder } from '../functions/api/telegram-order.js'
+import {
+  handleTelegramCustomerWebhook,
+  handleTelegramCustomerNotify,
+} from '../functions/api/telegram-customer.js'
 import { onRequest as handleCloudinarySign } from '../functions/api/cloudinary-sign.js'
 import {
   resolveBrandAssets,
@@ -496,6 +500,14 @@ export default {
 
     if (pathname === '/api/telegram-order') {
       return handleTelegramOrder({ request, env, ctx })
+    }
+
+    if (pathname === '/api/telegram-customer-webhook') {
+      return handleTelegramCustomerWebhook({ request, env, ctx })
+    }
+
+    if (pathname === '/api/telegram-customer-notify') {
+      return handleTelegramCustomerNotify({ request, env, ctx })
     }
 
     if (pathname === '/api/cloudinary-sign') {

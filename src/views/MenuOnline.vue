@@ -11077,6 +11077,7 @@ const hasSale = computed(() =>
   --sa-bg: #f6f8fa;
   --sa-main-bg: #f6f8fa;
   --sa-top-header-bg: linear-gradient(135deg, #059669 0%, #047857 58%, #065f46 100%);
+  --sa-top-header-bg-h: linear-gradient(90deg, #059669 0%, #047857 58%, #065f46 100%);
   --sa-header-bg: rgba(255, 255, 255, 0.94);
   --sa-bottom-bar-bg: rgba(255, 255, 255, 0.94);
   --sa-toolbar-bg: rgba(246, 248, 250, 0.94);
@@ -11156,6 +11157,7 @@ const hasSale = computed(() =>
   --sa-bg: #0b0f17;
   --sa-main-bg: #0b0f17;
   --sa-top-header-bg: linear-gradient(135deg, #065f46 0%, #064e3b 55%, #022c22 100%);
+  --sa-top-header-bg-h: linear-gradient(90deg, #065f46 0%, #064e3b 55%, #022c22 100%);
   --sa-header-bg: rgba(15, 21, 33, 0.94);
   --sa-bottom-bar-bg: rgba(19, 26, 38, 0.94);
   --sa-toolbar-bg: rgba(11, 15, 23, 0.94);
@@ -19038,13 +19040,27 @@ const hasSale = computed(() =>
     height: 56px;
     padding: 0 12px;
     margin: 0 !important;
-    background: var(--sa-top-header-bg);
+    background: var(--sa-top-header-bg-h, var(--sa-top-header-bg));
     border-bottom: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 0;
     box-shadow: 0 3px 14px rgba(var(--sa-primary-dark-rgb), 0.18);
     position: sticky;
     top: 0;
     z-index: 50;
+  }
+
+  /* Seamless top curtain covering exposed area above sticky header
+     in iOS in-app browsers (Telegram, Messenger, Zalo) & overscroll */
+  .mobile-header-clean::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% - 1px);
+    height: 180px;
+    background: var(--sa-top-header-bg-h, var(--sa-top-header-bg));
+    pointer-events: none;
+    z-index: -1;
   }
 
   .mobile-header-clean.has-scam {
@@ -19135,6 +19151,18 @@ const hasSale = computed(() =>
     max-width: 92vw;
     max-height: 70vh;
     padding: 8px;
+  }
+}
+
+/* PWA standalone mode: extend sticky mobile header cleanly into iOS status bar safe area */
+@media (max-width: 768px) and (display-mode: standalone) {
+  .mobile-header-clean {
+    height: calc(56px + env(safe-area-inset-top, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .search-wrapper {
+    top: calc(56px + env(safe-area-inset-top, 0px));
   }
 }
 

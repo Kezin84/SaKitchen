@@ -521,6 +521,11 @@ export function buildStorefrontThemeVars(rawConfig, colorScheme = 'light') {
   const topHeaderDark = isLowSatDark
     ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 55%, #020617 100%)'
     : `linear-gradient(135deg, ${primaryDark} 0%, ${primaryDeep} 55%, ${primaryDeepest} 100%)`
+  // Pure horizontal gradient so mobile header + top overscroll/in-app browser curtain blend seamlessly
+  const topHeaderLightH = `linear-gradient(90deg, ${basePrimary} 0%, ${primaryHover} 58%, ${primaryDark} 100%)`
+  const topHeaderDarkH = isLowSatDark
+    ? 'linear-gradient(90deg, #1e293b 0%, #0f172a 55%, #020617 100%)'
+    : `linear-gradient(90deg, ${primaryDark} 0%, ${primaryDeep} 55%, ${primaryDeepest} 100%)`
 
   const primaryRgb = rgbTriplet(basePrimary)
   const primaryBrightRgb = rgbTriplet(primaryBright)
@@ -573,6 +578,7 @@ export function buildStorefrontThemeVars(rawConfig, colorScheme = 'light') {
     '--sa-bg': isDark ? bgDark : bgLight,
     '--sa-main-bg': isDark ? bgDark : bgLight,
     '--sa-top-header-bg': isDark ? topHeaderDark : topHeaderLight,
+    '--sa-top-header-bg-h': isDark ? topHeaderDarkH : topHeaderLightH,
     '--sa-header-bg': isDark ? 'rgba(15, 21, 33, 0.94)' : 'rgba(255, 255, 255, 0.94)',
     '--sa-bottom-bar-bg': isDark ? 'rgba(19, 26, 38, 0.94)' : 'rgba(255, 255, 255, 0.94)',
     '--sa-toolbar-bg': isDark ? toolbarBgDark : toolbarBgLight,

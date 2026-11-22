@@ -7078,6 +7078,9 @@ function connectLiveOrder(orderId, { fromUrl = false, syncUrl = false } = {}) {
       isEditingMeta.value = false
     }
 
+    const snapHostId = String(snap.meta?.Host_id || '').trim()
+    const amHost = !snapHostId || snapHostId === memberId
+
     if ((!isEditingMeta.value || isSnapLocked) && snap.meta) {
       applyingRemoteMeta = true
       if (snap.meta.Ten_khach_hang !== undefined) tenKhach.value = snap.meta.Ten_khach_hang || ''
@@ -7092,16 +7095,26 @@ function connectLiveOrder(orderId, { fromUrl = false, syncUrl = false } = {}) {
       if (snap.meta.Ghi_chu !== undefined) {
         ghiChu.value = stripAutoPromoTag(snap.meta.Ghi_chu || '')
       }
-      if (isSnapLocked && (!snap.meta?.Host_id || snap.meta.Host_id === memberId)) {
+      let needSyncTgAutofill = false
+      if (amHost && !isSnapLocked && isTelegramMiniApp()) {
+        const prevRemoteTen = String(snap.meta.Ten_khach_hang || '').trim()
+        const prevRemoteSdt = String(snap.meta.So_dien_thoai || '').trim()
+        applyTelegramProfileAutofill(getTelegramUserProfile())
+        if (tenKhach.value.trim() !== prevRemoteTen || sdt.value.trim() !== prevRemoteSdt) {
+          needSyncTgAutofill = true
+        }
+      }
+      if (isSnapLocked && amHost) {
         saveCustomerFormLocal()
       }
       nextTick(() => {
         applyingRemoteMeta = false
+        if (needSyncTgAutofill) {
+          scheduleSyncLiveMeta()
+        }
       })
     }
 
-    const snapHostId = String(snap.meta?.Host_id || '').trim()
-    const amHost = !snapHostId || snapHostId === memberId
     const myMemberRec = (snap.membersList || []).find((m) => m.id === memberId) || null
     const kickedEntry = !amHost
       ? Object.values(snap.kickedMap || {}).find((k) => String(k?.id || '') === memberId)
@@ -7945,25 +7958,58 @@ function onDocumentClick(e) {
 onMounted(() => {
   document.addEventListener('click', onDocumentClick)
 })
+function applyTelegramProfileAutofill(tgProfile) {
+  if (!tgProfile) return
+  const combined = String(tgProfile.displayLabel || '').trim()
+  if (!combined) return
+
+  const curTen = tenKhach.value.trim()
+  // Điền mới hoặc tự nâng cấp nếu trước đó mới chỉ lưu mỗi fullName hoặc mỗi @username riêng lẻ
+  if (
+    !curTen ||
+    (tgProfile.fullName && curTen === tgProfile.fullName && tgProfile.handle) ||
+    (tgProfile.handle && curTen === tgProfile.handle && tgProfile.fullName)
+  ) {
+    tenKhach.value = combined
+  }
+
+  const curMember = memberName.value.trim()
+  if (
+    !curMember ||
+    (tgProfile.fullName && curMember === tgProfile.fullName && tgProfile.handle) ||
+    (tgProfile.handle && curMember === tgProfile.handle && tgProfile.fullName)
+  ) {
+    memberName.value = combined
+  }
+
+  // Giữ ô SĐT dành riêng cho số điện thoại (dọn nếu bản trước lỡ điền @username vào ô SĐT)
+  if (tgProfile.handle && sdt.value.trim() === tgProfile.handle) {
+    sdt.value = ''
+  }
+}
+
 onMounted(() => {
   bindOrderBellUnlock()
   loadPersistedLocalState()
 
-  initTelegramMiniApp({ isDark: themeMode.value === 'dark' })
   if (isTelegramMiniApp()) {
-    const tgProfile = getTelegramUserProfile()
-    if (tgProfile) {
-      if (!tenKhach.value.trim() && tgProfile.fullName) {
-        tenKhach.value = tgProfile.fullName
-      }
-      if (!memberName.value.trim() && tgProfile.fullName) {
-        memberName.value = tgProfile.fullName
-      }
-      if (!sdt.value.trim() && tgProfile.username) {
-        sdt.value = `@${tgProfile.username}`
-      }
-    }
+    applyTelegramProfileAutofill(getTelegramUserProfile())
   }
+  initTelegramMiniApp({
+    isDark: themeMode.value === 'dark',
+    onReady: (tgProfile) => {
+      const beforeTen = tenKhach.value
+      const beforeSdt = sdt.value
+      applyTelegramProfileAutofill(tgProfile)
+      if (
+        (tenKhach.value !== beforeTen || sdt.value !== beforeSdt) &&
+        isGroupHost.value &&
+        !isOrderLocked.value
+      ) {
+        scheduleSyncLiveMeta()
+      }
+    },
+  })
 
   const qOrder = String(route.query?.order || getTelegramStartOrderId() || '').trim()
   if (qOrder) {

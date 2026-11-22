@@ -77,6 +77,9 @@ export function getTelegramUserProfile() {
   const lastName = String(rawUser.last_name || '').trim()
   const fullName = [firstName, lastName].filter(Boolean).join(' ').trim()
   const username = String(rawUser.username || '').trim().replace(/^@+/, '')
+  const handle = username ? `@${username}` : ''
+  const displayLabel =
+    fullName && handle ? `${fullName}|${handle}` : fullName || handle || ''
   const languageCode = String(rawUser.language_code || '').trim().toLowerCase()
 
   return {
@@ -85,6 +88,8 @@ export function getTelegramUserProfile() {
     lastName,
     fullName,
     username,
+    handle,
+    displayLabel,
     languageCode,
     initData: getTelegramInitData(),
   }
@@ -149,16 +154,27 @@ function applyTelegramWebAppBoot(isDark = false) {
   return true
 }
 
-export function initTelegramMiniApp({ isDark = false } = {}) {
+export function initTelegramMiniApp({ isDark = false, onReady = null } = {}) {
   if (typeof window === 'undefined') return
-  if (applyTelegramWebAppBoot(isDark)) return
+  if (applyTelegramWebAppBoot(isDark)) {
+    if (typeof onReady === 'function') {
+      try {
+        onReady(getTelegramUserProfile())
+      } catch {}
+    }
+    return
+  }
 
   const sdkScript = document.getElementById('sa-tg-webapp-sdk')
   if (sdkScript) {
     sdkScript.addEventListener(
       'load',
       () => {
-        applyTelegramWebAppBoot(isDark)
+        if (applyTelegramWebAppBoot(isDark) && typeof onReady === 'function') {
+          try {
+            onReady(getTelegramUserProfile())
+          } catch {}
+        }
       },
       { once: true },
     )

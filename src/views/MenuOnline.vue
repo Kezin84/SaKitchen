@@ -557,9 +557,8 @@
         </div>
       </div>
 
-      <!-- CENTERED PARTNER CARDS (PC + MOBILE) + 3 CLEAN CHECK SCAM CARDS (MOBILE) -->
+      <!-- CENTERED PARTNER CARDS + 3 CLEAN CHECK SCAM CARDS (PC + MOBILE) -->
       <section
-        v-if="isMobile || activePartnerList.length"
         ref="scamHubRef"
         class="scam-hub-section"
         aria-label="Partners & Check Scam Hub"
@@ -605,7 +604,7 @@
           </a>
         </div>
 
-        <div v-if="isMobile" class="scam-hub-grid">
+        <div class="scam-hub-grid">
           <a
             v-for="item in CHECK_SCAM_LINKS"
             :key="'hub-' + item.key"
@@ -1060,13 +1059,7 @@
             :style="!isMobile ? { '--card-stagger': Math.min(entryIdx % 12, 10) } : undefined"
             @click="selectParentAndSub(entry.parentLabel, entry.subLabel)"
           >
-            <span class="mgh-title">
-              <i class="ri-node-tree"></i>
-              <span>{{ entry.headingText }}</span>
-            </span>
-            <span v-if="entry.subLabel" class="mgh-action">
-              <i class="ri-arrow-right-s-line"></i>
-            </span>
+            <span class="mgh-title">{{ entry.headingText }}</span>
           </div>
           <div
             v-else
@@ -3821,6 +3814,19 @@
   </div>
 </button>
 
+  <!-- BẢNG TIN -->
+  <button
+    type="button"
+    @click="router.push('/bang-tin')"
+  >
+    <div class="btn-inner">
+      <div class="btn-scale">
+        <i class="ri-newspaper-line dock-accent-ico"></i>
+        <span class="btn-label">{{ $t('feed.navShort') }}</span>
+      </div>
+    </div>
+  </button>
+
   <!-- GIỎ HÀNG -->
   <button
     class="cart-btn"
@@ -3883,46 +3889,6 @@
           </svg>
         </span>
         <span class="btn-label">{{ $t('mobile.contact') }}</span>
-      </div>
-    </div>
-  </button>
-
-
-
-  <!-- GỬI ĐƠN (TRƯỞNG NHÓM) / HOÀN THÀNH (THÀNH VIÊN GHÉP) -->
-  <button
-    :class="{ active: activeMobilePanel === 'export' }"
-    @click="onMobileSendTab"
-  >
-    <div class="btn-inner">
-      <div class="btn-scale">
-        <div class="send-icon-wrap">
-          <i
-            class="dock-accent-ico"
-            :class="
-              isGroupGuest
-                ? isMyGuestSelectionDone
-                  ? 'ri-checkbox-circle-fill'
-                  : 'ri-check-double-line'
-                : 'ri-send-plane-fill'
-            "
-          ></i>
-          <span
-            v-if="cartItems.length && (!liveStatus || liveStatus === 'Nháp')"
-            class="send-badge"
-          >
-            {{ cartQtyTotal }}
-          </span>
-        </div>
-        <span class="btn-label">
-          {{
-            isGroupGuest
-              ? isMyGuestSelectionDone
-                ? $t('group.doneStatus')
-                : $t('group.mobileGuestDone')
-              : $t('mobile.send')
-          }}
-        </span>
       </div>
     </div>
   </button>
@@ -18849,31 +18815,32 @@ const hasSale = computed(() =>
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 14px;
-  margin-top: 4px;
-  border-radius: 12px;
-  background: var(--sa-surface-soft, rgba(var(--sa-primary-bright-rgb), 0.08));
-  border: 1px solid var(--sa-border-green, rgba(var(--sa-primary-bright-rgb), 0.28));
-  color: var(--sa-accent, var(--sa-primary));
-  font-size: 14px;
+  padding: 10px 2px 7px;
+  margin-top: 6px;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px dotted var(--sa-border-strong, #cbd5e1);
+  color: var(--sa-heading);
+  font-size: 15.5px;
   font-weight: 800;
+  letter-spacing: 0.01em;
   cursor: pointer;
-  transition: transform 0.14s ease, border-color 0.14s ease;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.menu-group-heading:first-child {
+  margin-top: 0;
 }
 
 .menu-group-heading:hover {
-  border-color: var(--sa-accent, var(--sa-primary));
+  color: var(--sa-accent, var(--sa-primary));
+  border-bottom-color: var(--sa-accent, var(--sa-primary));
 }
 
-.mgh-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.mgh-action {
-  font-size: 16px;
-  opacity: 0.8;
+.sa-storefront .mgh-title {
+  font-weight: 800;
+  color: inherit;
 }
 
 /* Linked Product Variant Switcher inside Detail Modal */

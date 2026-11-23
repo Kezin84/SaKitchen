@@ -20,7 +20,11 @@ import {
   normalizeBannerLink,
 } from '@/utils/bannerLink.js'
 import { getPartnerCardStyle } from '@/utils/partnerColor.js'
-import { sanitizeFeedCaptionHtml, stripFeedCaptionToPlainText } from '@/utils/feedCaption.js'
+import {
+  sanitizeFeedCaptionHtml,
+  stripFeedCaptionToPlainText,
+  compareFeedPosts,
+} from '@/utils/feedCaption.js'
 
 const SA_THEME_MODE_KEY = 'SA_THEME_MODE'
 const REACTION_STORAGE_KEY = 'SA_FEED_REACTIONS_V1'
@@ -41,9 +45,13 @@ const themeMode = ref('light')
 
 const activeTab = ref('all')
 const searchQuery = ref('')
+const mobileSearchOpen = ref(false)
+const mobileSearchInputRef = ref(null)
+const mobileScamSheetOpen = ref(false)
 const userReactions = ref({})
 const shareToast = ref('')
 let shareToastTimer = null
+let adTouchStartX = 0
 
 /* ACTIVE POST DETAIL SYNCED WITH /bang-tin/:postId */
 const activeDetailImgIdx = ref(0)
@@ -297,12 +305,7 @@ const visiblePosts = computed(() => {
         isActiveRow(p.Active) &&
         (stripFeedCaptionToPlainText(p.Content) || (Array.isArray(p.Images) && p.Images.length)),
     )
-    .sort((a, b) => {
-      const pinA = a.Pinned ? 1 : 0
-      const pinB = b.Pinned ? 1 : 0
-      if (pinA !== pinB) return pinB - pinA
-      return Number(b.Created_at || 0) - Number(a.Created_at || 0)
-    })
+    .sort(compareFeedPosts)
 })
 
 const activeDetailPost = computed(() => {
@@ -651,11 +654,48 @@ function stepLightbox(delta) {
   lightbox.value.index = (lightbox.value.index + delta + total) % total
 }
 
+function toggleMobileSearch() {
+  if (mobileSearchOpen.value || searchQuery.value) {
+    searchQuery.value = ''
+    mobileSearchOpen.value = false
+    return
+  }
+  mobileSearchOpen.value = true
+  nextTick(() => {
+    mobileSearchInputRef.value?.focus?.()
+  })
+}
+
+function scrollFeedTop() {
+  mobileScamSheetOpen.value = false
+  if (typeof window !== 'undefined') {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
+
+function onAdTouchStart(e) {
+  adTouchStartX = e.changedTouches?.[0]?.clientX || 0
+}
+
+function onAdTouchEnd(e) {
+  if (activeVerticalBanners.value.length <= 1) return
+  const endX = e.changedTouches?.[0]?.clientX || 0
+  const dx = endX - adTouchStartX
+  if (Math.abs(dx) >= 36) {
+    stepFeedVertAd(dx < 0 ? 1 : -1)
+  }
+}
+
 function onKeydown(e) {
   if (lightbox.value.open) {
     if (e.key === 'Escape') closeLightbox()
     else if (e.key === 'ArrowRight') stepLightbox(1)
     else if (e.key === 'ArrowLeft') stepLightbox(-1)
+    return
+  }
+
+  if (mobileScamSheetOpen.value && e.key === 'Escape') {
+    mobileScamSheetOpen.value = false
     return
   }
 
@@ -942,6 +982,16 @@ onUnmounted(() => {
         <div class="nf-nav">
           <button
             type="button"
+            class="nf-icon-btn nf-mob-search-btn"
+            :class="{ active: mobileSearchOpen || Boolean(searchQuery) }"
+            :title="$t('feed.searchPlaceholder')"
+            @click="toggleMobileSearch"
+          >
+            <i :class="mobileSearchOpen || searchQuery ? 'ri-close-line' : 'ri-search-line'"></i>
+          </button>
+
+          <button
+            type="button"
             class="nf-icon-btn"
             :title="themeMode === 'dark' ? $t('common.lightMode') : $t('common.darkMode')"
             @click="toggleThemeMode"
@@ -951,7 +1001,8 @@ onUnmounted(() => {
 
           <a :href="menuBackLink" target="_blank" rel="noopener noreferrer" class="nf-menu-cta">
             <i class="ri-restaurant-2-line"></i>
-            <span>{{ $t('feed.backToMenu') }}</span>
+            <span class="nf-cta-desk-text">{{ $t('feed.backToMenu') }}</span>
+            <span class="nf-cta-mob-text">{{ $t('feed.navMenu') }}</span>
             <span v-if="savedCartCount > 0" class="nf-cart-count">
               {{ savedCartCount > 99 ? '99+' : savedCartCount }}
             </span>
@@ -1107,7 +1158,10 @@ onUnmounted(() => {
         <!-- ================= CENTER COLUMN: POSTS ONLY ================= -->
         <div class="nf-timeline-col">
           <!-- COMPACT FILTER & SEARCH BAR -->
-          <div class="nf-feed-toolbar">
+          <div
+            class="nf-feed-toolbar"
+            :class="{ 'is-mob-search-open': mobileSearchOpen || Boolean(searchQuery) }"
+          >
             <div class="nf-tabs" role="tablist">
               <button
                 type="button"
@@ -1150,6 +1204,7 @@ onUnmounted(() => {
             <div class="nf-search-box">
               <i class="ri-search-line"></i>
               <input
+                ref="mobileSearchInputRef"
                 v-model="searchQuery"
                 type="text"
                 :placeholder="$t('feed.searchPlaceholder')"
@@ -1163,6 +1218,33 @@ onUnmounted(() => {
                 <i class="ri-close-line"></i>
               </button>
             </div>
+          </div>
+
+          <!-- MOBILE HORIZONTAL PARTNER STRIP (STORIES-STYLE COMPACT ROW) -->
+          <div
+            v-if="activePartners.length"
+            class="nf-mob-partner-strip"
+            aria-label="Hệ sinh thái & Đối tác"
+          >
+            <a
+              v-for="(pt, idx) in activePartners"
+              :key="'mob-pt-' + pt.ID"
+              :href="pt.normalizedUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="nf-mob-pt-pill"
+              :style="getPartnerCardStyle(pt.Bg_color, idx)"
+            >
+              <span class="nf-mob-pt-avatar">
+                <img v-if="pt.URL_img" :src="pt.URL_img" :alt="pt.Name" loading="lazy" />
+                <i v-else class="ri-store-3-fill"></i>
+              </span>
+              <span class="nf-mob-pt-info">
+                <strong>{{ pt.Name }}</strong>
+                <span v-if="pt.Subtitle">{{ pt.Subtitle }}</span>
+              </span>
+              <i class="ri-arrow-right-up-line nf-mob-pt-ext"></i>
+            </a>
           </div>
 
           <!-- SKELETON -->
@@ -1212,9 +1294,8 @@ onUnmounted(() => {
 
           <!-- FEED CARDS -->
           <template v-else>
+            <template v-for="(post, pIdx) in filteredPosts" :key="post.ID">
             <article
-              v-for="post in filteredPosts"
-              :key="post.ID"
               :ref="(el) => setPostCardRef(el, post.ID)"
               :data-post-id="post.ID"
               class="nf-post-card is-clickable-card"
@@ -1414,13 +1495,130 @@ onUnmounted(() => {
                 </div>
               </footer>
             </article>
+
+            <!-- MOBILE IN-FEED SPONSORED AD CARD (AFTER POST #2) -->
+            <div
+              v-if="
+                activeVerticalBanners.length &&
+                activeFeedVertAd &&
+                pIdx === Math.min(1, filteredPosts.length - 1)
+              "
+              class="nf-post-card nf-mob-infeed-ad"
+              @touchstart.passive="onAdTouchStart"
+              @touchend.passive="onAdTouchEnd"
+            >
+              <div class="nf-mia-head">
+                <div class="nf-mia-badge">
+                  <i class="ri-megaphone-fill"></i>
+                  <span>{{ $t('feed.sidebarAdTitle') }}</span>
+                </div>
+                <div v-if="activeVerticalBanners.length > 1" class="nf-mia-controls">
+                  <button
+                    type="button"
+                    class="nf-mia-arrow"
+                    aria-label="Previous"
+                    @click="stepFeedVertAd(-1)"
+                  >
+                    <i class="ri-arrow-left-s-line"></i>
+                  </button>
+                  <span class="nf-mia-count">
+                    {{ currentFeedAdIdx + 1 }}/{{ activeVerticalBanners.length }}
+                  </span>
+                  <button
+                    type="button"
+                    class="nf-mia-arrow"
+                    aria-label="Next"
+                    @click="stepFeedVertAd(1)"
+                  >
+                    <i class="ri-arrow-right-s-line"></i>
+                  </button>
+                </div>
+              </div>
+
+              <Transition name="standee-fade" mode="out-in">
+                <a
+                  v-if="
+                    activeFeedVertAd.action === BANNER_CLICK_ACTIONS.LINK &&
+                    activeFeedVertAd.normalizedLink
+                  "
+                  :key="'mob-ad-link-' + activeFeedVertAd.ID"
+                  :href="activeFeedVertAd.normalizedLink"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="nf-mia-body"
+                >
+                  <div
+                    class="nf-mia-poster has-glassy-ambient"
+                    :style="ambientBgStyle(activeFeedVertAd.URL)"
+                  >
+                    <img
+                      :src="activeFeedVertAd.URL"
+                      :alt="activeFeedVertAd.cleanTitle || brand.siteName"
+                    />
+                    <span class="nfs-ad-corner-ico">
+                      <i class="ri-arrow-right-up-line"></i>
+                    </span>
+                  </div>
+                  <div
+                    v-if="activeFeedVertAd.cleanTitle || activeFeedVertAd.normalizedLink"
+                    class="nf-mia-foot"
+                  >
+                    <span class="nf-mia-title">
+                      {{ activeFeedVertAd.cleanTitle || brand.siteName }}
+                    </span>
+                    <span class="nf-mia-cta">
+                      <span>{{ $t('feed.openAdLink') }}</span>
+                      <i class="ri-arrow-right-up-line"></i>
+                    </span>
+                  </div>
+                </a>
+
+                <button
+                  v-else
+                  :key="'mob-ad-btn-' + activeFeedVertAd.ID"
+                  type="button"
+                  class="nf-mia-body is-btn"
+                  @click="
+                    openLightbox([activeFeedVertAd.URL], 0, activeFeedVertAd.normalizedLink)
+                  "
+                >
+                  <div
+                    class="nf-mia-poster has-glassy-ambient"
+                    :style="ambientBgStyle(activeFeedVertAd.URL)"
+                  >
+                    <img
+                      :src="activeFeedVertAd.URL"
+                      :alt="activeFeedVertAd.cleanTitle || brand.siteName"
+                    />
+                    <span class="nfs-ad-corner-ico">
+                      <i class="ri-fullscreen-line"></i>
+                    </span>
+                  </div>
+                  <div v-if="activeFeedVertAd.cleanTitle" class="nf-mia-foot">
+                    <span class="nf-mia-title">{{ activeFeedVertAd.cleanTitle }}</span>
+                  </div>
+                </button>
+              </Transition>
+
+              <div v-if="activeVerticalBanners.length > 1" class="nfs-snav-dots nf-mia-dots">
+                <button
+                  v-for="(item, dIdx) in activeVerticalBanners"
+                  :key="'mia-dot-' + item.ID"
+                  type="button"
+                  class="nfs-snav-dot"
+                  :class="{ active: dIdx === currentFeedAdIdx }"
+                  @click="goToFeedVertAd(dIdx)"
+                ></button>
+              </div>
+            </div>
+            </template>
           </template>
         </div>
 
         <!-- ================= RIGHT STICKY SIDEBAR ================= -->
         <aside class="nf-sidebar-col nf-right-sidebar">
           <!-- CHECK SCAM TRUST WIDGET -->
-          <div class="nfs-widget">
+          <div class="nfs-widget nfs-scam-widget">
             <h3 class="nfs-title">
               <i class="ri-shield-check-fill"></i>
               <span>{{ $t('footer.safetyTitle') }}</span>
@@ -1480,6 +1678,101 @@ onUnmounted(() => {
         </aside>
       </div>
     </main>
+
+    <!-- MOBILE CHECK SCAM BOTTOM SHEET -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div
+          v-if="mobileScamSheetOpen"
+          class="nf-mob-sheet-backdrop"
+          :class="themeMode === 'dark' ? 'theme-dark' : 'theme-light'"
+          :style="themeVars"
+          @click.self="mobileScamSheetOpen = false"
+        >
+          <div class="nf-mob-scam-sheet">
+            <div class="nfm-sheet-handle"></div>
+            <div class="nfm-sheet-head">
+              <div class="nfm-sheet-title">
+                <i class="ri-shield-check-fill"></i>
+                <span>{{ $t('footer.safetyTitle') }}</span>
+              </div>
+              <button
+                type="button"
+                class="nfm-sheet-close"
+                @click="mobileScamSheetOpen = false"
+              >
+                <i class="ri-close-line"></i>
+              </button>
+            </div>
+            <div class="nfm-sheet-list">
+              <a
+                v-for="item in checkScamItems"
+                :key="'mob-sheet-' + item.key"
+                :href="item.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="nfm-sheet-item"
+                :class="item.variant"
+                @click="mobileScamSheetOpen = false"
+              >
+                <i :class="item.icon" class="nfm-sheet-ico"></i>
+                <span class="nfm-sheet-body">
+                  <strong>{{ item.title }}</strong>
+                  <span>{{ item.sub }}</span>
+                </span>
+                <i class="ri-arrow-right-up-line nfm-sheet-ext"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- MOBILE FIXED BOTTOM NAVIGATION BAR (4 TABS) -->
+    <nav class="nf-mob-bottom-bar" aria-label="Điều hướng di động">
+      <RouterLink
+        :to="menuBackLink"
+        class="nf-mbb-item"
+      >
+        <span class="nf-mbb-ico-wrap">
+          <i class="ri-restaurant-2-line"></i>
+          <span v-if="savedCartCount > 0" class="nf-mbb-badge">
+            {{ savedCartCount > 99 ? '99+' : savedCartCount }}
+          </span>
+        </span>
+        <span class="nf-mbb-label">{{ $t('feed.navMenu') }}</span>
+      </RouterLink>
+
+      <button
+        type="button"
+        class="nf-mbb-item active"
+        @click="scrollFeedTop"
+      >
+        <span class="nf-mbb-ico-wrap">
+          <i class="ri-newspaper-fill"></i>
+        </span>
+        <span class="nf-mbb-label">{{ $t('feed.navShort') }}</span>
+      </button>
+
+      <RouterLink to="/blog" class="nf-mbb-item">
+        <span class="nf-mbb-ico-wrap">
+          <i class="ri-article-line"></i>
+        </span>
+        <span class="nf-mbb-label">Blog</span>
+      </RouterLink>
+
+      <button
+        type="button"
+        class="nf-mbb-item"
+        :class="{ active: mobileScamSheetOpen }"
+        @click="mobileScamSheetOpen = !mobileScamSheetOpen"
+      >
+        <span class="nf-mbb-ico-wrap">
+          <i class="ri-shield-check-line"></i>
+        </span>
+        <span class="nf-mbb-label">Check Scam</span>
+      </button>
+    </nav>
 
     <!-- POST DETAIL MODAL (SYNCED WITH /bang-tin/:postId) -->
     <Teleport to="body">
@@ -1779,6 +2072,9 @@ onUnmounted(() => {
 <style scoped>
 .feed-public-page {
   min-height: 100vh;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: clip;
   background: var(--sa-bg, #f1f5f9);
   color: var(--sa-text, #1e293b);
   display: flex;
@@ -2213,6 +2509,18 @@ onUnmounted(() => {
   color: var(--sa-secondary-light, #fef08a);
 }
 
+.theme-dark .nf-mob-search-btn {
+  color: #ffffff;
+}
+
+.nf-mob-search-btn,
+.nf-cta-mob-text,
+.nf-mob-partner-strip,
+.nf-mob-infeed-ad,
+.nf-mob-bottom-bar {
+  display: none;
+}
+
 .nf-menu-cta {
   position: relative;
   display: inline-flex;
@@ -2580,7 +2888,7 @@ onUnmounted(() => {
 }
 
 .nfp-media-grid.is-1 {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .nfp-media-grid.is-2 {
@@ -2588,7 +2896,7 @@ onUnmounted(() => {
 }
 
 .nfp-media-grid.is-3 {
-  grid-template-columns: 1.25fr 1fr;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
   grid-template-rows: repeat(2, 112px);
 }
 
@@ -2603,6 +2911,9 @@ onUnmounted(() => {
 
 .nfp-media-tile {
   position: relative;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 8px;
   border: 1px solid var(--nf-border);
   border-radius: 13px;
@@ -3929,61 +4240,245 @@ onUnmounted(() => {
   }
 }
 
-@media (max-width: 720px) {
-  .nf-layout-grid,
-  .nf-layout-grid.no-left-col {
-    grid-template-columns: 1fr;
+@media (max-width: 768px) {
+  .nf-header {
+    min-height: 56px;
   }
 
-  .nfs-ad-stack {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 12px;
-  }
-
-  .nfs-ad-section-head {
-    grid-column: 1 / -1;
-  }
-}
-
-@media (max-width: 640px) {
   .nf-header-inner {
-    padding: 9px 12px;
+    min-height: 56px;
+    padding: 0 12px;
+    gap: 8px;
   }
 
-  .nf-nav-links {
-    display: none;
+  .nf-logo {
+    width: 35px;
+    height: 35px;
+    border-radius: 9px;
+  }
+
+  .nf-brand-text strong {
+    font-size: 14px;
+  }
+
+  .nf-brand-text span {
+    font-size: 10.5px;
+  }
+
+  .nf-nav-links,
+  .nf-cta-desk-text,
+  .nf-left-sidebar,
+  .nfs-scam-widget {
+    display: none !important;
+  }
+
+  .nf-cta-mob-text {
+    display: inline;
+  }
+
+  .nf-mob-search-btn {
+    display: inline-flex;
+  }
+
+  .nf-mob-search-btn.active {
+    background: rgba(255, 255, 255, 0.28);
+    border-color: rgba(255, 255, 255, 0.52);
+    color: #ffffff;
+  }
+
+  .nf-icon-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    font-size: 16px;
   }
 
   .nf-menu-cta {
-    padding: 8px 12px;
+    height: 34px;
+    padding: 0 11px;
     font-size: 12px;
+    gap: 5px;
   }
 
   .nf-container {
-    padding: 12px 10px 44px;
+    width: 100%;
+    max-width: 100vw;
+    padding: 10px 10px calc(86px + env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
   }
 
-  .nf-feed-toolbar,
-  .nf-post-card {
-    padding: 12px 14px;
-    border-radius: 15px;
+  .nf-layout-grid,
+  .nf-layout-grid.no-left-col {
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+    max-width: 100%;
+    gap: 12px;
+  }
+
+  .nf-timeline-col,
+  .nf-right-sidebar,
+  .nf-right-sidebar .nfs-widget {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .nf-timeline-col {
+    gap: 12px;
+  }
+
+  /* STICKY 1-ROW FILTER STRIP + COLLAPSIBLE SEARCH */
+  .nf-feed-toolbar {
+    position: sticky;
+    top: 56px;
+    z-index: 44;
+    width: calc(100% + 20px);
+    max-width: calc(100% + 20px);
+    box-sizing: border-box;
+    margin: 0 -10px;
+    padding: 8px 10px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    background: color-mix(in srgb, var(--nf-card-bg) 92%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+    gap: 8px;
   }
 
   .nf-tabs {
     width: 100%;
+    flex: 1 1 100%;
     flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
+    gap: 6px;
   }
 
   .nf-tabs::-webkit-scrollbar {
     display: none;
   }
 
-  .nf-search-box {
+  .nf-tab {
+    height: 32px;
+    padding: 0 11px;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .nf-feed-toolbar:not(.is-mob-search-open) .nf-search-box {
+    display: none;
+  }
+
+  .nf-feed-toolbar.is-mob-search-open .nf-search-box {
+    display: flex;
     width: 100%;
     flex: 1 1 100%;
+    height: 36px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  .nf-feed-toolbar.is-mob-search-open .nf-search-box input {
+    font-size: 13.5px;
+  }
+
+  /* HORIZONTAL STORIES-STYLE PARTNER STRIP AT TOP */
+  .nf-mob-partner-strip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding: 2px 1px;
+  }
+
+  .nf-mob-partner-strip::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nf-mob-pt-pill {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 46px;
+    padding: 5px 11px 5px 6px;
+    border-radius: 13px;
+    border: 1px solid var(--pt-border, rgba(255, 255, 255, 0.28));
+    color: var(--pt-fg, #ffffff);
+    text-decoration: none;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+    max-width: 210px;
+  }
+
+  .nf-mob-pt-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.95);
+    color: var(--pt-ico, #059669);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 15px;
+  }
+
+  .nf-mob-pt-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .nf-mob-pt-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.2;
+  }
+
+  .nf-mob-pt-info strong {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--pt-fg, #ffffff);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .nf-mob-pt-info span {
+    font-size: 10px;
+    color: var(--pt-sub, rgba(255, 255, 255, 0.85));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .nf-mob-pt-ext {
+    font-size: 13px;
+    color: var(--pt-fg, #ffffff);
+    opacity: 0.85;
+    flex-shrink: 0;
+  }
+
+  /* MOBILE POST CARDS — IMMERSIVE TALL PHOTO DISPLAY */
+  .nf-post-card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 13px 14px;
+    border-radius: 16px;
   }
 
   .nfp-detail-hint span {
@@ -3991,27 +4486,455 @@ onUnmounted(() => {
   }
 
   .nfp-media-grid.is-1 .nfp-media-tile {
-    height: 210px;
+    height: auto;
+    min-height: 235px;
+    max-height: 365px;
+    padding: 8px;
+  }
+
+  .nfp-media-grid.is-1 .nfp-media-tile img {
+    max-height: 345px;
   }
 
   .nfp-media-grid.is-2 .nfp-media-tile {
-    height: 145px;
+    height: 180px;
   }
 
   .nfp-media-grid.is-3 {
-    grid-template-rows: repeat(2, 94px);
+    grid-template-rows: repeat(2, 108px);
   }
 
   .nfp-media-grid.is-4plus {
-    grid-template-rows: repeat(2, 112px);
+    grid-template-rows: repeat(2, 126px);
   }
 
-  .nfp-share-btn span {
+  /* IN-FEED SPONSORED AD CARD (AFTER POST #2) */
+  .nf-mob-infeed-ad {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 13px;
+    border-color: rgba(16, 185, 129, 0.28);
+  }
+
+  .nf-mia-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .nf-mia-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--sa-accent, #059669);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.25px;
+  }
+
+  .nf-mia-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .nf-mia-arrow {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--nf-border);
+    background: var(--nf-card-soft);
+    color: var(--nf-heading);
+    font-size: 15px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .nf-mia-count {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--nf-muted);
+  }
+
+  .nf-mia-body {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 0;
+    border-radius: 13px;
+    overflow: hidden;
+    border: 1px solid var(--nf-border);
+    background: var(--nf-card-soft);
+    text-decoration: none;
+    color: var(--nf-heading);
+  }
+
+  .nf-mia-body.is-btn {
+    text-align: left;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .nf-mia-poster {
+    position: relative;
+    width: 100%;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 220px;
+    max-height: 360px;
+  }
+
+  .nf-mia-poster img {
+    position: relative;
+    z-index: 2;
+    max-width: 100%;
+    max-height: 340px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: 9px;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
+  }
+
+  .nf-mia-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 9px 12px;
+    background: var(--nf-card-bg);
+    border-top: 1px solid var(--nf-border);
+  }
+
+  .nf-mia-title {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--nf-heading);
+    min-width: 0;
+    flex: 1;
+  }
+
+  .nf-mia-cta {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--sa-accent, #059669);
+    color: #ffffff;
+    font-size: 11.5px;
+    font-weight: 800;
+  }
+
+  .nf-mia-dots {
+    margin-top: -2px;
+  }
+
+  /* HORIZONTAL HOT DISHES AT BOTTOM OF FEED */
+  .nf-right-sidebar .nfs-dish-list {
+    flex-direction: row;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 10px;
+    padding-bottom: 2px;
+  }
+
+  .nf-right-sidebar .nfs-dish-list::-webkit-scrollbar {
     display: none;
   }
 
-  .nfd-overlay {
-    padding: 10px;
+  .nf-right-sidebar .nfs-dish-row {
+    flex: 0 0 215px;
+    border: 1px solid var(--nf-border);
+    background: var(--nf-card-soft);
+    padding: 8px;
+    border-radius: 12px;
   }
+
+  /* NATIVE APP BOTTOM SHEET FOR POST DETAIL */
+  .nfd-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .nfd-dialog {
+    max-width: 100%;
+    height: 92dvh;
+    max-height: 92dvh;
+    border-radius: 20px 20px 0 0;
+    border-bottom: none;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .nfd-media-pane {
+    flex-shrink: 0;
+    padding: 10px 12px;
+  }
+
+  .nfd-media-stage {
+    height: 245px;
+    padding: 8px;
+  }
+
+  .nfd-info-pane {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .nfd-info-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px;
+  }
+
+  .nfd-info-footer {
+    flex-shrink: 0;
+    padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+    background: var(--nf-card-bg);
+  }
+
+  /* RAISE TOAST ABOVE BOTTOM BAR */
+  .nf-toast {
+    bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* FIXED 4-TAB MOBILE BOTTOM BAR */
+  .nf-mob-bottom-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 80;
+    height: calc(60px + env(safe-area-inset-bottom, 0px));
+    padding: 4px 8px env(safe-area-inset-bottom, 0px);
+    background: color-mix(in srgb, var(--nf-card-bg) 95%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid var(--nf-border);
+    box-shadow: 0 -6px 20px rgba(15, 23, 42, 0.08);
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: center;
+  }
+
+  .nf-mbb-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    height: 52px;
+    border: none;
+    background: transparent;
+    color: var(--nf-muted);
+    font-family: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    padding: 0 4px;
+    border-radius: 12px;
+    transition: color 0.16s ease, transform 0.14s ease;
+  }
+
+  .nf-mbb-item:active {
+    transform: scale(0.94);
+  }
+
+  .nf-mbb-item.active {
+    color: var(--sa-accent, #059669);
+  }
+
+  .nf-mbb-ico-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  .nf-mbb-badge {
+    position: absolute;
+    top: -5px;
+    right: -10px;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+    color: #ffffff;
+    font-size: 9.5px;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid var(--nf-card-bg);
+  }
+
+  .nf-mbb-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    line-height: 1.15;
+    white-space: nowrap;
+  }
+
+  .nf-mbb-item.active .nf-mbb-label {
+    font-weight: 800;
+  }
+}
+
+/* MOBILE CHECK SCAM BOTTOM SHEET */
+.nf-mob-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1020;
+  background: rgba(15, 23, 42, 0.56);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.nf-mob-sheet-backdrop.theme-light {
+  --nf-card-bg: var(--sa-surface, #ffffff);
+  --nf-card-soft: var(--sa-surface-2, #f8fafc);
+  --nf-heading: #0f172a;
+  --nf-muted: #64748b;
+  --nf-border: #e2e8f0;
+}
+
+.nf-mob-sheet-backdrop.theme-dark {
+  --nf-card-bg: var(--sa-surface, #131a26);
+  --nf-card-soft: var(--sa-surface-2, #1c2536);
+  --nf-heading: #f8fafc;
+  --nf-muted: #94a3b8;
+  --nf-border: rgba(148, 163, 184, 0.18);
+}
+
+.nf-mob-scam-sheet {
+  width: 100%;
+  max-width: 520px;
+  background: var(--nf-card-bg);
+  border-top: 1px solid var(--nf-border);
+  border-radius: 20px 20px 0 0;
+  padding: 8px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -14px 40px rgba(0, 0, 0, 0.25);
+}
+
+.nfm-sheet-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--nf-border);
+  margin: 2px auto 12px;
+}
+
+.nfm-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.nfm-sheet-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--nf-heading);
+}
+
+.nfm-sheet-title i {
+  color: #10b981;
+  font-size: 18px;
+}
+
+.nfm-sheet-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid var(--nf-border);
+  background: var(--nf-card-soft);
+  color: var(--nf-heading);
+  font-size: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.nfm-sheet-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nfm-sheet-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 13px;
+  border-radius: 13px;
+  background: var(--nf-card-soft);
+  border: 1px solid var(--nf-border);
+  text-decoration: none;
+  color: var(--nf-heading);
+}
+
+.nfm-sheet-ico {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.nfm-sheet-item.is-verify .nfm-sheet-ico {
+  color: #10b981;
+}
+.nfm-sheet-item.is-shops .nfm-sheet-ico {
+  color: #f59e0b;
+}
+.nfm-sheet-item.is-alerts .nfm-sheet-ico {
+  color: #f43f5e;
+}
+
+.nfm-sheet-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nfm-sheet-body strong {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--nf-heading);
+}
+
+.nfm-sheet-body span {
+  font-size: 12px;
+  color: var(--nf-muted);
+}
+
+.nfm-sheet-ext {
+  font-size: 16px;
+  color: var(--nf-muted);
+  flex-shrink: 0;
 }
 </style>

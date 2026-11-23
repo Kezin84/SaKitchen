@@ -133,3 +133,19 @@ export function stripFeedCaptionToPlainText(raw) {
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
+
+export function compareFeedPosts(a = {}, b = {}) {
+  const pinA = a?.Pinned ? 1 : 0
+  const pinB = b?.Pinned ? 1 : 0
+  if (pinA !== pinB) return pinB - pinA
+
+  const orderA = Number(a?.Sort_order || 0)
+  const orderB = Number(b?.Sort_order || 0)
+  if (orderA > 0 && orderB > 0 && orderA !== orderB) {
+    return orderA - orderB
+  }
+  if (orderA > 0 && orderB <= 0) return -1
+  if (orderB > 0 && orderA <= 0) return 1
+
+  return Number(b?.Created_at || 0) - Number(a?.Created_at || 0)
+}

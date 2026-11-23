@@ -33,11 +33,12 @@ import {
   isBannerActive,
 } from '../utils/bannerLink'
 import { normalizePartnerHexColor } from '../utils/partnerColor'
-import { sanitizeFeedCaptionHtml } from '../utils/feedCaption'
+import { sanitizeFeedCaptionHtml, compareFeedPosts } from '../utils/feedCaption'
 import {
   slugifyVi,
   normalizeBlogPost,
   normalizeBlogCategory,
+  compareBlogPosts,
   analyzePostSeo,
   sanitizeBlogHtml,
   parseTags,
@@ -4639,6 +4640,16 @@ async function addFeedPost(body) {
   const d = body.data || {}
   const id = s(d.ID || genShortId()).trim()
   const now = Date.now()
+  const entries = await readSheetEntries('feed_posts')
+  const isPinned = Boolean(d.Pinned)
+
+  const newKey = safeFirebaseKey(id)
+  const sortedExisting = [...entries]
+    .filter((e) => e.key !== newKey)
+    .sort((a, b) => compareFeedPosts(a.row, b.row))
+
+  const pinnedList = sortedExisting.filter((e) => Boolean(e.row?.Pinned))
+  const unpinnedList = sortedExisting.filter((e) => !e.row?.Pinned)
 
   const newRow = sanitizeRow({
     ID: id,
@@ -4646,7 +4657,8 @@ async function addFeedPost(body) {
     Content: sanitizeFeedCaptionHtml(d.Content),
     Images: normalizeStringArray(d.Images),
     Product_codes: normalizeStringArray(d.Product_codes),
-    Pinned: Boolean(d.Pinned),
+    Pinned: isPinned,
+    Sort_order: 1,
     Active: isPartnerActiveFlag(d.Active),
     Base_views: Math.max(0, Math.round(n(d.Base_views, 0))),
     Base_hearts: Math.max(0, Math.round(n(d.Base_hearts, 0))),
@@ -4661,7 +4673,22 @@ async function addFeedPost(body) {
     Updated_at: now,
   })
 
-  await set(dbRef(db, `feed_posts/${safeFirebaseKey(id)}`), newRow)
+  const newEntry = { key: newKey, row: newRow }
+  const finalEntries = isPinned
+    ? [newEntry, ...pinnedList, ...unpinnedList]
+    : [...pinnedList, newEntry, ...unpinnedList]
+
+  const updates = {}
+  finalEntries.forEach((entry, idx) => {
+    const pos = idx + 1
+    if (entry.key === newKey) {
+      updates[`feed_posts/${newKey}`] = { ...newRow, Sort_order: pos }
+    } else if (Math.round(n(entry.row?.Sort_order, 0)) !== pos) {
+      updates[`feed_posts/${entry.key}/Sort_order`] = pos
+    }
+  })
+
+  await update(dbRef(db), updates)
   return { success: true, id }
 }
 
@@ -4681,6 +4708,7 @@ async function updateFeedPost(body) {
   const nextPinned = Object.prototype.hasOwnProperty.call(d, 'Pinned')
     ? Boolean(d.Pinned)
     : Boolean(prev.Pinned)
+  const pinChanged = Boolean(prev.Pinned) !== nextPinned
 
   const updatedRow = sanitizeRow({
     ...prev,
@@ -4696,6 +4724,10 @@ async function updateFeedPost(body) {
         ? normalizeStringArray(d.Product_codes)
         : normalizeStringArray(prev.Product_codes),
     Pinned: nextPinned,
+    Sort_order:
+      d.Sort_order !== undefined
+        ? Math.max(0, Math.round(n(d.Sort_order, 0)))
+        : Math.max(0, Math.round(n(prev.Sort_order, 0))),
     Active: nextActive,
     Base_views:
       d.Base_views !== undefined
@@ -4716,7 +4748,69 @@ async function updateFeedPost(body) {
     Updated_at: Date.now(),
   })
 
+  if (pinChanged && d.Sort_order === undefined) {
+    const others = entries
+      .filter((e) => e.key !== target.key)
+      .sort((a, b) => compareFeedPosts(a.row, b.row))
+    const pinnedOthers = others.filter((e) => Boolean(e.row?.Pinned))
+    const unpinnedOthers = others.filter((e) => !e.row?.Pinned)
+    const targetEntry = { key: target.key, row: updatedRow }
+    const finalEntries = nextPinned
+      ? [targetEntry, ...pinnedOthers, ...unpinnedOthers]
+      : [...pinnedOthers, targetEntry, ...unpinnedOthers]
+
+    const updates = {}
+    finalEntries.forEach((entry, idx) => {
+      const pos = idx + 1
+      if (entry.key === target.key) {
+        updates[`feed_posts/${target.key}`] = { ...updatedRow, Sort_order: pos }
+      } else if (Math.round(n(entry.row?.Sort_order, 0)) !== pos) {
+        updates[`feed_posts/${entry.key}/Sort_order`] = pos
+      }
+    })
+    await update(dbRef(db), updates)
+    return { success: true }
+  }
+
   await set(dbRef(db, `feed_posts/${target.key}`), updatedRow)
+  return { success: true }
+}
+
+async function reorderFeedPosts(body) {
+  const ids = Array.isArray(body?.ids) ? body.ids.map((id) => s(id).trim()).filter(Boolean) : []
+  if (!ids.length) return { success: false, message: 'Thiếu danh sách thứ tự bài đăng' }
+
+  const allEntries = await readSheetEntries('feed_posts')
+  const byId = new Map(allEntries.map((entry) => [s(entry.row?.ID).trim(), entry]))
+
+  const ordered = []
+  const usedKeys = new Set()
+  for (const id of ids) {
+    const found = byId.get(id)
+    if (found && !usedKeys.has(found.key)) {
+      ordered.push(found)
+      usedKeys.add(found.key)
+    }
+  }
+  const leftovers = [...allEntries]
+    .filter((e) => !usedKeys.has(e.key))
+    .sort((a, b) => compareFeedPosts(a.row, b.row))
+  for (const lf of leftovers) {
+    ordered.push(lf)
+    usedKeys.add(lf.key)
+  }
+
+  const updates = {}
+  ordered.forEach((entry, idx) => {
+    const pos = idx + 1
+    if (Math.round(n(entry.row?.Sort_order, 0)) !== pos) {
+      updates[`feed_posts/${entry.key}/Sort_order`] = pos
+    }
+  })
+
+  if (Object.keys(updates).length) {
+    await update(dbRef(db), updates)
+  }
   return { success: true }
 }
 
@@ -5097,6 +5191,8 @@ async function upsertBlogPost(body) {
     TOC_Max_Level: normalized.TOC_Max_Level,
     TOC_Default_Open: normalized.TOC_Default_Open,
     TOC_Title: normalized.TOC_Title,
+    Pinned: normalized.Pinned,
+    Sort_order: normalized.Sort_order,
     SEO_Score: seoReport.score,
     Created_at: normalized.Created_at,
     Updated_at: normalized.Updated_at,
@@ -5104,12 +5200,140 @@ async function upsertBlogPost(body) {
   })
 
   if (target) {
+    const pinChanged = Boolean(existingRow.Pinned) !== normalized.Pinned
+    if (pinChanged && d.Sort_order === undefined) {
+      const others = postEntries
+        .filter((e) => e.key !== target.key)
+        .map((e) => ({ key: e.key, row: normalizeBlogPost(e.row) }))
+        .sort((a, b) => compareBlogPosts(a.row, b.row))
+      const pinnedOthers = others.filter((e) => e.row.Pinned)
+      const unpinnedOthers = others.filter((e) => !e.row.Pinned)
+      const targetEntry = { key: target.key, row: rowPayload }
+      const finalEntries = normalized.Pinned
+        ? [targetEntry, ...pinnedOthers, ...unpinnedOthers]
+        : [...pinnedOthers, targetEntry, ...unpinnedOthers]
+
+      const updates = {}
+      let finalPayload = rowPayload
+      finalEntries.forEach((entry, idx) => {
+        const pos = idx + 1
+        if (entry.key === target.key) {
+          finalPayload = { ...rowPayload, Sort_order: pos }
+          updates[`blog_posts/${target.key}`] = finalPayload
+        } else if (Math.round(n(entry.row?.Sort_order, 0)) !== pos) {
+          updates[`blog_posts/${entry.key}/Sort_order`] = pos
+        }
+      })
+      await update(dbRef(db), updates)
+      return { success: true, type: 'update', data: finalPayload }
+    }
+
     await set(dbRef(db, `blog_posts/${target.key}`), rowPayload)
     return { success: true, type: 'update', data: rowPayload }
   }
 
-  await set(dbRef(db, `blog_posts/${createRowKey()}`), rowPayload)
-  return { success: true, type: 'insert', data: rowPayload }
+  const newKey = createRowKey()
+  const sortedExisting = postEntries
+    .map((e) => ({ key: e.key, row: normalizeBlogPost(e.row) }))
+    .sort((a, b) => compareBlogPosts(a.row, b.row))
+  const pinnedExisting = sortedExisting.filter((e) => e.row.Pinned)
+  const unpinnedExisting = sortedExisting.filter((e) => !e.row.Pinned)
+  const newEntry = { key: newKey, row: rowPayload }
+  const finalEntries = normalized.Pinned
+    ? [newEntry, ...pinnedExisting, ...unpinnedExisting]
+    : [...pinnedExisting, newEntry, ...unpinnedExisting]
+
+  const updates = {}
+  let insertedPayload = rowPayload
+  finalEntries.forEach((entry, idx) => {
+    const pos = idx + 1
+    if (entry.key === newKey) {
+      insertedPayload = { ...rowPayload, Sort_order: pos }
+      updates[`blog_posts/${newKey}`] = insertedPayload
+    } else if (Math.round(n(entry.row?.Sort_order, 0)) !== pos) {
+      updates[`blog_posts/${entry.key}/Sort_order`] = pos
+    }
+  })
+
+  await update(dbRef(db), updates)
+  return { success: true, type: 'insert', data: insertedPayload }
+}
+
+async function toggleBlogPostPin(body) {
+  const id = s(body?.ID || body?.data?.ID).trim()
+  if (!id) return { success: false, message: 'Thiếu mã bài viết' }
+
+  const postEntries = await readSheetEntries('blog_posts')
+  const target = postEntries.find((e) => s(e.row?.ID).trim() === id)
+  if (!target) return { success: false, message: 'Không tìm thấy bài viết' }
+
+  const nextPinned =
+    body?.Pinned !== undefined
+      ? Boolean(body.Pinned)
+      : body?.data?.Pinned !== undefined
+        ? Boolean(body.data.Pinned)
+        : !Boolean(target.row?.Pinned)
+
+  const others = postEntries
+    .filter((e) => e.key !== target.key)
+    .map((e) => ({ key: e.key, row: normalizeBlogPost(e.row) }))
+    .sort((a, b) => compareBlogPosts(a.row, b.row))
+  const pinnedOthers = others.filter((e) => e.row.Pinned)
+  const unpinnedOthers = others.filter((e) => !e.row.Pinned)
+  const targetEntry = { key: target.key, row: { ...target.row, Pinned: nextPinned } }
+
+  const finalEntries = nextPinned
+    ? [targetEntry, ...pinnedOthers, ...unpinnedOthers]
+    : [...pinnedOthers, targetEntry, ...unpinnedOthers]
+
+  const updates = {
+    [`blog_posts/${target.key}/Pinned`]: nextPinned,
+  }
+  finalEntries.forEach((entry, idx) => {
+    const pos = idx + 1
+    updates[`blog_posts/${entry.key}/Sort_order`] = pos
+  })
+
+  await update(dbRef(db), updates)
+  return { success: true, Pinned: nextPinned }
+}
+
+async function reorderBlogPosts(body) {
+  const ids = Array.isArray(body?.ids) ? body.ids.map((id) => s(id).trim()).filter(Boolean) : []
+  if (!ids.length) return { success: false, message: 'Thiếu danh sách thứ tự bài viết' }
+
+  const allEntries = await readSheetEntries('blog_posts')
+  const byId = new Map(allEntries.map((entry) => [s(entry.row?.ID).trim(), entry]))
+
+  const ordered = []
+  const usedKeys = new Set()
+  for (const id of ids) {
+    const found = byId.get(id)
+    if (found && !usedKeys.has(found.key)) {
+      ordered.push(found)
+      usedKeys.add(found.key)
+    }
+  }
+  const leftovers = [...allEntries]
+    .filter((e) => !usedKeys.has(e.key))
+    .sort((a, b) => compareBlogPosts(normalizeBlogPost(a.row), normalizeBlogPost(b.row)))
+  for (const lf of leftovers) {
+    ordered.push(lf)
+    usedKeys.add(lf.key)
+  }
+
+  const updates = {}
+  ordered.forEach((entry, idx) => {
+    const pos = idx + 1
+    if (Math.round(n(entry.row?.Sort_order, 0)) !== pos) {
+      updates[`blog_posts/${entry.key}/Sort_order`] = pos
+    }
+  })
+
+  if (Object.keys(updates).length) {
+    await update(dbRef(db), updates)
+  }
+  return { success: true }
 }
 
 async function deleteBlogPost(body) {
@@ -5169,6 +5393,7 @@ const ACTION_HANDLERS = {
   deletePartner,
   addFeedPost,
   updateFeedPost,
+  reorderFeedPosts,
   deleteFeedPost,
   addTimeShop,
   updateTimeShop,
@@ -5177,6 +5402,8 @@ const ACTION_HANDLERS = {
   updateThongTinChuyenKhoan,
   deleteThongTinChuyenKhoan,
   upsertBlogPost,
+  toggleBlogPostPin,
+  reorderBlogPosts,
   deleteBlogPost,
   upsertBlogCategory,
   deleteBlogCategory,

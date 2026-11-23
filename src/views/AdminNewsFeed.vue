@@ -2,7 +2,11 @@
 import { ref, computed, onMounted, onActivated } from 'vue'
 import { getOneSheet, dispatchAction } from '@/config/api'
 import { uploadImageToCloudinary } from '@/utils/imageUpload.js'
-import { sanitizeFeedCaptionHtml, stripFeedCaptionToPlainText } from '@/utils/feedCaption.js'
+import {
+  sanitizeFeedCaptionHtml,
+  stripFeedCaptionToPlainText,
+  compareFeedPosts,
+} from '@/utils/feedCaption.js'
 import FeedCaptionEditor from '@/components/FeedCaptionEditor.vue'
 
 const POST_TYPES = [
@@ -16,6 +20,9 @@ const products = ref([])
 const tableLoading = ref(true)
 const submitting = ref(false)
 const togglingId = ref('')
+const reordering = ref(false)
+const dragSourceId = ref('')
+const dragOverId = ref('')
 const filterType = ref('all')
 const searchQuery = ref('')
 
@@ -299,25 +306,154 @@ async function submitPost() {
   }
 }
 
+const allOrderedPosts = computed(() => [...posts.value].filter(Boolean).sort(compareFeedPosts))
+
+const pinnedFeedCount = computed(
+  () => allOrderedPosts.value.filter((p) => Boolean(p.Pinned)).length,
+)
+
+const canReorderFeed = computed(
+  () => filterType.value === 'all' && !searchQuery.value.trim() && !reordering.value,
+)
+
+const postOrderIndexMap = computed(
+  () => new Map(allOrderedPosts.value.map((p, idx) => [p.ID, idx])),
+)
+
+function getPostGlobalPos(p) {
+  return (postOrderIndexMap.value.get(p?.ID) ?? 0) + 1
+}
+
+function getAllowedFeedPositions(p) {
+  const total = allOrderedPosts.value.length
+  if (!total) return [1]
+  const pinnedTotal = pinnedFeedCount.value
+  if (p?.Pinned) {
+    return Array.from({ length: Math.max(1, pinnedTotal) }, (_, i) => i + 1)
+  }
+  const start = pinnedTotal + 1
+  const count = Math.max(1, total - pinnedTotal)
+  return Array.from({ length: count }, (_, i) => start + i)
+}
+
+function canMoveFeedPost(p, delta) {
+  if (!canReorderFeed.value || !p?.ID) return false
+  const curIdx = postOrderIndexMap.value.get(p.ID)
+  if (curIdx === undefined) return false
+  const nextIdx = curIdx + delta
+  const pinnedTotal = pinnedFeedCount.value
+  const minIdx = p.Pinned ? 0 : pinnedTotal
+  const maxIdx = p.Pinned ? pinnedTotal - 1 : allOrderedPosts.value.length - 1
+  return nextIdx >= minIdx && nextIdx <= maxIdx
+}
+
+async function commitFeedOrder(nextOrdered, successMessage = 'Đã cập nhật vị trí bài đăng') {
+  if (reordering.value) return
+  reordering.value = true
+  const prevSnapshot = posts.value.map((item) => ({ ...item }))
+  posts.value = nextOrdered.map((item, idx) => ({
+    ...item,
+    Sort_order: idx + 1,
+  }))
+  try {
+    const res = await dispatchAction({
+      action: 'reorderFeedPosts',
+      ids: nextOrdered.map((item) => item.ID),
+    })
+    if (!res?.success) throw new Error(res?.message || 'Lỗi sắp xếp')
+    showToast(successMessage)
+  } catch {
+    posts.value = prevSnapshot
+    showToast('Không thể đổi vị trí bài đăng', 'error')
+  } finally {
+    reordering.value = false
+  }
+}
+
+async function moveFeedPostByDelta(p, delta) {
+  if (!canMoveFeedPost(p, delta)) return
+  const list = [...allOrderedPosts.value]
+  const curIdx = list.findIndex((item) => item.ID === p.ID)
+  if (curIdx < 0) return
+  const targetIdx = curIdx + delta
+  const [moved] = list.splice(curIdx, 1)
+  list.splice(targetIdx, 0, moved)
+  await commitFeedOrder(list, `Đã chuyển bài đăng sang vị trí #${targetIdx + 1}`)
+}
+
+async function jumpFeedPostToPosition(p, targetOneBased) {
+  if (!canReorderFeed.value || !p?.ID) return
+  const list = [...allOrderedPosts.value]
+  const curIdx = list.findIndex((item) => item.ID === p.ID)
+  if (curIdx < 0) return
+  const pinnedTotal = pinnedFeedCount.value
+  const minIdx = p.Pinned ? 0 : pinnedTotal
+  const maxIdx = p.Pinned ? Math.max(0, pinnedTotal - 1) : list.length - 1
+  const clampedIdx = Math.min(maxIdx, Math.max(minIdx, Number(targetOneBased || 1) - 1))
+  if (clampedIdx === curIdx) return
+  const [moved] = list.splice(curIdx, 1)
+  list.splice(clampedIdx, 0, moved)
+  await commitFeedOrder(list, `Đã chuyển bài đăng sang vị trí #${clampedIdx + 1}`)
+}
+
+function onFeedDragStart(e, p) {
+  if (!canReorderFeed.value || !p?.ID) {
+    e.preventDefault()
+    return
+  }
+  dragSourceId.value = p.ID
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', p.ID)
+  }
+}
+
+function onFeedDragOver(e, p) {
+  if (!dragSourceId.value || !p?.ID || dragSourceId.value === p.ID) return
+  e.preventDefault()
+  dragOverId.value = p.ID
+}
+
+async function onFeedDrop(e, targetPost) {
+  e.preventDefault()
+  const srcId = dragSourceId.value
+  dragSourceId.value = ''
+  dragOverId.value = ''
+  if (!srcId || !targetPost?.ID || srcId === targetPost.ID || !canReorderFeed.value) return
+
+  const list = [...allOrderedPosts.value]
+  const srcIdx = list.findIndex((item) => item.ID === srcId)
+  const rawTargetIdx = list.findIndex((item) => item.ID === targetPost.ID)
+  if (srcIdx < 0 || rawTargetIdx < 0) return
+
+  const srcPost = list[srcIdx]
+  const pinnedTotal = pinnedFeedCount.value
+  const minIdx = srcPost.Pinned ? 0 : pinnedTotal
+  const maxIdx = srcPost.Pinned ? Math.max(0, pinnedTotal - 1) : list.length - 1
+  const clampedIdx = Math.min(maxIdx, Math.max(minIdx, rawTargetIdx))
+  if (clampedIdx === srcIdx) return
+
+  const [moved] = list.splice(srcIdx, 1)
+  list.splice(clampedIdx, 0, moved)
+  await commitFeedOrder(list, `Đã chuyển bài đăng sang vị trí #${clampedIdx + 1}`)
+}
+
+function onFeedDragEnd() {
+  dragSourceId.value = ''
+  dragOverId.value = ''
+}
+
 const sortedPosts = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
-  return [...posts.value]
-    .filter((p) => {
-      if (!p) return false
-      if (filterType.value !== 'all' && p.Post_type !== filterType.value) return false
-      if (!q) return true
-      const text = stripFeedCaptionToPlainText(p.Content).toLowerCase()
-      const dishNames = (Array.isArray(p.Product_codes) ? p.Product_codes : [])
-        .map((c) => String(productMap.value.get(c)?.Ten_hang || '').toLowerCase())
-        .join(' ')
-      return text.includes(q) || dishNames.includes(q)
-    })
-    .sort((a, b) => {
-      const pinA = a.Pinned ? 1 : 0
-      const pinB = b.Pinned ? 1 : 0
-      if (pinA !== pinB) return pinB - pinA
-      return Number(b.Created_at || 0) - Number(a.Created_at || 0)
-    })
+  return allOrderedPosts.value.filter((p) => {
+    if (filterType.value !== 'all' && p.Post_type !== filterType.value) return false
+    if (!q) return true
+    const text = stripFeedCaptionToPlainText(p.Content).toLowerCase()
+    const dishNames = (Array.isArray(p.Product_codes) ? p.Product_codes : [])
+      .map((c) => String(productMap.value.get(c)?.Ten_hang || '').toLowerCase())
+      .join(' ')
+    return text.includes(q) || dishNames.includes(q)
+  })
 })
 
 const totalActiveCount = computed(() => posts.value.filter((p) => isPostActive(p)).length)
@@ -770,6 +906,10 @@ onActivated(() => {
             <span>Danh sách bài đã đăng</span>
           </h3>
           <span class="badge-pill">Đang hiện: {{ totalActiveCount }}/{{ posts.length }}</span>
+          <span v-if="!canReorderFeed && !reordering" class="reorder-hint-pill">
+            <i class="ri-information-line"></i>
+            <span>Chọn "Tất cả" &amp; xóa tìm kiếm để kéo thả / đổi vị trí</span>
+          </span>
         </div>
 
         <div class="list-filters">
@@ -819,10 +959,63 @@ onActivated(() => {
             v-for="p in sortedPosts"
             :key="p.ID"
             class="admin-post-row"
-            :class="{ 'is-muted': !isPostActive(p), 'is-pinned': p.Pinned }"
+            :class="{
+              'is-muted': !isPostActive(p),
+              'is-pinned': p.Pinned,
+              'is-dragging': dragSourceId === p.ID,
+              'is-drag-over': dragOverId === p.ID && dragSourceId !== p.ID,
+            }"
+            :draggable="canReorderFeed"
+            @dragstart="onFeedDragStart($event, p)"
+            @dragover="onFeedDragOver($event, p)"
+            @drop="onFeedDrop($event, p)"
+            @dragend="onFeedDragEnd"
           >
             <div class="apr-main">
               <div class="apr-top-meta">
+                <div
+                  class="apr-pos-box"
+                  :title="
+                    canReorderFeed
+                      ? 'Kéo thả hoặc chọn số thứ tự / mũi tên để đổi vị trí hiển thị'
+                      : 'Chọn Tất cả & xóa tìm kiếm để đổi vị trí'
+                  "
+                >
+                  <i class="ri-draggable apr-drag-ico"></i>
+                  <select
+                    class="apr-pos-select"
+                    :value="getPostGlobalPos(p)"
+                    :disabled="!canReorderFeed || getAllowedFeedPositions(p).length <= 1"
+                    @change="jumpFeedPostToPosition(p, Number($event.target.value))"
+                  >
+                    <option
+                      v-for="pos in getAllowedFeedPositions(p)"
+                      :key="'fpos-' + p.ID + '-' + pos"
+                      :value="pos"
+                    >
+                      #{{ pos }}
+                    </option>
+                  </select>
+                  <button
+                    type="button"
+                    class="apr-move-btn"
+                    title="Đưa lên 1 bậc"
+                    :disabled="!canMoveFeedPost(p, -1)"
+                    @click="moveFeedPostByDelta(p, -1)"
+                  >
+                    <i class="ri-arrow-up-s-line"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="apr-move-btn"
+                    title="Đưa xuống 1 bậc"
+                    :disabled="!canMoveFeedPost(p, 1)"
+                    @click="moveFeedPostByDelta(p, 1)"
+                  >
+                    <i class="ri-arrow-down-s-line"></i>
+                  </button>
+                </div>
+
                 <span class="apr-type-tag" :class="getPostTypeMeta(p.Post_type).tone">
                   <i :class="getPostTypeMeta(p.Post_type).icon"></i>
                   <span>{{ getPostTypeMeta(p.Post_type).label }}</span>
@@ -1753,6 +1946,19 @@ onActivated(() => {
   font-weight: 700;
 }
 
+.reorder-hint-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  color: #fde047;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
 .list-filters {
   display: flex;
   align-items: center;
@@ -1824,6 +2030,76 @@ onActivated(() => {
 .admin-post-row.is-pinned {
   border-color: rgba(251, 191, 36, 0.45);
   background: rgba(15, 23, 42, 0.68);
+}
+
+.admin-post-row.is-dragging {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+.admin-post-row.is-drag-over {
+  border-color: #34d399;
+  box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.28);
+}
+
+.apr-pos-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 4px;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.apr-drag-ico {
+  font-size: 14px;
+  color: #94a3b8;
+  cursor: grab;
+}
+
+.apr-pos-select {
+  background: rgba(15, 23, 42, 0.85);
+  color: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 6px;
+  padding: 2px 5px;
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+  outline: none;
+}
+
+.apr-pos-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.apr-move-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(51, 65, 85, 0.65);
+  color: #e2e8f0;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.apr-move-btn:hover:not(:disabled) {
+  background: #059669;
+  border-color: #34d399;
+  color: #ffffff;
+}
+
+.apr-move-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .admin-post-row.is-muted {

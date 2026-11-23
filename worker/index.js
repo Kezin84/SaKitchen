@@ -14,6 +14,7 @@ import {
 import {
   normalizeBlogPost,
   normalizeBlogCategory,
+  compareBlogPosts,
   isPostPubliclyVisible,
   renderBlogArticleHtml,
   escapeHtml,
@@ -123,7 +124,7 @@ async function getLiveBlogData(env, forceRefresh = false) {
   const posts = rawObjectToList(postsRaw)
     .map((row) => normalizeBlogPost(row))
     .filter((p) => isPostPubliclyVisible(p))
-    .sort((a, b) => (b.Published_at || b.Updated_at || 0) - (a.Published_at || a.Updated_at || 0))
+    .sort(compareBlogPosts)
 
   const categories = rawObjectToList(catsRaw)
     .map((row) => normalizeBlogCategory(row))

@@ -9,6 +9,7 @@ import {
   slugifyVi,
   normalizeBlogPost,
   normalizeBlogCategory,
+  compareBlogPosts,
   extractTocAndInjectHeadingIds,
   analyzePostSeo,
   buildAutoExcerpt,
@@ -17,6 +18,10 @@ import {
 
 const loading = ref(true)
 const saving = ref(false)
+const reorderingBlog = ref(false)
+const pinningPostId = ref('')
+const blogDragId = ref('')
+const blogDragOverId = ref('')
 const posts = ref([])
 const categories = ref([])
 const brand = ref(resolveBrandAssets(null, 'SA KITCHEN'))
@@ -63,6 +68,8 @@ function createEmptyForm() {
     TOC_Max_Level: 3,
     TOC_Default_Open: true,
     TOC_Title: DEFAULT_TOC_TITLE,
+    Pinned: false,
+    Sort_order: 0,
     Created_at: 0,
     Updated_at: 0,
     Published_at: 0,
@@ -98,6 +105,7 @@ function snapshotFormState(f) {
     TOC_Max_Level: f.TOC_Max_Level,
     TOC_Default_Open: f.TOC_Default_Open,
     TOC_Title: f.TOC_Title,
+    Pinned: Boolean(f.Pinned),
   })
 }
 
@@ -143,7 +151,7 @@ async function loadBlogCmsData() {
     ])
     posts.value = (postsRes?.data || [])
       .map((row) => normalizeBlogPost(row))
-      .sort((a, b) => (b.Updated_at || b.Created_at || 0) - (a.Updated_at || a.Created_at || 0))
+      .sort(compareBlogPosts)
     categories.value = (catsRes?.data || [])
       .map((row) => normalizeBlogCategory(row))
       .sort((a, b) => a.Order - b.Order || a.Name.localeCompare(b.Name))
@@ -222,6 +230,161 @@ const filteredPosts = computed(() => {
     return true
   })
 })
+
+const canReorderBlog = computed(
+  () =>
+    statusFilter.value === 'all' &&
+    !categoryFilter.value &&
+    !searchQuery.value.trim() &&
+    !reorderingBlog.value,
+)
+
+const pinnedBlogCount = computed(() => posts.value.filter((p) => Boolean(p.Pinned)).length)
+
+const blogOrderIndexMap = computed(() => new Map(posts.value.map((p, idx) => [p.ID, idx])))
+
+function getBlogGlobalPos(post) {
+  return (blogOrderIndexMap.value.get(post?.ID) ?? 0) + 1
+}
+
+function getAllowedBlogPositions(post) {
+  const total = posts.value.length
+  if (!total) return [1]
+  const pinnedTotal = pinnedBlogCount.value
+  if (post?.Pinned) {
+    return Array.from({ length: Math.max(1, pinnedTotal) }, (_, i) => i + 1)
+  }
+  const start = pinnedTotal + 1
+  const count = Math.max(1, total - pinnedTotal)
+  return Array.from({ length: count }, (_, i) => start + i)
+}
+
+function canMoveBlogPost(post, delta) {
+  if (!canReorderBlog.value || !post?.ID) return false
+  const curIdx = blogOrderIndexMap.value.get(post.ID)
+  if (curIdx === undefined) return false
+  const nextIdx = curIdx + delta
+  const pinnedTotal = pinnedBlogCount.value
+  const minIdx = post.Pinned ? 0 : pinnedTotal
+  const maxIdx = post.Pinned ? pinnedTotal - 1 : posts.value.length - 1
+  return nextIdx >= minIdx && nextIdx <= maxIdx
+}
+
+async function commitBlogOrder(nextOrdered, successMessage = 'Đã cập nhật vị trí bài viết') {
+  if (reorderingBlog.value) return
+  reorderingBlog.value = true
+  const prevSnapshot = posts.value.map((item) => ({ ...item }))
+  posts.value = nextOrdered.map((item, idx) => ({
+    ...item,
+    Sort_order: idx + 1,
+  }))
+  try {
+    const res = await dispatchAction({
+      action: 'reorderBlogPosts',
+      ids: nextOrdered.map((item) => item.ID),
+    })
+    if (!res?.success) throw new Error(res?.message || 'Lỗi đổi vị trí')
+    showToast(successMessage)
+  } catch (err) {
+    posts.value = prevSnapshot
+    showToast(err?.message || 'Không thể đổi vị trí bài viết', 'error')
+  } finally {
+    reorderingBlog.value = false
+  }
+}
+
+async function moveBlogPostByDelta(post, delta) {
+  if (!canMoveBlogPost(post, delta)) return
+  const list = [...posts.value]
+  const curIdx = list.findIndex((item) => item.ID === post.ID)
+  if (curIdx < 0) return
+  const targetIdx = curIdx + delta
+  const [moved] = list.splice(curIdx, 1)
+  list.splice(targetIdx, 0, moved)
+  await commitBlogOrder(list, `Đã chuyển bài viết sang vị trí #${targetIdx + 1}`)
+}
+
+async function jumpBlogPostToPosition(post, targetOneBased) {
+  if (!canReorderBlog.value || !post?.ID) return
+  const list = [...posts.value]
+  const curIdx = list.findIndex((item) => item.ID === post.ID)
+  if (curIdx < 0) return
+  const pinnedTotal = pinnedBlogCount.value
+  const minIdx = post.Pinned ? 0 : pinnedTotal
+  const maxIdx = post.Pinned ? Math.max(0, pinnedTotal - 1) : list.length - 1
+  const clampedIdx = Math.min(maxIdx, Math.max(minIdx, Number(targetOneBased || 1) - 1))
+  if (clampedIdx === curIdx) return
+  const [moved] = list.splice(curIdx, 1)
+  list.splice(clampedIdx, 0, moved)
+  await commitBlogOrder(list, `Đã chuyển bài viết sang vị trí #${clampedIdx + 1}`)
+}
+
+async function quickToggleBlogPin(post) {
+  if (!post?.ID || pinningPostId.value) return
+  const nextPinned = !Boolean(post.Pinned)
+  pinningPostId.value = post.ID
+  try {
+    const res = await dispatchAction({
+      action: 'toggleBlogPostPin',
+      ID: post.ID,
+      Pinned: nextPinned,
+    })
+    if (!res?.success) throw new Error(res?.message || 'Lỗi ghim bài viết')
+    await loadBlogCmsData()
+    showToast(nextPinned ? 'Đã ghim bài viết lên đầu trang Blog!' : 'Đã bỏ ghim bài viết')
+  } catch (err) {
+    showToast(err?.message || 'Không thể cập nhật trạng thái ghim', 'error')
+  } finally {
+    pinningPostId.value = ''
+  }
+}
+
+function onBlogDragStart(e, post) {
+  if (!canReorderBlog.value || !post?.ID) {
+    e.preventDefault()
+    return
+  }
+  blogDragId.value = post.ID
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', post.ID)
+  }
+}
+
+function onBlogDragOver(e, post) {
+  if (!blogDragId.value || !post?.ID || blogDragId.value === post.ID) return
+  e.preventDefault()
+  blogDragOverId.value = post.ID
+}
+
+async function onBlogDrop(e, targetPost) {
+  e.preventDefault()
+  const srcId = blogDragId.value
+  blogDragId.value = ''
+  blogDragOverId.value = ''
+  if (!srcId || !targetPost?.ID || srcId === targetPost.ID || !canReorderBlog.value) return
+
+  const list = [...posts.value]
+  const srcIdx = list.findIndex((item) => item.ID === srcId)
+  const rawTargetIdx = list.findIndex((item) => item.ID === targetPost.ID)
+  if (srcIdx < 0 || rawTargetIdx < 0) return
+
+  const srcPost = list[srcIdx]
+  const pinnedTotal = pinnedBlogCount.value
+  const minIdx = srcPost.Pinned ? 0 : pinnedTotal
+  const maxIdx = srcPost.Pinned ? Math.max(0, pinnedTotal - 1) : list.length - 1
+  const clampedIdx = Math.min(maxIdx, Math.max(minIdx, rawTargetIdx))
+  if (clampedIdx === srcIdx) return
+
+  const [moved] = list.splice(srcIdx, 1)
+  list.splice(clampedIdx, 0, moved)
+  await commitBlogOrder(list, `Đã chuyển bài viết sang vị trí #${clampedIdx + 1}`)
+}
+
+function onBlogDragEnd() {
+  blogDragId.value = ''
+  blogDragOverId.value = ''
+}
 
 // Live Auto TOC Preview for current editor content
 const liveTocResult = computed(() =>
@@ -311,6 +474,8 @@ function editPost(post) {
     TOC_Max_Level: norm.TOC_Max_Level,
     TOC_Default_Open: norm.TOC_Default_Open,
     TOC_Title: norm.TOC_Title,
+    Pinned: norm.Pinned,
+    Sort_order: norm.Sort_order,
     Created_at: norm.Created_at,
     Updated_at: norm.Updated_at,
     Published_at: norm.Published_at,
@@ -333,6 +498,8 @@ function duplicatePost(post) {
     Title: `${norm.Title} (Bản sao)`,
     Slug: slugifyVi(`${norm.Slug || norm.Title}-copy`),
     Status: 'draft',
+    Pinned: false,
+    Sort_order: 0,
     Created_at: 0,
     Updated_at: 0,
     Published_at: 0,
@@ -465,14 +632,8 @@ async function savePost(targetStatus = null) {
     editorBaselineJson.value = snapshotFormState(form.value)
     autoSlugEnabled.value = false
 
-    // Update local list without full reload flicker
-    const idx = posts.value.findIndex((p) => p.ID === saved.ID)
-    if (idx >= 0) {
-      posts.value.splice(idx, 1, saved)
-    } else {
-      posts.value.unshift(saved)
-    }
-    posts.value.sort((a, b) => (b.Updated_at || b.Created_at || 0) - (a.Updated_at || a.Created_at || 0))
+    // Refresh sorted list so Sort_order & Pinned stay 100% consistent
+    await loadBlogCmsData()
 
     showToast(
       nextStatus === 'published'
@@ -756,6 +917,7 @@ function getPreviewUrl(post) {
           <table class="posts-table">
             <thead>
               <tr>
+                <th class="th-pos">Vị trí</th>
                 <th>Bài viết</th>
                 <th>Chuyên mục</th>
                 <th>Trạng thái</th>
@@ -765,7 +927,66 @@ function getPreviewUrl(post) {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="post in filteredPosts" :key="post.ID">
+              <tr
+                v-for="post in filteredPosts"
+                :key="post.ID"
+                :class="{
+                  'is-pinned-row': post.Pinned,
+                  'is-dragging-row': blogDragId === post.ID,
+                  'is-drag-over-row': blogDragOverId === post.ID && blogDragId !== post.ID,
+                }"
+                :draggable="canReorderBlog"
+                @dragstart="onBlogDragStart($event, post)"
+                @dragover="onBlogDragOver($event, post)"
+                @drop="onBlogDrop($event, post)"
+                @dragend="onBlogDragEnd"
+              >
+                <td class="pos-cell">
+                  <div
+                    class="blog-pos-box"
+                    :title="
+                      canReorderBlog
+                        ? 'Kéo thả hoặc chọn vị trí / mũi tên để sắp xếp thứ tự bài viết'
+                        : 'Chọn Tất cả trạng thái, Tất cả chuyên mục & xóa tìm kiếm để đổi vị trí'
+                    "
+                  >
+                    <i class="ri-draggable blog-drag-ico"></i>
+                    <select
+                      class="blog-pos-select"
+                      :value="getBlogGlobalPos(post)"
+                      :disabled="!canReorderBlog || getAllowedBlogPositions(post).length <= 1"
+                      @change="jumpBlogPostToPosition(post, Number($event.target.value))"
+                    >
+                      <option
+                        v-for="pos in getAllowedBlogPositions(post)"
+                        :key="'bpos-' + post.ID + '-' + pos"
+                        :value="pos"
+                      >
+                        #{{ pos }}
+                      </option>
+                    </select>
+                    <div class="blog-move-btns">
+                      <button
+                        type="button"
+                        class="blog-move-btn"
+                        title="Đưa lên 1 bậc"
+                        :disabled="!canMoveBlogPost(post, -1)"
+                        @click="moveBlogPostByDelta(post, -1)"
+                      >
+                        <i class="ri-arrow-up-s-line"></i>
+                      </button>
+                      <button
+                        type="button"
+                        class="blog-move-btn"
+                        title="Đưa xuống 1 bậc"
+                        :disabled="!canMoveBlogPost(post, 1)"
+                        @click="moveBlogPostByDelta(post, 1)"
+                      >
+                        <i class="ri-arrow-down-s-line"></i>
+                      </button>
+                    </div>
+                  </div>
+                </td>
                 <td>
                   <div class="post-cell">
                     <div class="post-thumb">
@@ -783,6 +1004,9 @@ function getPreviewUrl(post) {
                         {{ post.Title }}
                       </button>
                       <div class="post-meta-sub">
+                        <span v-if="post.Pinned" class="pin-mini-badge">
+                          <i class="ri-pushpin-2-fill"></i> Đã ghim đầu
+                        </span>
                         <span class="post-slug">/blog/{{ post.Slug }}</span>
                         <span v-if="post.TOC_Enabled" class="toc-mini-badge" title="Mục lục tự động đang bật">
                           <i class="ri-list-ordered"></i> Auto TOC
@@ -814,6 +1038,16 @@ function getPreviewUrl(post) {
                 </td>
                 <td>
                   <div class="row-actions">
+                    <button
+                      type="button"
+                      class="act-btn pin-btn"
+                      :class="{ active: post.Pinned }"
+                      :disabled="pinningPostId === post.ID"
+                      :title="post.Pinned ? 'Bỏ ghim đầu trang' : 'Ghim bài viết lên đầu trang Blog'"
+                      @click="quickToggleBlogPin(post)"
+                    >
+                      <i class="ri-pushpin-2-fill"></i>
+                    </button>
                     <button type="button" class="act-btn" title="Chỉnh sửa" @click="editPost(post)">
                       <i class="ri-edit-line"></i>
                     </button>
@@ -1316,6 +1550,19 @@ function getPreviewUrl(post) {
               <label>Tác giả hiển thị</label>
               <input v-model="form.Author" type="text" class="cms-input" placeholder="SA KITCHEN" />
             </div>
+            <div class="side-pin-row" @click="form.Pinned = !form.Pinned">
+              <div class="spr-left">
+                <i class="ri-pushpin-2-fill"></i>
+                <div>
+                  <strong>Ghim lên đầu trang Blog</strong>
+                  <span>Hiển thị nổi bật trên cùng</span>
+                </div>
+              </div>
+              <label class="toggle-switch" @click.stop>
+                <input v-model="form.Pinned" type="checkbox" />
+                <span class="ts-slider"></span>
+              </label>
+            </div>
             <div v-if="form.Published_at || form.Updated_at" class="side-meta-dates">
               <div v-if="form.Published_at">
                 <span>Xuất bản:</span> <strong>{{ formatDate(form.Published_at) }}</strong>
@@ -1743,6 +1990,133 @@ function getPreviewUrl(post) {
 }
 .th-actions {
   text-align: right !important;
+}
+.th-pos {
+  width: 118px;
+}
+.pos-cell {
+  white-space: nowrap;
+}
+.posts-table tr.is-pinned-row {
+  background: #fffbeb;
+}
+.posts-table tr.is-dragging-row {
+  opacity: 0.45;
+}
+.posts-table tr.is-drag-over-row td {
+  box-shadow: inset 0 2px 0 #059669;
+}
+.blog-pos-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px 3px 4px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+.blog-drag-ico {
+  font-size: 14px;
+  color: #94a3b8;
+  cursor: grab;
+}
+.blog-pos-select {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  border-radius: 6px;
+  padding: 2px 5px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  outline: none;
+}
+.blog-pos-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.blog-move-btns {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.blog-move-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.blog-move-btn:hover:not(:disabled) {
+  background: #059669;
+  border-color: #059669;
+  color: #ffffff;
+}
+.blog-move-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.pin-mini-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  color: #b45309;
+  font-weight: 800;
+  font-size: 11px;
+}
+.act-btn.pin-btn.active {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #d97706;
+}
+.act-btn.pin-btn:hover:not(:disabled) {
+  border-color: #f59e0b;
+  color: #d97706;
+}
+.side-pin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+}
+.spr-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.spr-left > i {
+  font-size: 17px;
+  color: #f59e0b;
+}
+.spr-left div {
+  display: flex;
+  flex-direction: column;
+}
+.spr-left strong {
+  font-size: 13px;
+  color: #0f172a;
+}
+.spr-left span {
+  font-size: 11.5px;
+  color: #64748b;
 }
 
 .post-cell {

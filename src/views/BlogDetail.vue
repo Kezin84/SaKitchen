@@ -12,6 +12,7 @@ import {
 const SA_THEME_MODE_KEY = 'SA_THEME_MODE'
 import {
   normalizeBlogPost,
+  compareBlogPosts,
   isPostPubliclyVisible,
   renderBlogArticleHtml,
   estimateReadingMinutes,
@@ -183,7 +184,7 @@ async function loadData() {
     ])
     allPosts.value = (postsRes?.data || [])
       .map((r) => normalizeBlogPost(r))
-      .sort((a, b) => (b.Published_at || b.Updated_at || 0) - (a.Published_at || a.Updated_at || 0))
+      .sort(compareBlogPosts)
     brand.value = resolveBrandAssets(logoRes?.data?.[0] || null, 'SA KITCHEN')
     const displayRow =
       (displayRes?.data || []).find((r) => r.ID === 'DEFAULT') || displayRes?.data?.[0] || null

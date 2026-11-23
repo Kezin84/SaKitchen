@@ -75,7 +75,7 @@
     "feed_posts": {
       ".read": true,
       ".write": true,
-      ".indexOn": ["ID", "Pinned", "Created_at", "Post_type"]
+      ".indexOn": ["ID", "Pinned", "Sort_order", "Created_at", "Post_type"]
     },
     "time": {
       ".read": true,
@@ -98,7 +98,7 @@
     "blog_posts": {
       ".read": true,
       ".write": true,
-      ".indexOn": ["ID", "Slug", "Status", "Category_Slug"]
+      ".indexOn": ["ID", "Slug", "Status", "Category_Slug", "Pinned", "Sort_order"]
     },
     "blog_categories": {
       ".read": true,

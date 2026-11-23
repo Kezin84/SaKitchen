@@ -277,11 +277,34 @@ export function normalizeBlogPost(raw = {}) {
     TOC_Max_Level: normalizeTocMaxLevel(raw?.TOC_Max_Level),
     TOC_Default_Open: toBool(raw?.TOC_Default_Open, true),
     TOC_Title: String(raw?.TOC_Title || '').trim() || DEFAULT_TOC_TITLE,
+    Pinned: toBool(raw?.Pinned, false),
+    Sort_order:
+      Number.isFinite(Number(raw?.Sort_order)) && Number(raw.Sort_order) > 0
+        ? Math.round(Number(raw.Sort_order))
+        : 0,
     SEO_Score: Number(raw?.SEO_Score || 0) || 0,
     Created_at: Number(raw?.Created_at || 0) || 0,
     Updated_at: Number(raw?.Updated_at || 0) || 0,
     Published_at: Number(raw?.Published_at || 0) || 0,
   }
+}
+
+export function compareBlogPosts(a = {}, b = {}) {
+  const pinA = a?.Pinned ? 1 : 0
+  const pinB = b?.Pinned ? 1 : 0
+  if (pinA !== pinB) return pinB - pinA
+
+  const orderA = Number(a?.Sort_order || 0)
+  const orderB = Number(b?.Sort_order || 0)
+  if (orderA > 0 && orderB > 0 && orderA !== orderB) {
+    return orderA - orderB
+  }
+  if (orderA > 0 && orderB <= 0) return -1
+  if (orderB > 0 && orderA <= 0) return 1
+
+  const timeA = Number(a?.Published_at || a?.Updated_at || a?.Created_at || 0)
+  const timeB = Number(b?.Published_at || b?.Updated_at || b?.Created_at || 0)
+  return timeB - timeA
 }
 
 export function buildAutoExcerpt(html = '', maxChars = 160) {

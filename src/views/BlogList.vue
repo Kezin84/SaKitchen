@@ -12,6 +12,7 @@ const SA_THEME_MODE_KEY = 'SA_THEME_MODE'
 import {
   normalizeBlogPost,
   normalizeBlogCategory,
+  compareBlogPosts,
   isPostPubliclyVisible,
   estimateReadingMinutes,
   buildAutoExcerpt,
@@ -113,7 +114,7 @@ async function loadData() {
     posts.value = (postsRes?.data || [])
       .map((r) => normalizeBlogPost(r))
       .filter((p) => isPostPubliclyVisible(p))
-      .sort((a, b) => (b.Published_at || b.Updated_at || 0) - (a.Published_at || a.Updated_at || 0))
+      .sort(compareBlogPosts)
 
     categories.value = (catsRes?.data || [])
       .map((r) => normalizeBlogCategory(r))
@@ -410,7 +411,10 @@ function formatDate(ts) {
             <div v-else class="fc-placeholder">
               <i class="ri-restaurant-line"></i>
             </div>
-            <span class="fc-new-badge">Bài mới nhất</span>
+            <span class="fc-new-badge" :class="{ 'is-pinned': featuredPost.Pinned }">
+              <i v-if="featuredPost.Pinned" class="ri-pushpin-2-fill"></i>
+              <span>{{ featuredPost.Pinned ? 'Bài ghim nổi bật' : 'Bài mới nhất' }}</span>
+            </span>
           </div>
           <div class="fc-body">
             <div class="post-meta-top">
@@ -452,6 +456,10 @@ function formatDate(ts) {
               <div v-else class="bc-placeholder">
                 <i class="ri-article-line"></i>
               </div>
+              <span v-if="post.Pinned" class="bc-pin-badge">
+                <i class="ri-pushpin-2-fill"></i>
+                <span>Đã ghim</span>
+              </span>
             </div>
             <div class="bc-body">
               <div class="post-meta-top">
@@ -1004,12 +1012,20 @@ function formatDate(ts) {
   position: absolute;
   top: 14px;
   left: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 5px 11px;
   border-radius: 999px;
   background: var(--sa-accent, #059669);
   color: var(--sa-on-accent, #ffffff);
   font-size: 12px;
   font-weight: 800;
+}
+.fc-new-badge.is-pinned {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.35);
 }
 .fc-body {
   padding: 24px 26px 24px 4px;
@@ -1064,9 +1080,25 @@ function formatDate(ts) {
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
 }
 .bc-media {
+  position: relative;
   aspect-ratio: 16 / 9;
   background: var(--sa-surface-2, #f3f4f6);
   overflow: hidden;
+}
+.bc-pin-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 0 3px 10px rgba(217, 119, 6, 0.32);
 }
 .bc-media img {
   width: 100%;

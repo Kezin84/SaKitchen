@@ -10,6 +10,7 @@ import Logo from '@/views/Logo.vue'
 import Khuyenmai from '@/views/Khuyenmai.vue'
 import OpenTime from '@/views/OpenTime.vue'
 import ContactShop from '@/views/ContactShop.vue'
+import Partners from '@/views/Partners.vue'
 import SapXepHienThi from '@/views/SapXepHienThi.vue'
 import CauHinhHienThi from '@/views/CauHinhHienThi.vue'
 import Login from '@/views/Login.vue'
@@ -143,6 +144,7 @@ const router = createRouter({
           component: TinhChietKhau,
         },
         { path: 'banner', name: 'admin-banner', component: Banner },
+        { path: 'doi-tac', name: 'admin-partners', component: Partners },
         { path: 'sap-xep-hien-thi', name: 'admin-sap-xep-hien-thi', component: SapXepHienThi },
         { path: 'cau-hinh-hien-thi', name: 'admin-cau-hinh-hien-thi', component: CauHinhHienThi },
         { path: 'thong-bao', name: 'admin-thong-bao', component: Thongbao },

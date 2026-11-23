@@ -561,6 +561,11 @@ onUnmounted(() => {
           <span>Banner</span>
         </RouterLink>
 
+        <RouterLink :to="{ name: 'admin-partners' }" class="menu-item">
+          <i class="ri-links-fill"></i>
+          <span>Đối tác &amp; Web phụ</span>
+        </RouterLink>
+
         <RouterLink :to="{ name: 'admin-sap-xep-hien-thi' }" class="menu-item">
           <i class="ri-arrow-up-down-line"></i>
           <span>Sắp xếp hiển thị</span>
@@ -799,6 +804,11 @@ onUnmounted(() => {
         <RouterLink to="/admin/banner" class="mobile-menu-item" @click="closeMobileSidebar">
           <i class="ri-tv-2-fill"></i>
           <span>Banner</span>
+        </RouterLink>
+
+        <RouterLink :to="{ name: 'admin-partners' }" class="mobile-menu-item" @click="closeMobileSidebar">
+          <i class="ri-links-fill"></i>
+          <span>Đối tác &amp; Web phụ</span>
         </RouterLink>
 
         <RouterLink :to="{ name: 'admin-sap-xep-hien-thi' }" class="mobile-menu-item" @click="closeMobileSidebar">

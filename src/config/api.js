@@ -26,6 +26,7 @@ import {
 import { buildUniqueProductCode } from '../utils/productCode'
 import { normalizeThemeConfig } from '../utils/storefrontTheme'
 import { normalizeBannerAction, normalizeBannerLink } from '../utils/bannerLink'
+import { normalizePartnerHexColor } from '../utils/partnerColor'
 import {
   slugifyVi,
   normalizeBlogPost,
@@ -55,6 +56,7 @@ export const SHEETS = [
   'logo',
   'khuyenmai_info',
   'shop_contact',
+  'partners',
   'time',
   'thong_tin_chuyen_khoan',
   'display_config',
@@ -79,6 +81,7 @@ export const STOREFRONT_SHEETS = [
   'thong_bao',
   'logo',
   'shop_contact',
+  'partners',
   'khuyenmai_info',
   'time',
   'thong_tin_chuyen_khoan',
@@ -172,8 +175,13 @@ export async function getSheets(sheetNames = DATA_SHEETS) {
   const allowed = sheetNames.filter((name) => SHEETS.includes(name))
   const pairs = await Promise.all(
     allowed.map(async (name) => {
-      const snap = await get(dbRef(db, name))
-      return [name, snap.exists() ? normalizeSheet(snap.val()) : []]
+      try {
+        const snap = await get(dbRef(db, name))
+        return [name, snap.exists() ? normalizeSheet(snap.val()) : []]
+      } catch (err) {
+        console.warn(`[Firebase] getSheets(${name}) error:`, err)
+        return [name, []]
+      }
     }),
   )
   const result = {}
@@ -3151,6 +3159,10 @@ async function nhapHangHoa(body) {
         }
       }
 
+      if (item.Badge !== undefined) {
+        existing.row.Badge = s(item.Badge).trim()
+      }
+
       if (item.Trang_thai === 'Hết hàng' || item.Trang_thai === 'Còn hàng') {
         existing.row.Trang_thai = item.Trang_thai
       } else if (!existing.row.Trang_thai) {
@@ -3186,6 +3198,7 @@ async function nhapHangHoa(body) {
       Ncc_loai_giam: normalizeNccDiscountType(item.Ncc_loai_giam),
       Ncc_gia_tri_giam: normalizeNccDiscountValue(item.Ncc_gia_tri_giam),
       Trang_thai: trangThaiMoi,
+      Badge: s(item.Badge).trim(),
       Don_vi_tien_te: s(item.Don_vi_tien_te || 'P'),
       Gia_Giam: item.Gia_Giam !== undefined && item.Gia_Giam !== '' ? n(item.Gia_Giam) : '',
       img_1: s(item.img_1),
@@ -3303,6 +3316,8 @@ async function updateHangHoa(item) {
       target.row[k] = v === '' || v === null ? '' : n(v)
     } else if (k === 'Is_hidden') {
       target.row[k] = v === true || String(v) === 'true'
+    } else if (k === 'Badge') {
+      target.row[k] = s(v).trim()
     } else {
       target.row[k] = s(v)
     }
@@ -3425,6 +3440,9 @@ async function bulkUpdateHangHoa(body = {}) {
     if (patch.Trang_thai !== undefined) {
       row.Trang_thai = s(patch.Trang_thai) === 'Hết hàng' ? 'Hết hàng' : 'Còn hàng'
     }
+    if (patch.Badge !== undefined) {
+      row.Badge = s(patch.Badge).trim()
+    }
     if (patch.Is_hidden !== undefined) {
       row.Is_hidden = patch.Is_hidden === true || String(patch.Is_hidden) === 'true'
     }
@@ -3447,7 +3465,26 @@ async function bulkUpdateHangHoa(body = {}) {
       row.Gia_ban = applyBulkPriceRule(row.Gia_ban, patch.Gia_ban, false)
     }
     if (patch.Gia_Giam !== undefined) {
-      row.Gia_Giam = applyBulkPriceRule(row.Gia_Giam, patch.Gia_Giam, true)
+      const ruleMode = s(patch.Gia_Giam?.mode).trim()
+      const ruleVal = Math.max(0, Number(patch.Gia_Giam?.value || 0))
+      const currentBan = n(row.Gia_ban)
+      if (ruleMode === 'off_money_from_ban') {
+        if (ruleVal <= 0 || currentBan <= 0) {
+          row.Gia_Giam = ''
+        } else {
+          const nextFinal = Math.round(currentBan - ruleVal)
+          row.Gia_Giam = nextFinal > 0 && nextFinal < currentBan ? nextFinal : ''
+        }
+      } else if (ruleMode === 'off_percent_from_ban') {
+        if (ruleVal <= 0 || ruleVal >= 100 || currentBan <= 0) {
+          row.Gia_Giam = ''
+        } else {
+          const nextFinal = Math.round(currentBan * (1 - ruleVal / 100))
+          row.Gia_Giam = nextFinal > 0 && nextFinal < currentBan ? nextFinal : ''
+        }
+      } else {
+        row.Gia_Giam = applyBulkPriceRule(row.Gia_Giam, patch.Gia_Giam, true)
+      }
     }
 
     row.i18n = nextI18n
@@ -4415,6 +4452,96 @@ async function deleteShopContact(body) {
   return deleteById('shop_contact', body.ID)
 }
 
+// --- partners ---
+function isPartnerActiveFlag(val) {
+  if (val === undefined || val === null || val === '') return true
+  if (val === false || val === 0 || val === '0' || String(val).toLowerCase() === 'false') return false
+  return true
+}
+
+async function addPartner(body) {
+  const d = body.data || {}
+  const entries = await readSheetEntries('partners')
+  const nextOrder =
+    d.Sort_order !== undefined && Number.isFinite(Number(d.Sort_order))
+      ? Number(d.Sort_order)
+      : entries.length + 1
+
+  const newRow = sanitizeRow({
+    ID: s(d.ID || genShortId()),
+    Name: s(d.Name).trim(),
+    Subtitle: s(d.Subtitle).trim(),
+    Badge: s(d.Badge).trim(),
+    Bg_color: normalizePartnerHexColor(d.Bg_color),
+    URL_img: s(d.URL_img).trim(),
+    Direct_link: normalizeBannerLink(d.Direct_link),
+    Active: isPartnerActiveFlag(d.Active),
+    Sort_order: nextOrder,
+  })
+
+  await set(dbRef(db, `partners/${createRowKey()}`), newRow)
+  return { success: true }
+}
+
+async function updatePartner(body) {
+  const d = body.data || {}
+  if (!d.ID) return { success: false }
+  const entries = await readSheetEntries('partners')
+  const target = entries.find((e) => s(e.row.ID) === s(d.ID))
+  if (!target) return { success: false }
+
+  const nextLink =
+    d.Direct_link !== undefined
+      ? normalizeBannerLink(d.Direct_link)
+      : normalizeBannerLink(target.row.Direct_link)
+
+  const nextActive = Object.prototype.hasOwnProperty.call(d, 'Active')
+    ? isPartnerActiveFlag(d.Active)
+    : isPartnerActiveFlag(target.row.Active)
+
+  target.row = sanitizeRow({
+    ID: s(d.ID),
+    Name: d.Name !== undefined ? s(d.Name).trim() : s(target.row.Name).trim(),
+    Subtitle: d.Subtitle !== undefined ? s(d.Subtitle).trim() : s(target.row.Subtitle).trim(),
+    Badge: d.Badge !== undefined ? s(d.Badge).trim() : s(target.row.Badge).trim(),
+    Bg_color:
+      d.Bg_color !== undefined
+        ? normalizePartnerHexColor(d.Bg_color)
+        : normalizePartnerHexColor(target.row.Bg_color),
+    URL_img: d.URL_img !== undefined ? s(d.URL_img).trim() : s(target.row.URL_img).trim(),
+    Direct_link: nextLink,
+    Active: nextActive,
+    Sort_order:
+      d.Sort_order !== undefined && Number.isFinite(Number(d.Sort_order))
+        ? Number(d.Sort_order)
+        : n(target.row.Sort_order, 1),
+  })
+
+  await set(dbRef(db, `partners/${target.key}`), target.row)
+  return { success: true }
+}
+
+async function reorderPartners(body) {
+  const orderedIds = Array.isArray(body.ids) ? body.ids.map((id) => s(id)) : []
+  if (!orderedIds.length) return { success: false }
+  const entries = await readSheetEntries('partners')
+  const updates = {}
+  orderedIds.forEach((id, idx) => {
+    const found = entries.find((e) => s(e.row.ID) === id)
+    if (found) {
+      updates[`partners/${found.key}/Sort_order`] = idx + 1
+    }
+  })
+  if (Object.keys(updates).length) {
+    await update(dbRef(db), updates)
+  }
+  return { success: true }
+}
+
+async function deletePartner(body) {
+  return deleteById('partners', body.ID)
+}
+
 // --- time ---
 async function addTimeShop(body) {
   const d = body.data || {}
@@ -4789,6 +4916,10 @@ const ACTION_HANDLERS = {
   addShopContact,
   updateShopContact,
   deleteShopContact,
+  addPartner,
+  updatePartner,
+  reorderPartners,
+  deletePartner,
   addTimeShop,
   updateTimeShop,
   deleteTimeShop,

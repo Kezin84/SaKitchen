@@ -33,7 +33,8 @@
     "officialChannels": "Contact info",
     "collapseDock": "Collapse",
     "expandDock": "Expand contact info",
-    "allowMessageBadge": "Message"
+    "allowMessageBadge": "Message",
+    "ecosystem": "Ecosystem & Partners"
   },
   "search": {
     "placeholder": "Search dish, ingredient, price...",

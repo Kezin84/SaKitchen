@@ -67,6 +67,11 @@
       ".write": true,
       ".indexOn": ["ID"]
     },
+    "partners": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["ID", "Sort_order"]
+    },
     "time": {
       ".read": true,
       ".write": true,

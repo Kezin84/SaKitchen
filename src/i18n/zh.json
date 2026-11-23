@@ -33,7 +33,8 @@
     "officialChannels": "联系方式",
     "collapseDock": "收起",
     "expandDock": "展开联系方式",
-    "allowMessageBadge": "支持私信"
+    "allowMessageBadge": "支持私信",
+    "ecosystem": "生态与合作服务"
   },
   "search": {
     "placeholder": "搜索菜品、简繁体、价格...",

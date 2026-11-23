@@ -278,7 +278,7 @@
               <th style="width: 70px" class="text-center">ĐVT</th>
               <th style="width: 100px" class="text-center">Giá gốc</th>
               <th style="width: 100px" class="text-center">Giá bán</th>
-              <th style="width: 100px" class="text-center">Giá giảm</th>
+              <th style="width: 150px" class="text-center">Khuyến mãi</th>
               <th style="width: 80px" class="text-center">Tiền tệ</th>
               <th style="width: 150px" class="text-center">Ngôn ngữ</th>
               <th style="width: 120px" class="text-center">Trạng thái</th>
@@ -352,10 +352,18 @@
                 </div>
               </td>
               <td class="text-center text-number price-main" @click.stop="openEdit(item, { focusField: 'Gia_ban' })">{{ formatNumber(item.Gia_ban) }}</td>
-              <td class="text-center text-number" @click.stop="openEdit(item, { focusField: 'Gia_Giam' })">
-                <span v-if="item.Gia_Giam && item.Gia_Giam > 0" class="price-sale">
-                  {{ formatNumber(item.Gia_Giam) }}
-                </span>
+              <td class="text-center text-number" @click.stop="openDiscount(item)" title="Bấm để chỉnh Khuyến mãi">
+                <div v-if="isValidItemSale(item)" class="kho-sale-cell-stack">
+                  <span class="kho-sale-final">Còn {{ formatNumber(item.Gia_Giam) }}</span>
+                  <span class="kho-sale-diff-pill">
+                    -{{ formatNumber(getItemDiscountAmount(item)) }} (-{{ getItemDiscountPercent(item) }}%)
+                  </span>
+                </div>
+                <div v-else-if="Number(item.Gia_Giam || 0) > 0" class="kho-sale-cell-stack">
+                  <span class="kho-sale-warn-pill" title="Giá sau giảm đang lớn hơn hoặc bằng Giá bán">
+                    ⚠️ {{ formatNumber(item.Gia_Giam) }} (≥ Giá bán)
+                  </span>
+                </div>
                 <span v-else class="text-muted">—</span>
               </td>
               <td class="text-center" @click.stop="openEdit(item, { focusField: 'Don_vi_tien_te' })">
@@ -388,6 +396,30 @@
                     <span>TOP #{{ getTopRank(item) }}</span>
                   </span>
                   <span v-if="isProductHidden(item)" class="badge badge-hidden-pill">Đang ẩn</span>
+                  <button
+                    type="button"
+                    class="kho-quick-badge-trigger"
+                    :class="
+                      resolveProductBadge(item.Badge)
+                        ? [
+                            'has-badge',
+                            `is-group-${resolveProductBadge(item.Badge).group}`,
+                            `is-shape-${resolveProductBadge(item.Badge).shape}`,
+                          ]
+                        : 'is-empty'
+                    "
+                    title="Bấm để gắn / đổi nhanh Badge nổi bật"
+                    @click.stop="openQuickBadgeModal(item)"
+                  >
+                    <span v-if="resolveProductBadge(item.Badge)" class="kqb-inner">
+                      <i :class="resolveProductBadge(item.Badge).icon"></i>
+                      <span>{{ resolveProductBadge(item.Badge, selectedLanguage).label }}</span>
+                    </span>
+                    <span v-else class="kqb-inner">
+                      <i class="ri-award-line"></i>
+                      <span>+ Nhãn</span>
+                    </span>
+                  </button>
                 </div>
               </td>
               <td @click.stop class="text-center">
@@ -501,6 +533,29 @@
                       <span>TOP #{{ getTopRank(item) }}</span>
                     </span>
                     <span v-if="isProductHidden(item)" class="badge badge-hidden-pill">Đang ẩn</span>
+                    <button
+                      type="button"
+                      class="kho-quick-badge-trigger"
+                      :class="
+                        resolveProductBadge(item.Badge)
+                          ? [
+                              'has-badge',
+                              `is-group-${resolveProductBadge(item.Badge).group}`,
+                              `is-shape-${resolveProductBadge(item.Badge).shape}`,
+                            ]
+                          : 'is-empty'
+                      "
+                      @click.stop="openQuickBadgeModal(item)"
+                    >
+                      <span v-if="resolveProductBadge(item.Badge)" class="kqb-inner">
+                        <i :class="resolveProductBadge(item.Badge).icon"></i>
+                        <span>{{ resolveProductBadge(item.Badge, selectedLanguage).label }}</span>
+                      </span>
+                      <span v-else class="kqb-inner">
+                        <i class="ri-award-line"></i>
+                        <span>+ Nhãn</span>
+                      </span>
+                    </button>
                     <span class="card-code">{{ item.Ma_hang }}</span>
                   </div>
                 </div>
@@ -520,11 +575,19 @@
                     {{ formatNumber(item.Gia_ban) }} {{ item.Don_vi_tien_te || 'P' }}
                   </span>
                 </div>
-                <div v-if="item.Gia_Giam && item.Gia_Giam > 0" class="price-row">
-                  <span class="price-label">Giá giảm</span>
-                  <span class="price-value sale">
-                    {{ formatNumber(item.Gia_Giam) }} {{ item.Don_vi_tien_te || 'P' }}
-                  </span>
+                <div v-if="Number(item.Gia_Giam || 0) > 0" class="price-row is-sale-breakdown-row">
+                  <span class="price-label">Khuyến mãi</span>
+                  <div class="mobile-sale-stack">
+                    <span class="price-value sale">
+                      Còn {{ formatNumber(item.Gia_Giam) }} {{ item.Don_vi_tien_te || 'P' }}
+                    </span>
+                    <span v-if="isValidItemSale(item)" class="kho-sale-diff-pill">
+                      Giảm {{ formatNumber(getItemDiscountAmount(item)) }} {{ item.Don_vi_tien_te || 'P' }} (-{{ getItemDiscountPercent(item) }}%)
+                    </span>
+                    <span v-else class="kho-sale-warn-pill">
+                      ⚠️ Đang ≥ Giá bán
+                    </span>
+                  </div>
                 </div>
                 <div v-if="Number(item.Ncc_gia_tri_giam || 0) > 0" class="price-row">
                   <span class="price-label">CK NCC</span>
@@ -829,6 +892,61 @@
                     </button>
                   </div>
                 </div>
+                <div class="form-group kho-badge-edit-group">
+                  <label class="form-label kho-badge-label-row">
+                    <span>Nhãn nổi bật (Badge)</span>
+                    <span
+                      v-if="resolveProductBadge(edit.Badge)"
+                      class="kho-shaped-badge"
+                      :class="[
+                        `is-group-${resolveProductBadge(edit.Badge).group}`,
+                        `is-shape-${resolveProductBadge(edit.Badge).shape}`,
+                      ]"
+                    >
+                      <span class="kqb-inner">
+                        <i :class="resolveProductBadge(edit.Badge).icon"></i>
+                        <span>{{ resolveProductBadge(edit.Badge).label }}</span>
+                      </span>
+                    </span>
+                  </label>
+                  <div class="kho-badge-input-wrap">
+                    <input
+                      data-field="Badge"
+                      v-model="edit.Badge"
+                      class="form-control"
+                      placeholder="Chọn chip hoặc tự gõ nhãn..."
+                      maxlength="24"
+                      @input="markAsEdited"
+                    />
+                    <button
+                      v-if="edit.Badge"
+                      type="button"
+                      class="btn-clear-kho-badge"
+                      @click="edit.Badge = ''; markAsEdited()"
+                    >
+                      Gỡ
+                    </button>
+                  </div>
+                  <div class="kho-badge-presets">
+                    <button
+                      v-for="bp in PRODUCT_BADGE_PRESETS"
+                      :key="'mob-ed-' + bp.key"
+                      type="button"
+                      class="kho-preset-chip"
+                      :class="[
+                        `is-group-${bp.group}`,
+                        `is-shape-${bp.shape}`,
+                        { active: edit.Badge === bp.value },
+                      ]"
+                      @click="edit.Badge = edit.Badge === bp.value ? '' : bp.value; markAsEdited()"
+                    >
+                      <span class="kqb-inner">
+                        <i :class="bp.icon"></i>
+                        <span>{{ bp.value }}</span>
+                      </span>
+                    </button>
+                  </div>
+                </div>
                 <div class="form-group">
                   <label class="hide-toggle-row">
                     <input type="checkbox" v-model="edit.Is_hidden" @change="markAsEdited" />
@@ -951,9 +1069,9 @@
                 </div>
               </div>
 
-              <!-- Tien te, Gia goc, Gia ban, Gia giam -->
+              <!-- Tien te, Gia goc, Gia ban, Khuyen mai -->
               <div class="form-section">
-  <div class="form-row form-row-5">
+  <div class="form-row form-row-3">
     <div class="form-group">
       <label class="form-label">Tiền tệ</label>
       <input
@@ -977,7 +1095,7 @@
       />
     </div>
     <div class="form-group">
-      <label class="form-label">Giá bán</label>
+      <label class="form-label">Giá bán (niêm yết)</label>
       <input
         data-field="Gia_ban"
         type="text"
@@ -988,18 +1106,103 @@
         @input="onMoneyInput($event, 'Gia_ban')"
       />
     </div>
-    <div class="form-group">
-      <label class="form-label">Giá giảm</label>
-      <input
-        data-field="Gia_Giam"
-        type="text"
-        inputmode="numeric"
-        autocomplete="off"
-        class="form-control"
-        :class="{ 'form-control-highlight': isDiscountMode }"
-        :value="fmtMoney(edit.Gia_Giam)"
-        @input="onMoneyInput($event, 'Gia_Giam')"
-      />
+  </div>
+
+  <!-- KHỐI KHUYẾN MÃI RÕ NGHĨA 2 Ô (GIẢM ĐI BAO NHIÊU <-> GIÁ CÒN BẰNG BAO NHIÊU) -->
+  <div class="sale-split-box" :class="{ 'is-focus-highlight': isDiscountMode }">
+    <div class="sale-split-head">
+      <div class="sale-split-title">
+        <i class="ri-price-tag-3-fill"></i>
+        <span>Khuyến mãi (gõ 1 trong 2 ô, ô kia tự tính)</span>
+      </div>
+      <button
+        v-if="Number(edit.Gia_Giam || 0) > 0"
+        type="button"
+        class="btn-clear-sale"
+        @click="clearEditSalePrice"
+      >
+        Gỡ KM
+      </button>
+    </div>
+
+    <div class="sale-split-inputs">
+      <div class="form-group sale-col">
+        <label class="form-label sale-sub-label is-minus">
+          Giảm đi bao nhiêu (- {{ edit.Don_vi_tien_te || 'P' }})
+        </label>
+        <input
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          placeholder="VD: 50 (số tiền trừ)"
+          class="form-control sale-minus-input"
+          :disabled="!Number(edit.Gia_ban || 0)"
+          :value="fmtSaleDiscountOff(edit)"
+          @input="onSaleDiscountOffInput($event)"
+        />
+      </div>
+
+      <div class="sale-arrow-sep" aria-hidden="true">⇄</div>
+
+      <div class="form-group sale-col">
+        <label class="form-label sale-sub-label is-final">
+          Giá còn bằng (= {{ edit.Don_vi_tien_te || 'P' }} khách trả)
+        </label>
+        <input
+          data-field="Gia_Giam"
+          ref="discountInput"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          placeholder="VD: 250 (giá cuối)"
+          class="form-control sale-final-input"
+          :class="{ 'form-control-highlight': isDiscountMode }"
+          :value="fmtSaleFinalPrice(edit)"
+          @input="onSaleFinalPriceInput($event)"
+        />
+      </div>
+    </div>
+
+    <div v-if="Number(edit.Gia_ban || 0) > 0" class="sale-pct-chips">
+      <span class="sale-pct-hint">Chọn nhanh:</span>
+      <button
+        v-for="pct in SALE_QUICK_PERCENTS"
+        :key="'mob-pct-' + pct"
+        type="button"
+        class="sale-pct-chip"
+        :class="{ active: getItemDiscountPercent(edit) === pct }"
+        @click="applyQuickSalePercent(pct)"
+      >
+        -{{ pct }}%
+      </button>
+    </div>
+
+    <div
+      v-if="Number(edit.Gia_Giam || 0) > 0"
+      class="sale-live-summary"
+      :class="getEditSaleSummaryState(edit)"
+    >
+      <template v-if="Number(edit.Gia_Giam) >= Number(edit.Gia_ban || 0)">
+        <i class="ri-error-warning-fill"></i>
+        <span>
+          Không hợp lệ: Giá còn bằng (<strong>{{ fmtMoney(edit.Gia_Giam) }}</strong>) đang ≥ Giá bán (<strong>{{ fmtMoney(edit.Gia_ban) }}</strong>). Bấm <strong>Gỡ KM</strong> hoặc nhập số nhỏ hơn!
+        </span>
+      </template>
+      <template v-else-if="Number(edit.Gia_goc || 0) > 0 && Number(edit.Gia_Giam) <= Number(edit.Gia_goc)">
+        <i class="ri-alert-fill"></i>
+        <span>
+          Chú ý giá vốn! Giảm đi <strong>-{{ fmtMoney(getItemDiscountAmount(edit)) }} {{ edit.Don_vi_tien_te || 'P' }} (-{{ getItemDiscountPercent(edit) }}%)</strong> → Khách trả <strong>{{ fmtMoney(edit.Gia_Giam) }} {{ edit.Don_vi_tien_te || 'P' }}</strong> (Thấp hơn/bằng giá gốc {{ fmtMoney(edit.Gia_goc) }})
+        </span>
+      </template>
+      <template v-else>
+        <i class="ri-checkbox-circle-fill"></i>
+        <span>
+          Giá bán {{ fmtMoney(edit.Gia_ban) }} → Giảm đi <strong>-{{ fmtMoney(getItemDiscountAmount(edit)) }} (-{{ getItemDiscountPercent(edit) }}%)</strong> → Khách trả: <strong>{{ fmtMoney(edit.Gia_Giam) }} {{ edit.Don_vi_tien_te || 'P' }}</strong>
+          <template v-if="Number(edit.Gia_goc || 0) > 0">
+            · Lãi: <strong>+{{ fmtMoney(Number(edit.Gia_Giam) - Number(edit.Gia_goc)) }} {{ edit.Don_vi_tien_te || 'P' }}</strong>
+          </template>
+        </span>
+      </template>
     </div>
   </div>
   <div class="ncc-edit-block">
@@ -1256,6 +1459,61 @@
                         </div>
                       </div>
                     </div>
+                    <div class="form-group kho-badge-edit-group" style="margin-bottom: 12px;">
+                      <label class="form-label kho-badge-label-row">
+                        <span>Nhãn nổi bật trên thẻ món (Badge · tự đổi màu &amp; shape)</span>
+                        <span
+                          v-if="resolveProductBadge(edit.Badge)"
+                          class="kho-shaped-badge"
+                          :class="[
+                            `is-group-${resolveProductBadge(edit.Badge).group}`,
+                            `is-shape-${resolveProductBadge(edit.Badge).shape}`,
+                          ]"
+                        >
+                          <span class="kqb-inner">
+                            <i :class="resolveProductBadge(edit.Badge).icon"></i>
+                            <span>{{ resolveProductBadge(edit.Badge).label }}</span>
+                          </span>
+                        </span>
+                      </label>
+                      <div class="kho-badge-input-wrap">
+                        <input
+                          data-field="Badge"
+                          v-model="edit.Badge"
+                          class="form-control"
+                          placeholder="Chọn chip mẫu (tự dịch 5 ngôn ngữ) hoặc tự gõ nhãn..."
+                          maxlength="24"
+                          @input="markAsEdited"
+                        />
+                        <button
+                          v-if="edit.Badge"
+                          type="button"
+                          class="btn-clear-kho-badge"
+                          @click="edit.Badge = ''; markAsEdited()"
+                        >
+                          Gỡ nhãn
+                        </button>
+                      </div>
+                      <div class="kho-badge-presets">
+                        <button
+                          v-for="bp in PRODUCT_BADGE_PRESETS"
+                          :key="'pc-ed-' + bp.key"
+                          type="button"
+                          class="kho-preset-chip"
+                          :class="[
+                            `is-group-${bp.group}`,
+                            `is-shape-${bp.shape}`,
+                            { active: edit.Badge === bp.value },
+                          ]"
+                          @click="edit.Badge = edit.Badge === bp.value ? '' : bp.value; markAsEdited()"
+                        >
+                          <span class="kqb-inner">
+                            <i :class="bp.icon"></i>
+                            <span>{{ bp.value }}</span>
+                          </span>
+                        </button>
+                      </div>
+                    </div>
                     <div class="form-group" style="margin-bottom: 12px;">
                       <label class="form-label">Tên sản phẩm ({{ getLangShort(activeEditLang) }})</label>
                       <input
@@ -1307,7 +1565,7 @@
                   </div>
                 <div class="modal-section-card">
   <div class="modal-section-title">Giá bán & Khuyến mãi</div>
-  <div class="modal-section-grid modal-section-grid-2">
+  <div class="modal-section-grid modal-section-grid-3">
     <div class="form-group">
       <label class="form-label">Tiền tệ</label>
       <input
@@ -1331,7 +1589,7 @@
       />
     </div>
     <div class="form-group">
-      <label class="form-label">Giá bán</label>
+      <label class="form-label">Giá bán (niêm yết)</label>
       <input
         data-field="Gia_ban"
         type="text"
@@ -1342,20 +1600,103 @@
         @input="onMoneyInput($event, 'Gia_ban')"
       />
     </div>
-    <div class="form-group">
-      <label class="form-label">Giá giảm</label>
-      <input
-        data-field="Gia_Giam"
-        ref="discountInputModal"
-        type="text"
-        inputmode="numeric"
-        autocomplete="off"
-        placeholder="0"
-        class="form-control"
-        :class="{ 'form-control-highlight': isDiscountMode }"
-        :value="fmtMoney(edit.Gia_Giam)"
-        @input="onMoneyInput($event, 'Gia_Giam')"
-      />
+  </div>
+
+  <!-- KHỐI KHUYẾN MÃI RÕ NGHĨA 2 Ô (PC MODAL) -->
+  <div class="sale-split-box in-pc-modal" :class="{ 'is-focus-highlight': isDiscountMode }">
+    <div class="sale-split-head">
+      <div class="sale-split-title">
+        <i class="ri-price-tag-3-fill"></i>
+        <span>Khuyến mãi (nhập 1 trong 2 ô — ô còn lại tự nhảy số)</span>
+      </div>
+      <button
+        v-if="Number(edit.Gia_Giam || 0) > 0"
+        type="button"
+        class="btn-clear-sale"
+        @click="clearEditSalePrice"
+      >
+        Gỡ khuyến mãi
+      </button>
+    </div>
+
+    <div class="sale-split-inputs">
+      <div class="form-group sale-col">
+        <label class="form-label sale-sub-label is-minus">
+          Giảm đi bao nhiêu (- {{ edit.Don_vi_tien_te || 'P' }})
+        </label>
+        <input
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          placeholder="VD: 50 (số tiền trừ bớt)"
+          class="form-control sale-minus-input"
+          :disabled="!Number(edit.Gia_ban || 0)"
+          :value="fmtSaleDiscountOff(edit)"
+          @input="onSaleDiscountOffInput($event)"
+        />
+      </div>
+
+      <div class="sale-arrow-sep" aria-hidden="true">⇄</div>
+
+      <div class="form-group sale-col">
+        <label class="form-label sale-sub-label is-final">
+          Giá còn bằng (= {{ edit.Don_vi_tien_te || 'P' }} khách trả)
+        </label>
+        <input
+          data-field="Gia_Giam"
+          ref="discountInputModal"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          placeholder="VD: 250 (giá bán sau giảm)"
+          class="form-control sale-final-input"
+          :class="{ 'form-control-highlight': isDiscountMode }"
+          :value="fmtSaleFinalPrice(edit)"
+          @input="onSaleFinalPriceInput($event)"
+        />
+      </div>
+    </div>
+
+    <div v-if="Number(edit.Gia_ban || 0) > 0" class="sale-pct-chips">
+      <span class="sale-pct-hint">Chọn nhanh:</span>
+      <button
+        v-for="pct in SALE_QUICK_PERCENTS"
+        :key="'pc-pct-' + pct"
+        type="button"
+        class="sale-pct-chip"
+        :class="{ active: getItemDiscountPercent(edit) === pct }"
+        @click="applyQuickSalePercent(pct)"
+      >
+        -{{ pct }}%
+      </button>
+    </div>
+
+    <div
+      v-if="Number(edit.Gia_Giam || 0) > 0"
+      class="sale-live-summary"
+      :class="getEditSaleSummaryState(edit)"
+    >
+      <template v-if="Number(edit.Gia_Giam) >= Number(edit.Gia_ban || 0)">
+        <i class="ri-error-warning-fill"></i>
+        <span>
+          Không hợp lệ: Giá còn bằng (<strong>{{ fmtMoney(edit.Gia_Giam) }}</strong>) đang lớn hơn hoặc bằng Giá bán gốc (<strong>{{ fmtMoney(edit.Gia_ban) }}</strong>)! Vui lòng nhập số nhỏ hơn hoặc bấm <strong>Gỡ khuyến mãi</strong>.
+        </span>
+      </template>
+      <template v-else-if="Number(edit.Gia_goc || 0) > 0 && Number(edit.Gia_Giam) <= Number(edit.Gia_goc)">
+        <i class="ri-alert-fill"></i>
+        <span>
+          Chú ý giá vốn! Giảm đi <strong>-{{ fmtMoney(getItemDiscountAmount(edit)) }} {{ edit.Don_vi_tien_te || 'P' }} (-{{ getItemDiscountPercent(edit) }}%)</strong> → Khách trả <strong>{{ fmtMoney(edit.Gia_Giam) }} {{ edit.Don_vi_tien_te || 'P' }}</strong> (Thấp hơn/bằng giá gốc {{ fmtMoney(edit.Gia_goc) }})
+        </span>
+      </template>
+      <template v-else>
+        <i class="ri-checkbox-circle-fill"></i>
+        <span>
+          Giá bán {{ fmtMoney(edit.Gia_ban) }} → Giảm đi <strong>-{{ fmtMoney(getItemDiscountAmount(edit)) }} {{ edit.Don_vi_tien_te || 'P' }} (-{{ getItemDiscountPercent(edit) }}%)</strong> → Khách trả: <strong>{{ fmtMoney(edit.Gia_Giam) }} {{ edit.Don_vi_tien_te || 'P' }}</strong>
+          <template v-if="Number(edit.Gia_goc || 0) > 0">
+            · Lãi: <strong>+{{ fmtMoney(Number(edit.Gia_Giam) - Number(edit.Gia_goc)) }} {{ edit.Don_vi_tien_te || 'P' }}</strong>
+          </template>
+        </span>
+      </template>
     </div>
   </div>
   <div class="ncc-edit-block">
@@ -1732,6 +2073,51 @@
                 </select>
               </div>
 
+              <!-- Nhãn nổi bật (Badge) -->
+              <div class="bulk-field-card bulk-span-2" :class="{ active: bulkForm.enableBadge }">
+                <label class="bulk-field-toggle">
+                  <input type="checkbox" v-model="bulkForm.enableBadge" />
+                  <span>Nhãn nổi bật (Badge · để trống để gỡ hàng loạt)</span>
+                </label>
+                <div class="kho-badge-input-wrap">
+                  <input
+                    v-model="bulkForm.Badge"
+                    :disabled="!bulkForm.enableBadge"
+                    placeholder="Chọn chip mẫu hoặc tự gõ nhãn (để trống = gỡ nhãn)..."
+                    maxlength="24"
+                    class="form-control"
+                  />
+                  <button
+                    v-if="bulkForm.Badge && bulkForm.enableBadge"
+                    type="button"
+                    class="btn-clear-kho-badge"
+                    @click="bulkForm.Badge = ''"
+                  >
+                    Xóa chữ
+                  </button>
+                </div>
+                <div class="kho-badge-presets" :class="{ 'is-disabled': !bulkForm.enableBadge }">
+                  <button
+                    v-for="bp in PRODUCT_BADGE_PRESETS"
+                    :key="'bulk-' + bp.key"
+                    type="button"
+                    class="kho-preset-chip"
+                    :disabled="!bulkForm.enableBadge"
+                    :class="[
+                      `is-group-${bp.group}`,
+                      `is-shape-${bp.shape}`,
+                      { active: bulkForm.Badge === bp.value },
+                    ]"
+                    @click="bulkForm.Badge = bulkForm.Badge === bp.value ? '' : bp.value"
+                  >
+                    <span class="kqb-inner">
+                      <i :class="bp.icon"></i>
+                      <span>{{ bp.value }}</span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+
               <!-- Ẩn / Hiện trên Menu Web -->
               <div class="bulk-field-card" :class="{ active: bulkForm.enableHidden }">
                 <label class="bulk-field-toggle">
@@ -1887,11 +2273,11 @@
                 </div>
               </div>
 
-              <!-- Giá giảm -->
+              <!-- Khuyến mãi hàng loạt -->
               <div class="bulk-field-card bulk-span-2" :class="{ active: bulkForm.enableGiaGiam }">
                 <label class="bulk-field-toggle">
                   <input type="checkbox" v-model="bulkForm.enableGiaGiam" />
-                  <span>Giá giảm (Gán 0 để tắt khuyến mãi)</span>
+                  <span>Khuyến mãi (Giảm đi so với Giá bán hoặc Giá còn bằng · nhập 0 để gỡ KM)</span>
                 </label>
                 <div class="bulk-price-row">
                   <select
@@ -1899,11 +2285,11 @@
                     :disabled="!bulkForm.enableGiaGiam"
                     class="form-control bulk-mode-select"
                   >
-                    <option value="set">Gán giá cố định</option>
-                    <option value="add_money">Tăng thêm (+ tiền)</option>
-                    <option value="sub_money">Giảm bớt (- tiền)</option>
-                    <option value="add_percent">Tăng thêm (+ %)</option>
-                    <option value="sub_percent">Giảm bớt (- %)</option>
+                    <option value="off_percent_from_ban">Giảm đi (- %) so với Giá bán</option>
+                    <option value="off_money_from_ban">Giảm đi (- số tiền) so với Giá bán</option>
+                    <option value="set">Giá còn bằng (= giá cố định · 0 = gỡ KM)</option>
+                    <option value="sub_money">Giảm thêm (- tiền) từ Giá KM đang có</option>
+                    <option value="add_money">Tăng thêm (+ tiền) từ Giá KM đang có</option>
                   </select>
                   <input
                     type="number"
@@ -3026,6 +3412,81 @@
       </div>
     </transition>
 
+    <!-- ===== QUICK INLINE BADGE PICKER MODAL ===== -->
+    <transition name="fade-scale">
+      <div
+        v-if="quickBadgeState.open && quickBadgeState.item"
+        class="notification-overlay"
+        @click.self="closeQuickBadgeModal"
+      >
+        <div class="quick-badge-dialog" @click.stop>
+          <div class="qbd-header">
+            <div>
+              <h3 class="qbd-title">Gắn nhãn nổi bật</h3>
+              <p class="qbd-sub">{{ quickBadgeState.item.Ten_hang }}</p>
+            </div>
+            <button type="button" class="qbd-close" @click="closeQuickBadgeModal">✕</button>
+          </div>
+
+          <div class="qbd-presets-label">Bấm 1 chạm để gắn ngay (tự dịch 5 ngôn ngữ):</div>
+          <div class="qbd-presets-grid">
+            <button
+              v-for="bp in PRODUCT_BADGE_PRESETS"
+              :key="'qbd-' + bp.key"
+              type="button"
+              class="qbd-preset-card"
+              :disabled="quickBadgeState.saving"
+              :class="{ active: quickBadgeState.draft === bp.value }"
+              @click="applyQuickBadgeValue(bp.value)"
+            >
+              <span
+                class="kho-shaped-badge"
+                :class="[`is-group-${bp.group}`, `is-shape-${bp.shape}`]"
+              >
+                <span class="kqb-inner">
+                  <i :class="bp.icon"></i>
+                  <span>{{ bp.value }}</span>
+                </span>
+              </span>
+            </button>
+          </div>
+
+          <div class="qbd-custom-section">
+            <label class="qbd-presets-label">Hoặc tự gõ nhãn riêng:</label>
+            <div class="qbd-custom-row">
+              <input
+                v-model="quickBadgeState.draft"
+                placeholder="VD: Món nhậu, Combo lời, 24/7..."
+                maxlength="24"
+                class="form-control"
+                @keyup.enter="applyQuickBadgeValue(quickBadgeState.draft)"
+              />
+              <button
+                type="button"
+                class="btn-modal btn-primary qbd-apply-btn"
+                :disabled="quickBadgeState.saving"
+                @click="applyQuickBadgeValue(quickBadgeState.draft)"
+              >
+                Lưu
+              </button>
+            </div>
+          </div>
+
+          <div v-if="quickBadgeState.item.Badge" class="qbd-footer">
+            <button
+              type="button"
+              class="qbd-remove-btn"
+              :disabled="quickBadgeState.saving"
+              @click="applyQuickBadgeValue('')"
+            >
+              <i class="ri-delete-bin-6-line"></i>
+              <span>Gỡ nhãn hiện tại ("{{ quickBadgeState.item.Badge }}")</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
   </div>
 </template>
 
@@ -3048,6 +3509,7 @@ import {
   normalizeNccDiscountValue,
   formatNccDiscountLabel,
 } from '@/utils/nccDiscount'
+import { PRODUCT_BADGE_PRESETS, resolveProductBadge } from '@/utils/productBadge'
 import { exportProductsWorkbook } from '@/utils/productExcel'
 
 const supplementaryImageKeys = ['img_1', 'img_2', 'img_3', 'img_4', 'img_5', 'img_6']
@@ -4041,6 +4503,8 @@ const createDefaultBulkForm = () => ({
   Don_vi_tien_te: 'P',
   enableTrangThai: false,
   Trang_thai: 'Còn hàng',
+  enableBadge: false,
+  Badge: '',
   enableHidden: false,
   Is_hidden: false,
   enableTop: false,
@@ -4055,7 +4519,7 @@ const createDefaultBulkForm = () => ({
   giaBanMode: 'set',
   giaBanValue: 0,
   enableGiaGiam: false,
-  giaGiamMode: 'set',
+  giaGiamMode: 'off_percent_from_ban',
   giaGiamValue: 0,
 })
 const bulkForm = ref(createDefaultBulkForm())
@@ -4074,6 +4538,7 @@ const hasAnyBulkFieldEnabled = computed(() => {
       f.enableDvt ||
       f.enableDonViTienTe ||
       f.enableTrangThai ||
+      f.enableBadge ||
       f.enableHidden ||
       f.enableTop ||
       f.enableNccDiscount ||
@@ -4926,6 +5391,7 @@ function prepareEditState(item) {
     Dvt: i18n.vi.Dvt || rawItem.Dvt || '',
     Mo_ta: i18n.vi.Mo_ta || rawItem.Mo_ta || '',
     Is_hidden: isProductHidden(rawItem),
+    Badge: String(rawItem.Badge || '').trim(),
     Top_at: getProductTopAt(rawItem),
     Ncc_loai_giam: normalizeNccDiscountType(rawItem.Ncc_loai_giam),
     Ncc_gia_tri_giam: normalizeNccDiscountValue(rawItem.Ncc_gia_tri_giam),
@@ -5182,8 +5648,89 @@ async function quickToggleStatus(item) {
   }
 }
 
+const quickBadgeState = ref({
+  open: false,
+  item: null,
+  draft: '',
+  saving: false,
+})
+
+function clearMenuStorefrontCache() {
+  try {
+    localStorage.removeItem('MENU_CACHE_SA_UNIFIED')
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function openQuickBadgeModal(item) {
+  if (!item?.Ma_hang) return
+  quickBadgeState.value = {
+    open: true,
+    item,
+    draft: String(item.Badge || '').trim(),
+    saving: false,
+  }
+}
+
+function closeQuickBadgeModal() {
+  if (quickBadgeState.value.saving) return
+  quickBadgeState.value.open = false
+  quickBadgeState.value.item = null
+}
+
+async function applyQuickBadgeValue(nextRaw) {
+  const item = quickBadgeState.value.item
+  if (!item?.Ma_hang || quickBadgeState.value.saving) return
+
+  const nextBadge = String(nextRaw ?? '').trim()
+  const rawItem = list.value.find((r) => r.Ma_hang === item.Ma_hang)
+  const prevBadge = String((rawItem || item).Badge || '').trim()
+
+  quickBadgeState.value.saving = true
+  if (rawItem) rawItem.Badge = nextBadge
+  item.Badge = nextBadge
+
+  try {
+    const res = await dispatchAction({
+      action: 'updateHangHoa',
+      data: {
+        Ma_hang: item.Ma_hang,
+        Badge: nextBadge,
+      },
+    })
+    if (!res?.success) throw new Error(res?.message || 'Lỗi lưu nhãn')
+    clearMenuStorefrontCache()
+    quickBadgeState.value.open = false
+    quickBadgeState.value.item = null
+    showAlert(
+      nextBadge
+        ? `Đã gắn nhãn "${nextBadge}" cho "${item.Ten_hang}"`
+        : `Đã gỡ nhãn khỏi "${item.Ten_hang}"`,
+      'success',
+    )
+  } catch (err) {
+    console.error(err)
+    if (rawItem) rawItem.Badge = prevBadge
+    item.Badge = prevBadge
+    showAlert('Cập nhật nhãn thất bại', 'error')
+  } finally {
+    quickBadgeState.value.saving = false
+  }
+}
+
 async function saveEdit() {
   if (saving.value) return
+
+  const rawGiaGiam = Number(edit.value.Gia_Giam || 0)
+  const rawGiaBan = Number(edit.value.Gia_ban || 0)
+  if (rawGiaGiam > 0 && rawGiaGiam >= rawGiaBan) {
+    showAlert('Giá còn bằng sau giảm phải nhỏ hơn Giá bán niêm yết (hoặc bấm Gỡ KM)!', 'error')
+    return
+  }
+  if (rawGiaGiam <= 0) {
+    edit.value.Gia_Giam = ''
+  }
 
   saving.value = true
   try {
@@ -5219,6 +5766,7 @@ async function saveEdit() {
     }
 
     await Promise.all(tasks)
+    clearMenuStorefrontCache()
 
     showAlert('Cập nhật thành công', 'success')
     resetEditTracking()
@@ -5343,6 +5891,7 @@ async function saveBulkEdit() {
   if (f.enableDvt) patch.Dvt = String(f.Dvt || '').trim()
   if (f.enableDonViTienTe) patch.Don_vi_tien_te = String(f.Don_vi_tien_te || '').trim() || 'P'
   if (f.enableTrangThai) patch.Trang_thai = f.Trang_thai === 'Hết hàng' ? 'Hết hàng' : 'Còn hàng'
+  if (f.enableBadge) patch.Badge = String(f.Badge || '').trim()
   if (f.enableHidden) patch.Is_hidden = Boolean(f.Is_hidden)
   if (f.enableTop) patch.Top_action = f.topAction === 'unpin' ? 'unpin' : 'pin'
   if (f.enableNccDiscount) {
@@ -5369,6 +5918,7 @@ async function saveBulkEdit() {
       patch,
     })
     if (!res?.success) throw new Error(res?.message || 'Cập nhật hàng loạt thất bại')
+    clearMenuStorefrontCache()
     showAlert(`Đã cập nhật ${res.updated || maHangs.length} sản phẩm`, 'success')
     showBulkEditModal.value = false
     selected.value = []
@@ -5431,6 +5981,129 @@ function fmtMoney(val) {
 function parseMoney(str) {
   const digits = (str || '').toString().replace(/[^\d]/g, '')
   return digits ? Number(digits) : 0
+}
+
+const SALE_QUICK_PERCENTS = [5, 10, 15, 20, 25, 30]
+
+function isValidItemSale(item) {
+  const ban = Number(item?.Gia_ban || 0)
+  const giam = Number(item?.Gia_Giam || 0)
+  return giam > 0 && ban > 0 && giam < ban
+}
+
+function getItemDiscountAmount(item) {
+  if (!isValidItemSale(item)) return 0
+  return Math.max(0, Number(item.Gia_ban) - Number(item.Gia_Giam))
+}
+
+function getItemDiscountPercent(item) {
+  if (!isValidItemSale(item)) return 0
+  return Math.round(100 - (Number(item.Gia_Giam) / Number(item.Gia_ban)) * 100)
+}
+
+function getEditSaleSummaryState(item) {
+  const giam = Number(item?.Gia_Giam || 0)
+  const ban = Number(item?.Gia_ban || 0)
+  const goc = Number(item?.Gia_goc || 0)
+  if (giam >= ban) return 'is-error'
+  if (goc > 0 && giam <= goc) return 'is-warn'
+  return 'is-ok'
+}
+
+function fmtSaleFinalPrice(item) {
+  const n = Number(item?.Gia_Giam || 0)
+  return n > 0 ? fmtMoney(n) : ''
+}
+
+function fmtSaleDiscountOff(item) {
+  if (!isValidItemSale(item)) return ''
+  return fmtMoney(getItemDiscountAmount(item))
+}
+
+function restoreInputCaret(el, formatted, digitsLeft) {
+  let pos = 0
+  let seen = 0
+  while (pos < formatted.length && seen < digitsLeft) {
+    if (/\d/.test(formatted[pos])) seen++
+    pos++
+  }
+  requestAnimationFrame(() => el.setSelectionRange(pos, pos))
+}
+
+function onSaleFinalPriceInput(e) {
+  const el = e.target
+  const raw = el.value
+  const caret = el.selectionStart || 0
+  const onlyDigits = raw.replace(/[^\d]/g, '')
+
+  if (!onlyDigits) {
+    edit.value.Gia_Giam = ''
+    el.value = ''
+    markAsEdited()
+    return
+  }
+
+  const digitsLeft = raw.slice(0, caret).replace(/[^\d]/g, '').length
+  const num = Number(onlyDigits)
+  if (!num || num <= 0) {
+    edit.value.Gia_Giam = ''
+    el.value = ''
+    markAsEdited()
+    return
+  }
+
+  edit.value.Gia_Giam = num
+  markAsEdited()
+
+  const formatted = fmtMoney(num)
+  el.value = formatted
+  restoreInputCaret(el, formatted, digitsLeft)
+}
+
+function onSaleDiscountOffInput(e) {
+  const el = e.target
+  const raw = el.value
+  const caret = el.selectionStart || 0
+  const onlyDigits = raw.replace(/[^\d]/g, '')
+  const giaBan = Number(edit.value.Gia_ban || 0)
+
+  if (!onlyDigits || giaBan <= 0) {
+    edit.value.Gia_Giam = ''
+    el.value = ''
+    markAsEdited()
+    return
+  }
+
+  const digitsLeft = raw.slice(0, caret).replace(/[^\d]/g, '').length
+  const rawOff = Number(onlyDigits)
+  if (!rawOff || rawOff <= 0) {
+    edit.value.Gia_Giam = ''
+    el.value = ''
+    markAsEdited()
+    return
+  }
+
+  const maxAllowedOff = Math.max(1, giaBan - 1)
+  const effectiveOff = Math.min(rawOff, maxAllowedOff)
+  edit.value.Gia_Giam = Math.max(1, giaBan - effectiveOff)
+  markAsEdited()
+
+  const formatted = fmtMoney(effectiveOff)
+  el.value = formatted
+  restoreInputCaret(el, formatted, digitsLeft)
+}
+
+function applyQuickSalePercent(pct) {
+  const giaBan = Number(edit.value.Gia_ban || 0)
+  if (giaBan <= 0) return
+  const nextFinal = Math.max(1, Math.round(giaBan * (1 - pct / 100)))
+  edit.value.Gia_Giam = nextFinal
+  markAsEdited()
+}
+
+function clearEditSalePrice() {
+  edit.value.Gia_Giam = ''
+  markAsEdited()
 }
 
 function onMoneyInput(e, key) {
@@ -9656,6 +10329,559 @@ function onMoneyInput(e, key) {
   font-size: 12.5px;
   font-weight: 600;
   color: #64748b;
+}
+
+/* =========================================================
+   QUICK INLINE BADGE TRIGGER, SHAPES & MODAL IN KHO HANG
+   ========================================================= */
+.kho-quick-badge-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 9px;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1.25;
+  cursor: pointer;
+  border: none;
+  color: #ffffff;
+  transition: transform 0.16s ease, filter 0.16s ease, border-color 0.16s ease;
+}
+
+.kho-quick-badge-trigger.is-empty {
+  border-radius: 999px;
+  border: 1px dashed rgba(148, 163, 184, 0.42);
+  background: rgba(30, 41, 59, 0.65);
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.kho-quick-badge-trigger.is-empty:hover {
+  border-color: #34d399;
+  color: #ecfdf5;
+  background: rgba(16, 185, 129, 0.16);
+}
+
+.kho-quick-badge-trigger.has-badge:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+.kqb-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 3.5px;
+}
+
+.kho-shaped-badge,
+.kho-preset-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  border: none;
+}
+
+.kho-preset-chip {
+  cursor: pointer;
+  opacity: 0.72;
+  transition: transform 0.16s ease, opacity 0.16s ease, box-shadow 0.16s ease;
+}
+
+.kho-preset-chip:hover:not(:disabled) {
+  opacity: 0.96;
+  transform: translateY(-1px);
+}
+
+.kho-preset-chip.active {
+  opacity: 1;
+  box-shadow: 0 0 0 2px #ffffff, 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.kho-preset-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+/* GROUP PALETTES */
+.is-group-fire {
+  background: linear-gradient(135deg, #ff6a00 0%, #dc2626 100%);
+}
+.is-group-new {
+  background: linear-gradient(135deg, #10b981 0%, #0d9488 100%);
+}
+.is-group-crown {
+  background: linear-gradient(135deg, #b45309 0%, #f59e0b 52%, #d97706 100%);
+}
+.is-group-spicy {
+  background: linear-gradient(135deg, #ef4444 0%, #991b1b 100%);
+}
+.is-group-custom {
+  background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+}
+
+/* DISTINCT SHAPES */
+.is-shape-flame {
+  border-radius: 10px 3px 10px 3px;
+  transform: skewX(-9deg);
+}
+.is-shape-flame .kqb-inner {
+  transform: skewX(9deg);
+}
+.is-shape-leaf {
+  border-radius: 3px 14px 3px 14px;
+}
+.is-shape-crest {
+  padding-left: 11px;
+  padding-right: 11px;
+  clip-path: polygon(6px 0%, calc(100% - 6px) 0%, 100% 50%, calc(100% - 6px) 100%, 6px 100%, 0% 50%);
+}
+.is-shape-pennant {
+  padding-left: 12px;
+  border-radius: 0 7px 7px 0;
+  clip-path: polygon(7px 0%, 100% 0%, 100% 100%, 7px 100%, 0% 50%);
+}
+.is-shape-ticket {
+  padding-left: 11px;
+  padding-right: 11px;
+  border-radius: 5px;
+  clip-path: polygon(0% 0%, 100% 0%, 100% calc(50% - 3px), calc(100% - 3.5px) 50%, 100% calc(50% + 3px), 100% 100%, 0% 100%, 0% calc(50% + 3px), 3.5px 50%, 0% calc(50% - 3px));
+}
+
+/* EDIT FORM / MODAL BADGE CONTROLS */
+.kho-badge-label-row {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.kho-badge-input-wrap {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.kho-badge-input-wrap .form-control {
+  flex: 1;
+}
+
+.btn-clear-kho-badge {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-clear-kho-badge:hover {
+  background: rgba(239, 68, 68, 0.28);
+  color: #ffffff;
+}
+
+.kho-badge-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.kho-badge-presets.is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* QUICK BADGE DIALOG */
+.quick-badge-dialog {
+  width: 100%;
+  max-width: 420px;
+  background: #0f172a;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.65);
+  color: #f8fafc;
+}
+
+.qbd-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.qbd-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #86efac;
+  margin: 0 0 3px;
+}
+
+.qbd-sub {
+  font-size: 13px;
+  color: #cbd5e1;
+  margin: 0;
+}
+
+.qbd-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(51, 65, 85, 0.65);
+  color: #cbd5e1;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+.qbd-presets-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-bottom: 8px;
+}
+
+.qbd-presets-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.qbd-preset-card {
+  padding: 10px 6px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(30, 41, 59, 0.65);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.16s ease;
+}
+
+.qbd-preset-card:hover:not(:disabled) {
+  border-color: #34d399;
+  background: rgba(30, 41, 59, 0.95);
+  transform: translateY(-1px);
+}
+
+.qbd-preset-card.active {
+  border-color: #4ade80;
+  background: rgba(22, 163, 74, 0.18);
+}
+
+.qbd-custom-row {
+  display: flex;
+  gap: 8px;
+}
+
+.qbd-custom-row .form-control {
+  flex: 1;
+}
+
+.qbd-apply-btn {
+  padding: 0 18px !important;
+  min-height: 40px;
+}
+
+.qbd-footer {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.qbd-remove-btn {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(239, 68, 68, 0.14);
+  color: #fca5a5;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.qbd-remove-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.26);
+  color: #ffffff;
+}
+
+/* =========================================================
+   CLEAR 2-WAY SALE BREAKDOWN IN TABLE, CARDS & EDIT FORMS
+   ========================================================= */
+.kho-sale-cell-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+}
+
+.kho-sale-final {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #4ade80;
+  white-space: nowrap;
+}
+
+.kho-sale-diff-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1.5px 7px;
+  border-radius: 999px;
+  background: rgba(249, 115, 22, 0.18);
+  border: 1px solid rgba(251, 146, 60, 0.38);
+  color: #fdba74;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.kho-sale-warn-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  color: #fca5a5;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.is-sale-breakdown-row {
+  align-items: flex-start !important;
+}
+
+.mobile-sale-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.modal-section-grid-3 {
+  grid-template-columns: 90px 1fr 1fr;
+  gap: 12px;
+}
+
+.form-row-3 {
+  display: grid;
+  grid-template-columns: 80px 1fr 1fr;
+  gap: 10px;
+}
+
+.sale-split-box {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(52, 211, 153, 0.28);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sale-split-box.in-pc-modal {
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+
+.sale-split-box.is-focus-highlight {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.22);
+}
+
+.sale-split-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.sale-split-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #86efac;
+}
+
+.sale-split-title i {
+  color: #fbbf24;
+  font-size: 15px;
+}
+
+.btn-clear-sale {
+  padding: 4px 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-clear-sale:hover {
+  background: rgba(239, 68, 68, 0.28);
+  color: #ffffff;
+}
+
+.sale-split-inputs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: 8px;
+}
+
+.sale-col {
+  margin-bottom: 0 !important;
+}
+
+.sale-sub-label {
+  font-size: 11.5px !important;
+  margin-bottom: 5px !important;
+}
+
+.sale-sub-label.is-minus {
+  color: #fdba74 !important;
+}
+
+.sale-sub-label.is-final {
+  color: #86efac !important;
+}
+
+.sale-minus-input {
+  border-color: rgba(251, 146, 60, 0.36) !important;
+}
+
+.sale-final-input {
+  border-color: rgba(52, 211, 153, 0.4) !important;
+  font-weight: 700;
+}
+
+.sale-arrow-sep {
+  padding-bottom: 10px;
+  color: #94a3b8;
+  font-size: 16px;
+  font-weight: 700;
+  user-select: none;
+}
+
+.sale-pct-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.sale-pct-hint {
+  font-size: 11.5px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.sale-pct-chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(30, 41, 59, 0.7);
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.sale-pct-chip:hover {
+  border-color: #fb923c;
+  color: #ffffff;
+}
+
+.sale-pct-chip.active {
+  background: linear-gradient(135deg, #f97316 0%, #dc2626 100%);
+  border-color: #fdba74;
+  color: #ffffff;
+}
+
+.sale-live-summary {
+  margin-top: 10px;
+  padding: 8px 11px;
+  border-radius: 9px;
+  font-size: 12px;
+  line-height: 1.45;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.sale-live-summary i {
+  font-size: 15px;
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+
+.sale-live-summary.is-ok {
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  color: #d1fae5;
+}
+
+.sale-live-summary.is-ok i {
+  color: #34d399;
+}
+
+.sale-live-summary.is-warn {
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(251, 191, 36, 0.42);
+  color: #fef3c7;
+}
+
+.sale-live-summary.is-warn i {
+  color: #fbbf24;
+}
+
+.sale-live-summary.is-error {
+  background: rgba(239, 68, 68, 0.16);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  color: #fee2e2;
+}
+
+.sale-live-summary.is-error i {
+  color: #f87171;
+}
+
+@media (max-width: 520px) {
+  .sale-split-inputs {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .sale-arrow-sep {
+    display: none;
+  }
 }
 </style>
 

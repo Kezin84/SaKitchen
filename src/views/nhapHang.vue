@@ -255,6 +255,62 @@
                   <label>Đơn vị tiền tệ</label>
                   <input v-model="form.Don_vi_tien_te" placeholder="VD: P, VND, USD..." />
                 </div>
+
+                <div class="field span-12">
+                  <label class="badge-field-label-row">
+                    <span>Nhãn nổi bật trên thẻ món (Badge · tự đổi màu &amp; khung riêng)</span>
+                    <span
+                      v-if="resolveProductBadge(form.Badge)"
+                      class="adm-prod-badge"
+                      :class="[
+                        `is-group-${resolveProductBadge(form.Badge).group}`,
+                        `is-shape-${resolveProductBadge(form.Badge).shape}`,
+                      ]"
+                    >
+                      <span class="adm-prod-badge-inner">
+                        <i :class="resolveProductBadge(form.Badge).icon"></i>
+                        <span>{{ resolveProductBadge(form.Badge).label }}</span>
+                      </span>
+                    </span>
+                  </label>
+                  <div class="badge-input-line">
+                    <input
+                      v-model="form.Badge"
+                      placeholder="Chọn chip bên dưới hoặc tự gõ (VD: Món nhậu, 24/7...)"
+                      maxlength="24"
+                    />
+                    <button
+                      v-if="form.Badge"
+                      type="button"
+                      class="btn-clear-badge"
+                      @click="form.Badge = ''"
+                    >
+                      Gỡ nhãn
+                    </button>
+                  </div>
+                  <div class="badge-preset-row">
+                    <button
+                      v-for="bp in PRODUCT_BADGE_PRESETS"
+                      :key="bp.key"
+                      type="button"
+                      class="badge-preset-btn"
+                      :class="[
+                        `is-group-${bp.group}`,
+                        `is-shape-${bp.shape}`,
+                        { active: form.Badge === bp.value },
+                      ]"
+                      @click="form.Badge = form.Badge === bp.value ? '' : bp.value"
+                    >
+                      <span class="adm-prod-badge-inner">
+                        <i :class="bp.icon"></i>
+                        <span>{{ bp.value }}</span>
+                      </span>
+                    </button>
+                  </div>
+                  <div class="badge-i18n-hint">
+                    Các nhãn mẫu ở trên tự động dịch sang đủ 5 ngôn ngữ khi khách xem Menu; chữ tự gõ sẽ giữ nguyên.
+                  </div>
+                </div>
               </div>
             </div>
 <div class="panel">
@@ -511,9 +567,24 @@
                   </td>
 
                   <td>
-                    <span class="tag" :class="h.Trang_thai === 'Còn hàng' ? 'ok' : 'bad'">
-                      {{ h.Trang_thai }}
-                    </span>
+                    <div class="pending-status-stack">
+                      <span class="tag" :class="h.Trang_thai === 'Còn hàng' ? 'ok' : 'bad'">
+                        {{ h.Trang_thai }}
+                      </span>
+                      <span
+                        v-if="resolveProductBadge(h.Badge)"
+                        class="adm-prod-badge is-mini"
+                        :class="[
+                          `is-group-${resolveProductBadge(h.Badge).group}`,
+                          `is-shape-${resolveProductBadge(h.Badge).shape}`,
+                        ]"
+                      >
+                        <span class="adm-prod-badge-inner">
+                          <i :class="resolveProductBadge(h.Badge).icon"></i>
+                          <span>{{ resolveProductBadge(h.Badge).label }}</span>
+                        </span>
+                      </span>
+                    </div>
                   </td>
 
                   <td>
@@ -930,6 +1001,59 @@
             </div>
 
             <div class="field span-12">
+              <label class="badge-field-label-row">
+                <span>Nhãn nổi bật (Badge)</span>
+                <span
+                  v-if="resolveProductBadge(editForm.Badge)"
+                  class="adm-prod-badge"
+                  :class="[
+                    `is-group-${resolveProductBadge(editForm.Badge).group}`,
+                    `is-shape-${resolveProductBadge(editForm.Badge).shape}`,
+                  ]"
+                >
+                  <span class="adm-prod-badge-inner">
+                    <i :class="resolveProductBadge(editForm.Badge).icon"></i>
+                    <span>{{ resolveProductBadge(editForm.Badge).label }}</span>
+                  </span>
+                </span>
+              </label>
+              <div class="badge-input-line">
+                <input
+                  v-model="editForm.Badge"
+                  placeholder="Chọn chip mẫu hoặc tự gõ nhãn..."
+                  maxlength="24"
+                />
+                <button
+                  v-if="editForm.Badge"
+                  type="button"
+                  class="btn-clear-badge"
+                  @click="editForm.Badge = ''"
+                >
+                  Gỡ
+                </button>
+              </div>
+              <div class="badge-preset-row">
+                <button
+                  v-for="bp in PRODUCT_BADGE_PRESETS"
+                  :key="'ed-' + bp.key"
+                  type="button"
+                  class="badge-preset-btn"
+                  :class="[
+                    `is-group-${bp.group}`,
+                    `is-shape-${bp.shape}`,
+                    { active: editForm.Badge === bp.value },
+                  ]"
+                  @click="editForm.Badge = editForm.Badge === bp.value ? '' : bp.value"
+                >
+                  <span class="adm-prod-badge-inner">
+                    <i :class="bp.icon"></i>
+                    <span>{{ bp.value }}</span>
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div class="field span-12">
               <label>Mô tả ({{ getLangShort(activeEditLang) }})</label>
               <textarea
                 v-model="editForm.i18n[activeEditLang].Mo_ta"
@@ -1076,6 +1200,7 @@ import {
   getProductTranslatedLangs,
   productMatchesKeyword,
 } from '@/utils/i18nData'
+import { PRODUCT_BADGE_PRESETS, resolveProductBadge } from '@/utils/productBadge'
 
 const XLSX = XLSXRaw?.utils ? XLSXRaw : XLSXRaw?.default || XLSXRaw
 
@@ -1186,6 +1311,7 @@ const emptyForm = () => ({
   Ncc_loai_giam: 'percent',
   Ncc_gia_tri_giam: 0,
   Trang_thai: 'Còn hàng',
+  Badge: '',
   Don_vi_tien_te: 'P',
   img_1: '',
   img_2: '',
@@ -1239,6 +1365,7 @@ function selectProduct(p) {
     Ncc_loai_giam: normalizeNccDiscountType(p.Ncc_loai_giam),
     Ncc_gia_tri_giam: normalizeNccDiscountValue(p.Ncc_gia_tri_giam),
     Trang_thai: p.Trang_thai || 'Còn hàng',
+    Badge: p.Badge || '',
     Don_vi_tien_te: p.Don_vi_tien_te || 'P',
     img_1: p.img_1 || '',
     img_2: p.img_2 || '',
@@ -1582,6 +1709,7 @@ function buildPayload() {
       Ncc_loai_giam: normalizeNccDiscountType(i.Ncc_loai_giam),
       Ncc_gia_tri_giam: normalizeNccDiscountValue(i.Ncc_gia_tri_giam),
       Trang_thai: i.Trang_thai || 'Còn hàng',
+      Badge: String(i.Badge || '').trim(),
       Don_vi_tien_te: i.Don_vi_tien_te || 'P',
       img_1: i.img_1 || '',
       img_2: i.img_2 || '',
@@ -1886,6 +2014,7 @@ function openEdit(index) {
   activeEditLang.value = 'vi'
   editForm.value = {
     ...target,
+    Badge: target.Badge || '',
     Ncc_loai_giam: normalizeNccDiscountType(target.Ncc_loai_giam),
     Ncc_gia_tri_giam: normalizeNccDiscountValue(target.Ncc_gia_tri_giam),
     i18n: JSON.parse(JSON.stringify(i18n)),
@@ -3609,5 +3738,144 @@ h2 {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* ===== PRODUCT BADGE PICKER & SHAPED PREVIEW ===== */
+.badge-field-label-row {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.badge-input-line {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.badge-input-line input {
+  flex: 1;
+}
+
+.btn-clear-badge {
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-clear-badge:hover {
+  background: rgba(239, 68, 68, 0.28);
+  color: #ffffff;
+}
+
+.badge-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.badge-i18n-hint {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+
+.pending-status-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.adm-prod-badge,
+.badge-preset-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 800;
+  line-height: 1.2;
+  border: none;
+}
+
+.adm-prod-badge.is-mini {
+  font-size: 10px;
+  padding: 2.5px 8px;
+}
+
+.badge-preset-btn {
+  cursor: pointer;
+  opacity: 0.72;
+  transition: transform 0.16s ease, opacity 0.16s ease, box-shadow 0.16s ease;
+}
+
+.badge-preset-btn:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+}
+
+.badge-preset-btn.active {
+  opacity: 1;
+  box-shadow: 0 0 0 2px #ffffff, 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.adm-prod-badge-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.is-group-fire {
+  background: linear-gradient(135deg, #ff6a00 0%, #dc2626 100%);
+}
+.is-group-new {
+  background: linear-gradient(135deg, #10b981 0%, #0d9488 100%);
+}
+.is-group-crown {
+  background: linear-gradient(135deg, #b45309 0%, #f59e0b 52%, #d97706 100%);
+}
+.is-group-spicy {
+  background: linear-gradient(135deg, #ef4444 0%, #991b1b 100%);
+}
+.is-group-custom {
+  background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+}
+
+.is-shape-flame {
+  border-radius: 10px 3px 10px 3px;
+  transform: skewX(-9deg);
+}
+.is-shape-flame .adm-prod-badge-inner {
+  transform: skewX(9deg);
+}
+.is-shape-leaf {
+  border-radius: 3px 14px 3px 14px;
+}
+.is-shape-crest {
+  padding-left: 12px;
+  padding-right: 12px;
+  clip-path: polygon(7px 0%, calc(100% - 7px) 0%, 100% 50%, calc(100% - 7px) 100%, 7px 100%, 0% 50%);
+}
+.is-shape-pennant {
+  padding-left: 13px;
+  border-radius: 0 7px 7px 0;
+  clip-path: polygon(8px 0%, 100% 0%, 100% 100%, 8px 100%, 0% 50%);
+}
+.is-shape-ticket {
+  padding-left: 11px;
+  padding-right: 11px;
+  border-radius: 5px;
+  clip-path: polygon(0% 0%, 100% 0%, 100% calc(50% - 3px), calc(100% - 3.5px) 50%, 100% calc(50% + 3px), 100% 100%, 0% 100%, 0% calc(50% + 3px), 3.5px 50%, 0% calc(50% - 3px));
 }
 </style>

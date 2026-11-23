@@ -33,7 +33,8 @@
     "officialChannels": "Thông tin liên hệ",
     "collapseDock": "Thu gọn",
     "expandDock": "Mở thông tin liên hệ",
-    "allowMessageBadge": "Nhắn tin"
+    "allowMessageBadge": "Nhắn tin",
+    "ecosystem": "Hệ sinh thái & Đối tác"
   },
   "search": {
     "placeholder": "Tìm món (không dấu, tên, giá)...",

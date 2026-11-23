@@ -27,17 +27,53 @@
     <SeasonalOverlay :effect="activeStorefrontTheme.seasonalEffect" />
     <!-- ========== DESKTOP TOP HEADER (1A) ========== -->
     <header v-if="!isMobile" class="desktop-top-header">
-      <div class="dth-inner" :class="{ 'has-header-scam': showHeaderScam }">
-        <!-- BRAND LEFT -->
-        <div class="dth-brand" @click="onAllFilter" role="button" tabindex="0">
-          <img v-if="logo?.URL" :src="logo.URL" class="dth-logo" alt="" />
-          <div class="dth-brand-meta">
-            <div class="dth-name">{{ logo?.Name || 'SA KITCHEN' }}</div>
-            <div v-if="shopTime" class="dth-time">
-              <span class="dot-online"></span>
-              <span>{{ shopTime }}</span>
+      <div
+        class="dth-inner"
+        :class="{
+          'has-header-scam': showHeaderScam,
+          'has-header-partner': showHeaderScam && activePartnerList.length > 0,
+        }"
+      >
+        <!-- LEFT ZONE: BRAND + BLOG + (WHEN PARTNERS EXIST) 3 CHECK SCAM BUTTONS LEFT OF SEARCH -->
+        <div class="dth-left-zone">
+          <div class="dth-brand-cluster">
+            <div class="dth-brand" @click="onAllFilter" role="button" tabindex="0">
+              <img v-if="logo?.URL" :src="logo.URL" class="dth-logo" alt="" />
+              <div class="dth-brand-meta">
+                <div class="dth-name">{{ logo?.Name || 'SA KITCHEN' }}</div>
+                <div v-if="shopTime" class="dth-time">
+                  <span class="dot-online"></span>
+                  <span>{{ shopTime }}</span>
+                </div>
+              </div>
             </div>
+
+            <RouterLink to="/blog" class="dth-ctrl-btn dth-blog-link" title="Blog & Cẩm nang ẩm thực">
+              <i class="ri-article-line"></i>
+              <span>Blog</span>
+            </RouterLink>
           </div>
+
+          <nav
+            v-if="showHeaderScam && activePartnerList.length"
+            class="dth-scam-bar is-left"
+            aria-label="Check Scam & Trusted Shops"
+          >
+            <a
+              v-for="item in CHECK_SCAM_LINKS"
+              :key="'hdr-left-' + item.key"
+              :href="item.url"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="dth-scam-btn"
+              :class="item.variant"
+              :title="`${item.title} — ${item.sub}`"
+              :aria-label="item.title"
+            >
+              <i :class="item.icon" class="dth-scam-ico"></i>
+              <span class="dth-scam-label">{{ item.headerLabel }}</span>
+            </a>
+          </nav>
         </div>
 
         <!-- INTEGRATED SEARCH CENTER -->
@@ -94,10 +130,33 @@
           </div>
         </div>
 
-        <!-- RIGHT ZONE: COMPACT CHECK SCAM ON SCROLL + ACTIONS -->
+        <!-- RIGHT ZONE: PARTNER BUTTONS (OR CHECK SCAM IF NO PARTNERS) + ACTIONS -->
         <div class="dth-right-zone">
           <nav
-            v-if="showHeaderScam"
+            v-if="showHeaderScam && activePartnerList.length"
+            class="dth-partner-bar"
+            aria-label="Hệ sinh thái & Đối tác"
+          >
+            <a
+              v-for="(p, pIdx) in activePartnerList"
+              :key="'hdr-pt-' + p.ID"
+              :href="p.normalizedUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="dth-partner-btn"
+              :style="getPartnerCardStyle(p.Bg_color, pIdx)"
+              :title="p.Subtitle ? `${p.Name} — ${p.Subtitle}` : p.Name"
+            >
+              <span class="dth-pt-avatar">
+                <img v-if="p.URL_img" :src="p.URL_img" :alt="p.Name" loading="lazy" />
+                <i v-else class="ri-store-3-fill"></i>
+              </span>
+              <span class="dth-pt-name">{{ p.Name }}</span>
+            </a>
+          </nav>
+
+          <nav
+            v-else-if="showHeaderScam"
             class="dth-scam-bar"
             aria-label="Check Scam & Trusted Shops"
           >
@@ -117,64 +176,8 @@
             </a>
           </nav>
 
-          <!-- RIGHT CONTROLS: BLOG + CONTACT + THEME + LANG + CART PILL -->
+          <!-- RIGHT CONTROLS: THEME + LANG + CART PILL -->
           <div class="dth-actions">
-          <RouterLink to="/blog" class="dth-ctrl-btn dth-blog-link" title="Blog & Cẩm nang ẩm thực">
-            <i class="ri-article-line"></i>
-            <span>Blog</span>
-          </RouterLink>
-          <div
-            class="dth-contact-wrap"
-            ref="contactPopoverRef"
-          >
-            <button
-              type="button"
-              class="dth-ctrl-btn"
-              :class="{ active: showContactPopover }"
-              @click.stop="showContactPopover = !showContactPopover"
-            >
-              <i class="ri-customer-service-2-line"></i>
-              <span>{{ $t('mobile.contact') }}</span>
-              <i class="ri-arrow-down-s-line dth-caret"></i>
-            </button>
-
-            <div v-if="showContactPopover" class="dth-contact-popover" @click.stop>
-              <div class="dcp-header">
-                <i class="ri-customer-service-2-fill"></i>
-                <span>{{ $t('contact.sendOrder') }}</span>
-              </div>
-              <div class="dcp-list">
-                <component
-                  :is="c.Direct_link ? 'a' : 'div'"
-                  v-for="c in shopContactList"
-                  :key="c.ID"
-                  :href="c.Direct_link || undefined"
-                  :target="c.Direct_link ? '_blank' : undefined"
-                  :rel="c.Direct_link ? 'noopener' : undefined"
-                  class="dcp-item"
-                  :class="{
-                    'is-msg-allowed': isContactMessageAllowed(c),
-                    'is-static': !c.Direct_link
-                  }"
-                  @click="c.Direct_link ? (showContactPopover = false) : null"
-                >
-                  <img :src="c.URL_img" class="dcp-avatar" alt="" />
-                  <div class="dcp-info">
-                    <div class="dcp-name-row">
-                      <span class="dcp-name">{{ c.PLATFORM_name }}</span>
-                      <span v-if="isContactMessageAllowed(c)" class="contact-msg-badge">
-                        <i class="ri-message-3-fill"></i>
-                        <span>{{ $t('contact.allowMessageBadge') }}</span>
-                      </span>
-                    </div>
-                    <div class="dcp-desc">{{ c.INFO }}</div>
-                  </div>
-                  <i v-if="c.Direct_link" class="ri-external-link-line dcp-ext"></i>
-                </component>
-              </div>
-            </div>
-          </div>
-
           <button
             type="button"
             class="dth-ctrl-btn icon-only theme-toggle-btn"
@@ -196,13 +199,18 @@
           <button
             type="button"
             class="dth-cart-pill"
-            :class="{ active: showCart, bump: bumpCart }"
+            :class="{ active: showCart, bump: bumpCart, 'has-items': cartQtyTotal > 0 }"
+            :title="
+              cartQtyTotal > 0
+                ? `${$t('mobile.cart')} (${cartQtyTotal}) — ${formatPrice(customerPayableTotal, cartCurrency)}`
+                : $t('mobile.cart')
+            "
+            :aria-label="$t('mobile.cart')"
             @click="showCart = !showCart"
           >
             <i class="ri-shopping-basket-2-fill"></i>
-            <span class="dcp-badge">{{ cartQtyTotal }}</span>
-            <span class="dcp-amount">
-              {{ cartQtyTotal > 0 ? formatPrice(customerPayableTotal, cartCurrency) : $t('mobile.cart') }}
+            <span v-if="cartQtyTotal > 0" class="dcp-badge">
+              {{ cartQtyTotal > 99 ? '99+' : cartQtyTotal }}
             </span>
           </button>
           </div>
@@ -313,10 +321,17 @@
         }"
         ref="mainRef"
       >
-        <div v-if="isMobile && logo" class="mobile-header-clean" :class="{ 'has-scam': showHeaderScam }">
-          <img :src="logo.URL" class="mh-logo" alt="" />
+        <div
+          v-if="isMobile && logo"
+          class="mobile-header-clean"
+          :class="{
+            'has-scam': showHeaderScam,
+            'has-partner': showHeaderScam && activePartnerList.length > 0,
+          }"
+        >
+          <img :src="logo.URL" class="mh-logo" alt="" @click="onAllFilter" />
 
-          <div class="mh-name">
+          <div class="mh-name" @click="onAllFilter">
             {{ logo.Name }}
           </div>
 
@@ -328,6 +343,7 @@
             {{ shopTime }}
           </div>
 
+          <!-- KIỂU B: KHI LƯỚT XUỐNG -> 3 NÚT CHECK TRƯỚC, DẢI CARD ĐỐI TÁC BÊN PHẢI -->
           <nav
             v-if="showHeaderScam"
             class="mh-scam-bar"
@@ -346,6 +362,30 @@
             >
               <i :class="item.icon" class="dth-scam-ico mh-scam-ico"></i>
               <span class="dth-scam-label mh-scam-label">{{ item.headerLabel }}</span>
+            </a>
+          </nav>
+
+          <nav
+            v-if="showHeaderScam && activePartnerList.length"
+            class="mh-partner-strip"
+            aria-label="Hệ sinh thái & Đối tác"
+          >
+            <a
+              v-for="(p, pIdx) in activePartnerList"
+              :key="'mh-pt-' + p.ID"
+              :href="p.normalizedUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="mh-partner-btn"
+              :style="getPartnerCardStyle(p.Bg_color, pIdx)"
+              :title="p.Name"
+              @click="triggerTelegramHaptic('light')"
+            >
+              <span class="mh-pt-avatar">
+                <img v-if="p.URL_img" :src="p.URL_img" :alt="p.Name" loading="lazy" />
+                <i v-else class="ri-store-3-fill"></i>
+              </span>
+              <span class="mh-pt-name">{{ p.Name }}</span>
             </a>
           </nav>
 
@@ -510,8 +550,53 @@
         </div>
       </div>
 
-      <!-- STANDALONE CHECK SCAM HUB (3 LARGER SEPARATE BUTTONS) -->
-      <section ref="scamHubRef" class="scam-hub-section" aria-label="Check Scam & Trusted Shops">
+      <!-- CENTERED PARTNER CARDS (ON TOP) + 3 CLEAN CHECK SCAM CARDS (BELOW) -->
+      <section
+        ref="scamHubRef"
+        class="scam-hub-section"
+        aria-label="Partners & Check Scam Hub"
+      >
+        <div
+          v-if="activePartnerList.length"
+          class="partner-hub-bar"
+          :class="{
+            'is-count-1': activePartnerList.length === 1,
+            'is-count-2': activePartnerList.length === 2,
+            'is-compact-mobile': activePartnerList.length >= 3 && activePartnerList.length <= 4,
+            'is-scrollable': activePartnerList.length > 4,
+          }"
+          :style="{ '--partner-cols': Math.min(Math.max(activePartnerList.length, 1), 4) }"
+          aria-label="Hệ sinh thái & Đối tác"
+        >
+          <a
+            v-for="(p, pIdx) in activePartnerList"
+            :key="'pt-' + p.ID"
+            :href="p.normalizedUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="partner-mini-card"
+            :style="getPartnerCardStyle(p.Bg_color, pIdx)"
+            :title="p.Subtitle ? `${p.Name} — ${p.Subtitle}` : p.Name"
+            @click="triggerTelegramHaptic('light')"
+          >
+            <span v-if="p.Badge" class="pmc-corner-badge">{{ p.Badge }}</span>
+            <span class="pmc-avatar">
+              <img v-if="p.URL_img" :src="p.URL_img" :alt="p.Name" class="pmc-img" loading="lazy" />
+              <i v-else class="ri-store-3-fill pmc-fallback-ico"></i>
+            </span>
+            <span class="pmc-body">
+              <span class="pmc-title-row">
+                <span class="pmc-title">{{ p.Name }}</span>
+                <span v-if="p.Badge" class="pmc-inline-badge">{{ p.Badge }}</span>
+              </span>
+              <span v-if="p.Subtitle" class="pmc-sub">{{ p.Subtitle }}</span>
+            </span>
+            <span class="pmc-ext-box">
+              <i class="ri-arrow-right-up-line pmc-ext"></i>
+            </span>
+          </a>
+        </div>
+
         <div class="scam-hub-grid">
           <a
             v-for="item in CHECK_SCAM_LINKS"
@@ -521,6 +606,7 @@
             rel="noopener noreferrer"
             class="scam-hub-btn"
             :class="item.variant"
+            :title="`${item.title} — ${item.sub}`"
           >
             <span class="scam-hub-icon">
               <i :class="item.icon"></i>
@@ -977,15 +1063,27 @@
                   <span>-{{ discountPercent(entry.item) }}%</span>
                 </div>
 
-                <!-- TAG TRẠNG THÁI TRÊN ẢNH -->
+                <!-- TAG HẾT HÀNG HOẶC BADGE NỔI BẬT TRÊN GÓC PHẢI ẢNH -->
                 <div
-                  class="status-tag card-status-pill"
-                  :class="{
-                    available: entry.item.Trang_thai === 'Còn hàng',
-                    out: entry.item.Trang_thai === 'Hết hàng'
-                  }"
+                  v-if="entry.item.Trang_thai === 'Hết hàng'"
+                  class="status-tag card-status-pill out"
                 >
                   {{ $t(getStatusKey(entry.item.Trang_thai)) }}
+                </div>
+                <div
+                  v-else-if="getItemBadge(entry.item)"
+                  class="card-badge-wrap"
+                  :class="[
+                    `is-group-${getItemBadge(entry.item).group}`,
+                    `is-shape-${getItemBadge(entry.item).shape}`,
+                  ]"
+                >
+                  <span class="card-badge-shape">
+                    <span class="card-badge-inner">
+                      <i :class="getItemBadge(entry.item).icon" class="card-badge-ico"></i>
+                      <span class="card-badge-txt">{{ getItemBadge(entry.item).label }}</span>
+                    </span>
+                  </span>
                 </div>
 
                 <!-- DẢI NHÃN SỐ LƯỢNG ĐANG CÓ TRONG GIỎ Ở ĐÁY ẢNH -->
@@ -1187,6 +1285,19 @@
                   {{ $t('status.out_stock') }}
                 </span>
                 <span
+                  v-else-if="getItemBadge(item)"
+                  class="mb-item-badge"
+                  :class="[
+                    `is-group-${getItemBadge(item).group}`,
+                    `is-shape-${getItemBadge(item).shape}`,
+                  ]"
+                >
+                  <span class="mb-item-badge-inner">
+                    <i :class="getItemBadge(item).icon"></i>
+                    <span>{{ getItemBadge(item).label }}</span>
+                  </span>
+                </span>
+                <span
                   v-if="cartQtyByCode[item.Ma_hang]"
                   class="mb-incart-pill"
                   :class="{ 'is-pop': addedMap[item.Ma_hang] }"
@@ -1368,6 +1479,39 @@
                 >
                   <span>{{ $t('footer.viewMap') }}</span>
                   <i class="ri-arrow-right-up-line"></i>
+                </a>
+              </div>
+            </div>
+
+            <!-- ECOSYSTEM / PARTNER CARDS IN FOOTER COL 1 -->
+            <div v-if="activePartnerList.length" class="pwf-partner-box">
+              <strong class="pwf-partner-heading">
+                <i class="ri-links-fill"></i>
+                <span>{{ $t('contact.ecosystem') }}</span>
+              </strong>
+              <div class="pwf-partner-list">
+                <a
+                  v-for="(p, pIdx) in activePartnerList"
+                  :key="'pwf-pt-' + p.ID"
+                  :href="p.normalizedUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="pwf-partner-card"
+                  :style="getPartnerCardStyle(p.Bg_color, pIdx)"
+                  :title="p.Subtitle ? `${p.Name} — ${p.Subtitle}` : p.Name"
+                >
+                  <span class="pwf-pt-avatar">
+                    <img v-if="p.URL_img" :src="p.URL_img" :alt="p.Name" loading="lazy" />
+                    <i v-else class="ri-store-3-fill"></i>
+                  </span>
+                  <span class="pwf-pt-info">
+                    <span class="pwf-pt-name-row">
+                      <span class="pwf-pt-name">{{ p.Name }}</span>
+                      <span v-if="p.Badge" class="pwf-pt-badge">{{ p.Badge }}</span>
+                    </span>
+                    <span v-if="p.Subtitle" class="pwf-pt-sub">{{ p.Subtitle }}</span>
+                  </span>
+                  <i class="ri-arrow-right-up-line pwf-pt-ext"></i>
                 </a>
               </div>
             </div>
@@ -1583,6 +1727,21 @@
           <template v-if="selectedItem.Trang_thai === 'Hết hàng'">
             <span v-if="selectedItem.Danh_muc_cha || selectedItem.Danh_muc || selectedItem.Size" class="dp-meta-sep">·</span>
             <span class="dp-out-text">{{ $t(getStatusKey(selectedItem.Trang_thai)) }}</span>
+          </template>
+          <template v-else-if="getItemBadge(selectedItem)">
+            <span v-if="selectedItem.Danh_muc_cha || selectedItem.Danh_muc || selectedItem.Size" class="dp-meta-sep">·</span>
+            <span
+              class="mb-item-badge is-detail-badge"
+              :class="[
+                `is-group-${getItemBadge(selectedItem).group}`,
+                `is-shape-${getItemBadge(selectedItem).shape}`,
+              ]"
+            >
+              <span class="mb-item-badge-inner">
+                <i :class="getItemBadge(selectedItem).icon"></i>
+                <span>{{ getItemBadge(selectedItem).label }}</span>
+              </span>
+            </span>
           </template>
         </div>
 
@@ -2296,6 +2455,60 @@
     <i class="ri-arrow-up-line"></i>
   </button>
 
+  <!-- ===== FLOATING RIGHT MINI CART CARD WHEN SIDEBAR CLOSED (PA1 - DESKTOP) ===== -->
+  <transition name="right-cart-dock">
+    <button
+      v-if="!isMobile && !loadingMain && !showCart"
+      type="button"
+      class="pc-right-cart-dock"
+      :class="{
+        bump: bumpCart,
+        'has-items': cartQtyTotal > 0,
+        'has-live-order': Boolean(liveStatus && liveStatus !== 'Nháp'),
+      }"
+      :title="`${$t('mobile.cart')} — ${$t('cart.expandShort')}`"
+      @click="showCart = true"
+      @wheel="forwardWheelToMain"
+    >
+      <span class="prcd-icon-wrap">
+        <i
+          :class="
+            liveStatus && liveStatus !== 'Nháp'
+              ? orderStatusInfo.icon
+              : 'ri-shopping-basket-2-fill'
+          "
+        ></i>
+        <span v-if="cartQtyTotal > 0" class="prcd-badge">
+          {{ cartQtyTotal > 99 ? '99+' : cartQtyTotal }}
+        </span>
+      </span>
+
+      <span class="prcd-body">
+        <template v-if="liveStatus && liveStatus !== 'Nháp'">
+          <span class="prcd-status-tag" :class="orderStatusInfo.stateClass">
+            {{ orderStatusInfo.text }}
+          </span>
+          <span v-if="cartQtyTotal > 0" class="prcd-total">
+            {{ formatPrice(customerPayableTotal, cartCurrency) }}
+          </span>
+        </template>
+        <template v-else-if="cartQtyTotal > 0">
+          <span class="prcd-count-line">{{ cartQtyTotal }} {{ $t('menu.itemsUnit') }}</span>
+          <span class="prcd-total">{{ formatPrice(customerPayableTotal, cartCurrency) }}</span>
+        </template>
+        <template v-else>
+          <span class="prcd-empty-title">{{ $t('mobile.cart') }}</span>
+          <span class="prcd-count-line">0 {{ $t('menu.itemsUnit') }}</span>
+        </template>
+      </span>
+
+      <span class="prcd-open-cta">
+        <i class="ri-arrow-left-s-line"></i>
+        <span>{{ $t('cart.expandShort') }}</span>
+      </span>
+    </button>
+  </transition>
+
   <!-- ===== FLOATING LEFT TRUST & CONTACT DOCK (PA1 - DESKTOP) ===== -->
   <aside
     v-if="!isMobile && !loadingMain"
@@ -2312,69 +2525,103 @@
       <i :class="leftDockCollapsed ? 'ri-arrow-right-s-line' : 'ri-arrow-left-s-line'"></i>
     </button>
 
-    <div class="ltd-scam-group">
-      <a
-        v-for="item in CHECK_SCAM_LINKS"
-        :key="'ltd-scam-' + item.key"
-        :href="item.url"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="ltd-scam-btn"
-        :class="item.variant"
-        :title="`${item.title} - ${item.sub}`"
-      >
-        <span class="ltd-scam-icon">
-          <i :class="item.icon"></i>
-        </span>
-        <span v-if="!leftDockCollapsed" class="ltd-scam-text">
-          <span class="ltd-scam-title">{{ item.title }}</span>
-          <span class="ltd-scam-sub">{{ item.sub }}</span>
-        </span>
-        <span v-else class="ltd-scam-mini">{{ item.short }}</span>
-        <i v-if="!leftDockCollapsed" class="ri-external-link-line ltd-scam-ext"></i>
-      </a>
-    </div>
+    <div class="ltd-scroll-body">
+      <div v-if="activePartnerList.length" class="ltd-partner-section">
+        <div v-if="!leftDockCollapsed" class="ltd-section-title">
+          <i class="ri-links-fill"></i>
+          <span>{{ $t('contact.ecosystem') }}</span>
+        </div>
 
-    <div v-if="shopContactList.length" class="ltd-contact-section">
-      <div v-if="!leftDockCollapsed" class="ltd-section-title">
-        <i class="ri-customer-service-2-fill"></i>
-        <span>{{ $t('contact.officialChannels') }}</span>
-      </div>
-      <div v-else class="ltd-divider"></div>
-
-      <div class="ltd-contact-list">
-        <component
-          :is="c.Direct_link ? 'a' : 'div'"
-          v-for="c in shopContactList"
-          :key="'ltd-' + c.ID"
-          :href="c.Direct_link || undefined"
-          :target="c.Direct_link ? '_blank' : undefined"
-          :rel="c.Direct_link ? 'noopener noreferrer' : undefined"
-          class="ltd-contact-card"
-          :class="{
-            'is-msg-allowed': isContactMessageAllowed(c),
-            'is-static': !c.Direct_link
-          }"
-          :title="`${c.PLATFORM_name}: ${c.INFO}`"
-        >
-          <div class="ltd-contact-avatar-wrap">
-            <img :src="c.URL_img" class="ltd-contact-img" :alt="c.PLATFORM_name" />
-            <span
-              v-if="leftDockCollapsed && isContactMessageAllowed(c)"
-              class="ltd-msg-dot"
-            ></span>
-          </div>
-          <div v-if="!leftDockCollapsed" class="ltd-contact-meta">
-            <div class="ltd-contact-name-row">
-              <div class="ltd-contact-name">{{ c.PLATFORM_name }}</div>
-              <span v-if="isContactMessageAllowed(c)" class="contact-msg-badge is-compact">
-                <i class="ri-message-3-fill"></i>
-                <span>{{ $t('contact.allowMessageBadge') }}</span>
+        <div class="ltd-partner-list">
+          <a
+            v-for="(p, pIdx) in activePartnerList"
+            :key="'ltd-pt-' + p.ID"
+            :href="p.normalizedUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="ltd-partner-card"
+            :style="getPartnerCardStyle(p.Bg_color, pIdx)"
+            :title="p.Subtitle ? `${p.Name}: ${p.Subtitle}` : p.Name"
+          >
+            <div class="ltd-partner-avatar-wrap">
+              <img v-if="p.URL_img" :src="p.URL_img" class="ltd-partner-img" :alt="p.Name" loading="lazy" />
+              <span v-else class="ltd-partner-fallback">
+                <i class="ri-store-3-fill"></i>
               </span>
             </div>
-            <div class="ltd-contact-info">{{ c.INFO }}</div>
-          </div>
-        </component>
+            <div v-if="!leftDockCollapsed" class="ltd-partner-meta">
+              <div class="ltd-partner-name">{{ p.Name }}</div>
+              <div v-if="p.Subtitle" class="ltd-partner-sub">{{ p.Subtitle }}</div>
+            </div>
+            <i v-if="!leftDockCollapsed" class="ri-arrow-right-up-line ltd-partner-ext"></i>
+          </a>
+        </div>
+      </div>
+
+      <div class="ltd-scam-group">
+        <a
+          v-for="item in CHECK_SCAM_LINKS"
+          :key="'ltd-scam-' + item.key"
+          :href="item.url"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="ltd-scam-btn"
+          :class="item.variant"
+          :title="`${item.title} - ${item.sub}`"
+        >
+          <span class="ltd-scam-icon">
+            <i :class="item.icon"></i>
+          </span>
+          <span v-if="!leftDockCollapsed" class="ltd-scam-text">
+            <span class="ltd-scam-title">{{ item.title }}</span>
+            <span class="ltd-scam-sub">{{ item.sub }}</span>
+          </span>
+          <span v-else class="ltd-scam-mini">{{ item.short }}</span>
+          <i v-if="!leftDockCollapsed" class="ri-external-link-line ltd-scam-ext"></i>
+        </a>
+      </div>
+
+      <div v-if="shopContactList.length" class="ltd-contact-section">
+        <div v-if="!leftDockCollapsed" class="ltd-section-title">
+          <i class="ri-customer-service-2-fill"></i>
+          <span>{{ $t('contact.officialChannels') }}</span>
+        </div>
+        <div v-else class="ltd-divider"></div>
+
+        <div class="ltd-contact-list">
+          <component
+            :is="c.Direct_link ? 'a' : 'div'"
+            v-for="c in shopContactList"
+            :key="'ltd-' + c.ID"
+            :href="c.Direct_link || undefined"
+            :target="c.Direct_link ? '_blank' : undefined"
+            :rel="c.Direct_link ? 'noopener noreferrer' : undefined"
+            class="ltd-contact-card"
+            :class="{
+              'is-msg-allowed': isContactMessageAllowed(c),
+              'is-static': !c.Direct_link
+            }"
+            :title="`${c.PLATFORM_name}: ${c.INFO}`"
+          >
+            <div class="ltd-contact-avatar-wrap">
+              <img :src="c.URL_img" class="ltd-contact-img" :alt="c.PLATFORM_name" />
+              <span
+                v-if="leftDockCollapsed && isContactMessageAllowed(c)"
+                class="ltd-msg-dot"
+              ></span>
+            </div>
+            <div v-if="!leftDockCollapsed" class="ltd-contact-meta">
+              <div class="ltd-contact-name-row">
+                <div class="ltd-contact-name">{{ c.PLATFORM_name }}</div>
+                <span v-if="isContactMessageAllowed(c)" class="contact-msg-badge is-compact">
+                  <i class="ri-message-3-fill"></i>
+                  <span>{{ $t('contact.allowMessageBadge') }}</span>
+                </span>
+              </div>
+              <div class="ltd-contact-info">{{ c.INFO }}</div>
+            </div>
+          </component>
+        </div>
       </div>
     </div>
   </aside>
@@ -2610,6 +2857,21 @@
               <template v-if="selectedItem.Trang_thai === 'Hết hàng'">
                 <span v-if="selectedItem.Danh_muc_cha || selectedItem.Danh_muc || selectedItem.Size" class="dp-meta-sep">·</span>
                 <span class="dp-out-text">{{ $t(getStatusKey(selectedItem.Trang_thai)) }}</span>
+              </template>
+              <template v-else-if="getItemBadge(selectedItem)">
+                <span v-if="selectedItem.Danh_muc_cha || selectedItem.Danh_muc || selectedItem.Size" class="dp-meta-sep">·</span>
+                <span
+                  class="mb-item-badge is-detail-badge"
+                  :class="[
+                    `is-group-${getItemBadge(selectedItem).group}`,
+                    `is-shape-${getItemBadge(selectedItem).shape}`,
+                  ]"
+                >
+                  <span class="mb-item-badge-inner">
+                    <i :class="getItemBadge(selectedItem).icon"></i>
+                    <span>{{ getItemBadge(selectedItem).label }}</span>
+                  </span>
+                </span>
               </template>
             </div>
 
@@ -3070,6 +3332,29 @@
     <button class="modal-close" @click="showContactModal = false">✕</button>
 
     <h3 class="export-title">{{ $t('contact.supportInfo') }}</h3>
+
+    <div v-if="activePartnerList.length" class="mobile-partner-sheet-group">
+      <a
+        v-for="(p, pIdx) in activePartnerList"
+        :key="'mob-sheet-pt-' + p.ID"
+        :href="p.normalizedUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="mobile-sheet-partner-card"
+        :style="getPartnerCardStyle(p.Bg_color, pIdx)"
+        @click="showContactModal = false"
+      >
+        <span class="mspc-avatar">
+          <img v-if="p.URL_img" :src="p.URL_img" :alt="p.Name" loading="lazy" />
+          <i v-else class="ri-store-3-fill"></i>
+        </span>
+        <span class="mspc-meta">
+          <span class="mspc-name">{{ p.Name }}</span>
+          <span v-if="p.Subtitle" class="mspc-sub">{{ p.Subtitle }}</span>
+        </span>
+        <i class="ri-arrow-right-up-line mspc-ext"></i>
+      </a>
+    </div>
 
     <div class="mobile-checkscam-group">
       <a
@@ -5820,6 +6105,8 @@ import {
   DISPLAY_MODE_BY_CATEGORY,
 } from '@/utils/displayOrder'
 import { bindOrderBellUnlock, playOrderBell } from '@/utils/orderBell'
+import { resolveProductBadge } from '@/utils/productBadge'
+import { getPartnerCardStyle } from '@/utils/partnerColor'
 import {
   BANNER_CLICK_ACTIONS,
   normalizeBannerAction,
@@ -5950,6 +6237,7 @@ const langLoading = ref(false)
 
 const closingModal = ref(false)
 const shopContacts = ref([])
+const partners = ref([])
 const cartListRef = ref(null)
 let bannerTimer = null
 const BANNER_INTERVAL = 4500
@@ -6161,6 +6449,7 @@ let unsubLiveOrder = null
 let unsubHangHoaLive = null
 let unsubKhuyenMaiLive = null
 let unsubDisplayConfigLive = null
+let unsubPartnersLive = null
 let metaSyncTimer = null
 let toastTimer = null
 let applyingRemoteMeta = false
@@ -7673,7 +7962,7 @@ let marker = null
 const priceSort = ref('all')   //  mặc định TẤT CẢ
 const addedMap = ref({})
 const loadingMain = ref(true)
-const CACHE_VERSION = 2
+const CACHE_VERSION = 6
 const CACHE_TTL = 1000 * 60 * 10 // 10 phút
 const showCategoryModal = ref(false)
 const showContactModal = ref(false)
@@ -8050,6 +8339,10 @@ onMounted(() => {
 
   unsubDisplayConfigLive = subscribeSheet('display_config', (rows) => {
     displayConfigRows.value = rows || []
+  })
+
+  unsubPartnersLive = subscribeSheet('partners', (rows) => {
+    partners.value = rows || []
   })
 
   const savedLang = localStorage.getItem('APP_LANG')
@@ -8455,6 +8748,29 @@ function resetToAllCategory() {
 }
 
 const shopContactList = computed(() => shopContacts.value || [])
+
+const activePartnerList = computed(() => {
+  return (partners.value || [])
+    .map((p, idx) => ({ p, idx }))
+    .filter(({ p }) => {
+      if (!p) return false
+      const v = p.Active
+      if (v === false || v === 0 || v === '0' || String(v).toLowerCase() === 'false') {
+        return false
+      }
+      return Boolean(String(p.Name || '').trim() && normalizeBannerLink(p.Direct_link))
+    })
+    .sort((a, b) => {
+      const oa = Number.isFinite(Number(a.p.Sort_order)) ? Number(a.p.Sort_order) : 9999 + a.idx
+      const ob = Number.isFinite(Number(b.p.Sort_order)) ? Number(b.p.Sort_order) : 9999 + b.idx
+      if (oa !== ob) return oa - ob
+      return a.idx - b.idx
+    })
+    .map(({ p }) => ({
+      ...p,
+      normalizedUrl: normalizeBannerLink(p.Direct_link),
+    }))
+})
 
 function isContactMessageAllowed(c) {
   if (!c) return false
@@ -9697,6 +10013,11 @@ function getStatusKey(raw) {
   return raw
 }
 
+function getItemBadge(item) {
+  if (!item?.Badge) return null
+  return resolveProductBadge(item.Badge, locale.value || 'vi')
+}
+
 function selectAddress(place) {
   diaChi.value = place.display_name
   addressKeyword.value = place.display_name
@@ -9762,7 +10083,7 @@ function findVisibleCartTargetEl() {
         '.mobile-bottom-bar .cart-btn .cart-icon-wrap',
         '.mobile-bottom-bar .cart-btn',
       ]
-    : ['.dth-cart-pill']
+    : ['.pc-right-cart-dock .prcd-icon-wrap', '.pc-right-cart-dock', '.dth-cart-pill']
 
   for (const sel of selectors) {
     const el = document.querySelector(sel)
@@ -10996,6 +11317,9 @@ function applyData(data) {
   thongBao.value = data.thong_bao || []
   logos.value = data.logo || []
   shopContacts.value = data.shop_contact || []
+  if (Array.isArray(data.partners)) {
+    partners.value = data.partners
+  }
   khuyenMaiInfo.value = data.khuyenmai_info || []
   times.value = data.time || []
   thongTinChuyenKhoan.value = data.thong_tin_chuyen_khoan || []
@@ -11703,6 +12027,7 @@ async function reloadData() {
       thong_bao: json.data.thong_bao || [],
       logo: json.data.logo || [],
       shop_contact: json.data.shop_contact || [],
+      partners: json.data.partners || [],
       khuyenmai_info: json.data.khuyenmai_info || [],
       time: json.data.time || [],
       thong_tin_chuyen_khoan: json.data.thong_tin_chuyen_khoan || [],
@@ -11787,6 +12112,10 @@ onUnmounted(() => {
   if (unsubDisplayConfigLive) {
     unsubDisplayConfigLive()
     unsubDisplayConfigLive = null
+  }
+  if (unsubPartnersLive) {
+    unsubPartnersLive()
+    unsubPartnersLive = null
   }
   if (metaSyncTimer) clearTimeout(metaSyncTimer)
   if (toastTimer) clearTimeout(toastTimer)
@@ -12224,13 +12553,32 @@ const hasSale = computed(() =>
   gap: 12px;
 }
 
+.dth-left-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dth-brand-cluster {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.dth-brand-cluster .dth-blog-link {
+  text-decoration: none;
+}
+
 .dth-brand {
   display: flex;
   align-items: center;
   gap: 12px;
   cursor: pointer;
   flex-shrink: 0;
-  justify-self: start;
   user-select: none;
 }
 
@@ -12421,6 +12769,107 @@ const hasSale = computed(() =>
   animation: dthScamFadeIn 0.2s ease-out;
 }
 
+.dth-scam-bar.is-left {
+  margin-right: 0;
+  margin-left: auto;
+}
+
+/* HEADER PARTNER BUTTONS (RIGHT OF SEARCH ON SCROLL) */
+.dth-partner-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-right: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  animation: dthScamFadeIn 0.2s ease-out;
+}
+
+.dth-partner-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.dth-partner-btn {
+  flex: 0 0 auto;
+  min-width: 60px;
+  width: max-content;
+  max-width: none;
+  height: 48px;
+  padding: 4px 10px 3px;
+  border-radius: 11px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  text-decoration: none;
+  text-align: center;
+  border: 1px solid var(--pt-border, rgba(255, 255, 255, 0.34));
+  color: var(--pt-fg, #ffffff);
+  transition: transform 0.16s ease, filter 0.16s ease, box-shadow 0.16s ease;
+}
+
+.dth-partner-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+.dth-pt-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--pt-ico, #059669);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.dth-pt-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.dth-pt-name {
+  width: auto;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--pt-fg, #ffffff);
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.desktop-top-header .dth-scam-ico {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: #ffffff !important;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.desktop-top-header .dth-scam-btn.is-verify .dth-scam-ico {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.desktop-top-header .dth-scam-btn.is-shops .dth-scam-ico {
+  background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
+}
+
+.desktop-top-header .dth-scam-btn.is-alerts .dth-scam-ico {
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+}
+
 @keyframes dthScamFadeIn {
   from {
     opacity: 0;
@@ -12547,9 +12996,24 @@ const hasSale = computed(() =>
   }
 
   .dth-inner.has-header-scam .dth-cart-pill {
+    width: 36px;
     height: 36px;
-    padding: 0 10px;
-    gap: 6px;
+    padding: 0;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1320px) {
+  .dth-inner.has-header-partner .dth-time {
+    display: none;
+  }
+
+  .dth-inner.has-header-partner .dth-name {
+    font-size: 14.5px;
+  }
+
+  .dth-inner.has-header-partner .dth-logo {
+    width: 36px;
+    height: 36px;
   }
 }
 
@@ -12564,6 +13028,19 @@ const hasSale = computed(() =>
     height: 36px;
     padding: 0 6px;
     gap: 4px;
+  }
+
+  .dth-partner-btn {
+    min-width: 54px;
+    width: max-content;
+    max-width: none;
+    height: 46px;
+    padding: 3px 8px;
+    gap: 2px;
+  }
+
+  .dth-pt-name {
+    font-size: 10px;
   }
 
   .dth-scam-label {
@@ -12737,28 +13214,30 @@ const hasSale = computed(() =>
   color: var(--sa-muted);
 }
 
-/* HEADER CART PILL (CRISP WHITE ON EMERALD HEADER) */
+/* HEADER CART BUTTON WITH CORNER NOTIFICATION BADGE */
 .dth-cart-pill {
+  position: relative;
+  width: 38px;
   height: 38px;
-  padding: 0 14px;
+  padding: 0;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.95);
   background: #ffffff;
-  color: var(--sa-primary-dark);
-  font-size: 13px;
-  font-weight: 700;
+  color: var(--sa-primary);
+  font-size: 18px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
   cursor: pointer;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   transition: all 0.18s ease;
-  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .dth-cart-pill i {
   color: var(--sa-primary);
-  font-size: 16px;
+  font-size: 18px;
+  line-height: 1;
 }
 
 .dth-cart-pill.active,
@@ -12775,21 +13254,24 @@ const hasSale = computed(() =>
 }
 
 .dcp-badge {
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
   border-radius: 999px;
-  background: var(--sa-primary);
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
   color: #ffffff;
-  font-size: 11.5px;
-  font-weight: 700;
+  border: 2px solid #ffffff;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-}
-
-.dcp-amount {
-  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(225, 29, 72, 0.4);
+  pointer-events: none;
 }
 
 /* MOBILE THEME TOGGLE BUTTON */
@@ -13525,44 +14007,67 @@ const hasSale = computed(() =>
 }
 
 .scam-hub-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
   gap: 12px;
 }
 
 .scam-hub-btn {
+  flex: 0 1 370px;
+  max-width: 370px;
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 64px;
-  padding: 14px 16px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  color: #ffffff;
+  gap: 11px;
+  min-height: 58px;
+  padding: 10px 15px;
+  border-radius: 14px;
+  background: var(--sa-surface);
+  border: 1px solid var(--sa-border-strong);
+  color: var(--sa-heading);
   text-decoration: none;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.14);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.04);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.sa-storefront.theme-dark .scam-hub-btn {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.26);
 }
 
 .scam-hub-btn.is-verify {
-  background: linear-gradient(135deg, #059669 0%, #047857 100%);
-  box-shadow: 0 8px 20px rgba(5, 150, 105, 0.28);
+  border-color: rgba(16, 185, 129, 0.28);
 }
 
 .scam-hub-btn.is-shops {
-  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
-  box-shadow: 0 8px 20px rgba(217, 119, 6, 0.28);
+  border-color: rgba(245, 158, 11, 0.3);
 }
 
 .scam-hub-btn.is-alerts {
-  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-  box-shadow: 0 8px 20px rgba(220, 38, 38, 0.28);
+  border-color: rgba(225, 29, 72, 0.26);
 }
 
 .scam-hub-btn:hover {
   transform: translateY(-2px);
-  filter: brightness(1.06);
-  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.22);
+}
+
+.scam-hub-btn.is-verify:hover {
+  border-color: #10b981;
+  box-shadow: 0 10px 22px rgba(16, 185, 129, 0.13);
+}
+
+.scam-hub-btn.is-shops:hover {
+  border-color: #f59e0b;
+  box-shadow: 0 10px 22px rgba(245, 158, 11, 0.14);
+}
+
+.scam-hub-btn.is-alerts:hover {
+  border-color: #f43f5e;
+  box-shadow: 0 10px 22px rgba(225, 29, 72, 0.13);
 }
 
 .scam-hub-btn:active {
@@ -13570,17 +14075,33 @@ const hasSale = computed(() =>
 }
 
 .scam-hub-icon {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  font-size: 18px;
   color: #ffffff;
-  font-size: 22px;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.scam-hub-btn.is-verify .scam-hub-icon {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.32);
+  color: #ffffff;
+}
+
+.scam-hub-btn.is-shops .scam-hub-icon {
+  background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
+  box-shadow: 0 4px 10px rgba(245, 158, 11, 0.32);
+  color: #ffffff;
+}
+
+.scam-hub-btn.is-alerts .scam-hub-icon {
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+  box-shadow: 0 4px 10px rgba(225, 29, 72, 0.32);
+  color: #ffffff;
 }
 
 .scam-hub-text {
@@ -13592,27 +14113,208 @@ const hasSale = computed(() =>
 }
 
 .scam-hub-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 800;
-  letter-spacing: 0.2px;
-  color: #ffffff;
+  letter-spacing: 0.1px;
+  color: var(--sa-heading);
   line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .scam-hub-sub {
-  font-size: 12px;
+  display: block;
+  font-size: 11.5px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
-  line-height: 1.3;
+  color: var(--sa-muted);
+  line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .scam-hub-ext {
-  font-size: 17px;
-  color: rgba(255, 255, 255, 0.9);
+  font-size: 15px;
+  color: var(--sa-muted);
   flex-shrink: 0;
+  transition: color 0.16s ease, transform 0.16s ease;
+}
+
+.scam-hub-btn:hover .scam-hub-ext {
+  color: var(--sa-heading);
+  transform: translate(1px, -1px);
+}
+
+/* =========================================================
+   CENTERED VIBRANT PARTNER CARDS (CHECK SCAM = ~3/4 PARTNER CARD)
+   ========================================================= */
+.partner-hub-bar {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.partner-hub-bar.is-scrollable {
+  justify-content: flex-start;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: 2px;
+}
+
+.partner-hub-bar.is-scrollable::-webkit-scrollbar {
+  display: none;
+}
+
+.partner-mini-card {
+  position: relative;
+  flex: 1 1 0;
+  max-width: 480px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  min-height: 80px;
+  padding: 14px 19px;
+  border-radius: 18px;
+  border: 1px solid var(--pt-border, rgba(255, 255, 255, 0.28));
+  color: var(--pt-fg, #ffffff);
+  text-decoration: none;
+  min-width: 0;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    filter 0.18s ease;
+}
+
+.partner-hub-bar.is-count-1 .partner-mini-card {
+  max-width: 520px;
+}
+
+.partner-hub-bar.is-count-2 .partner-mini-card {
+  max-width: 500px;
+}
+
+.partner-hub-bar.is-scrollable .partner-mini-card {
+  flex: 0 0 340px;
+}
+
+.partner-mini-card:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.07);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.25);
+}
+
+.partner-mini-card:active {
+  transform: scale(0.985);
+}
+
+.pmc-corner-badge {
+  display: none;
+}
+
+.pmc-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 15px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.pmc-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pmc-fallback-ico {
+  font-size: 26px;
+  color: var(--pt-ico, #059669);
+}
+
+.pmc-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pmc-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pmc-title {
+  font-size: 17.5px;
+  font-weight: 800;
+  color: var(--pt-fg, #ffffff);
+  line-height: 1.25;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.pmc-inline-badge {
+  padding: 2.5px 9px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #fde047 0%, #f59e0b 100%);
+  color: #78350f;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.35;
+  letter-spacing: 0.2px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+.pmc-sub {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--pt-sub, rgba(255, 255, 255, 0.9));
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pmc-ext-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--pt-ext-bg, rgba(255, 255, 255, 0.2));
+  border: 1px solid var(--pt-ext-border, rgba(255, 255, 255, 0.35));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background-color 0.18s ease, transform 0.18s ease;
+}
+
+.partner-mini-card:hover .pmc-ext-box {
+  background: var(--pt-ext-bg, rgba(255, 255, 255, 0.32));
+}
+
+.pmc-ext {
+  font-size: 18px;
+  color: var(--pt-fg, #ffffff);
+  transition: transform 0.18s ease;
+}
+
+.partner-mini-card:hover .pmc-ext {
+  transform: translate(1px, -1px);
 }
 
 .menu-container {
@@ -13646,6 +14348,189 @@ const hasSale = computed(() =>
     margin-left: max(78px, calc((100% - 1360px) / 2));
     margin-right: auto;
   }
+
+  /* Reserve clean right gutter when Cart Sidebar is closed so Right Mini Cart Card never overlaps products */
+  .layout.hide-right .main.dock-expanded .hero-container,
+  .layout.hide-right .main.dock-expanded .scam-hub-section,
+  .layout.hide-right .main.dock-expanded .sct-inner,
+  .layout.hide-right .main.dock-expanded .sct-subcat-inner,
+  .layout.hide-right .main.dock-expanded .menu-container {
+    width: min(1360px, calc(100% - 218px - 116px));
+    margin-left: max(218px, calc((100% - 1360px) / 2));
+    margin-right: auto;
+  }
+
+  .layout.hide-right .main.dock-collapsed .hero-container,
+  .layout.hide-right .main.dock-collapsed .scam-hub-section,
+  .layout.hide-right .main.dock-collapsed .sct-inner,
+  .layout.hide-right .main.dock-collapsed .sct-subcat-inner,
+  .layout.hide-right .main.dock-collapsed .menu-container {
+    width: min(1360px, calc(100% - 78px - 116px));
+    margin-left: max(78px, calc((100% - 1360px) / 2));
+    margin-right: auto;
+  }
+}
+
+/* =========================================================
+   FLOATING RIGHT MINI CART CARD WHEN SIDEBAR CLOSED (PA1)
+   ========================================================= */
+.pc-right-cart-dock {
+  position: fixed;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 98px;
+  padding: 12px 8px 10px;
+  border-radius: 18px;
+  background: var(--sa-surface);
+  border: 1.5px solid var(--sa-border-green);
+  box-shadow:
+    0 12px 30px rgba(15, 23, 42, 0.12),
+    0 2px 8px rgba(var(--sa-primary-rgb), 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  z-index: 46;
+  text-align: center;
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.pc-right-cart-dock.has-items {
+  border-color: var(--sa-accent);
+  box-shadow:
+    0 14px 32px rgba(15, 23, 42, 0.14),
+    0 4px 14px rgba(var(--sa-primary-rgb), 0.18);
+}
+
+.pc-right-cart-dock:hover {
+  transform: translateY(calc(-50% - 3px));
+  border-color: var(--sa-accent);
+  box-shadow:
+    0 16px 36px rgba(15, 23, 42, 0.16),
+    0 6px 18px rgba(var(--sa-primary-rgb), 0.22);
+}
+
+.pc-right-cart-dock:active {
+  transform: translateY(-50%) scale(0.97);
+}
+
+.pc-right-cart-dock.bump .prcd-icon-wrap {
+  animation: cart-bump 0.32s ease;
+}
+
+.prcd-icon-wrap {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--sa-primary) 0%, var(--sa-accent) 100%);
+  color: #ffffff;
+  font-size: 21px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(var(--sa-primary-rgb), 0.32);
+}
+
+.prcd-badge {
+  position: absolute;
+  top: -6px;
+  right: -7px;
+  min-width: 21px;
+  height: 21px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+  color: #ffffff;
+  border: 2px solid var(--sa-surface);
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(225, 29, 72, 0.42);
+}
+
+.prcd-body {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.prcd-empty-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--sa-heading);
+  line-height: 1.2;
+}
+
+.prcd-count-line {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sa-muted);
+  line-height: 1.2;
+}
+
+.prcd-total {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--sa-price);
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.prcd-status-tag {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--sa-surface-soft);
+  color: var(--sa-accent);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.prcd-open-cta {
+  width: 100%;
+  padding: 5px 6px;
+  border-radius: 999px;
+  background: var(--sa-surface-2);
+  border: 1px solid var(--sa-border-strong);
+  color: var(--sa-heading);
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+.pc-right-cart-dock:hover .prcd-open-cta {
+  background: var(--sa-accent);
+  border-color: var(--sa-accent);
+  color: #ffffff;
+}
+
+.right-cart-dock-enter-active,
+.right-cart-dock-leave-active {
+  transition: opacity 0.22s ease, transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.right-cart-dock-enter-from,
+.right-cart-dock-leave-to {
+  opacity: 0;
+  transform: translate(24px, -50%);
 }
 
 /* =========================================================
@@ -13715,11 +14600,11 @@ const hasSale = computed(() =>
   transform: scale(1.08);
 }
 
-/* CHECK SCAM 3 SEPARATE BUTTONS GROUP */
+/* CHECK SCAM 3 COMPACT BUTTONS GROUP (~3/4 OF PARTNER CARD) */
 .ltd-scam-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
   padding-bottom: 8px;
   border-bottom: 1px dashed var(--sa-border-strong);
@@ -13728,41 +14613,53 @@ const hasSale = computed(() =>
 .ltd-scam-btn {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  min-height: 50px;
-  padding: 10px 11px;
-  border-radius: 14px;
-  background: var(--sa-top-header-bg);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  color: #ffffff;
+  min-height: 45px;
+  padding: 7px 10px;
+  border-radius: 12px;
+  background: var(--sa-surface-2);
+  border: 1px solid var(--sa-border-strong);
+  color: var(--sa-heading);
   text-decoration: none;
-  box-shadow: 0 6px 16px rgba(var(--sa-primary-rgb), 0.26);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
   transition:
     transform 0.18s ease,
     box-shadow 0.18s ease,
-    filter 0.18s ease;
+    border-color 0.18s ease,
+    background-color 0.18s ease;
 }
 
 .ltd-scam-btn.is-verify {
-  background: linear-gradient(135deg, #059669 0%, #047857 100%);
-  box-shadow: 0 6px 16px rgba(5, 150, 105, 0.26);
+  border-color: rgba(16, 185, 129, 0.28);
 }
 
 .ltd-scam-btn.is-shops {
-  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
-  box-shadow: 0 6px 16px rgba(217, 119, 6, 0.26);
+  border-color: rgba(245, 158, 11, 0.3);
 }
 
 .ltd-scam-btn.is-alerts {
-  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.26);
+  border-color: rgba(225, 29, 72, 0.26);
 }
 
 .ltd-scam-btn:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.06);
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.24);
+  transform: translateY(-1px);
+  background: var(--sa-surface);
+}
+
+.ltd-scam-btn.is-verify:hover {
+  border-color: #10b981;
+  box-shadow: 0 6px 14px rgba(16, 185, 129, 0.12);
+}
+
+.ltd-scam-btn.is-shops:hover {
+  border-color: #f59e0b;
+  box-shadow: 0 6px 14px rgba(245, 158, 11, 0.13);
+}
+
+.ltd-scam-btn.is-alerts:hover {
+  border-color: #f43f5e;
+  box-shadow: 0 6px 14px rgba(225, 29, 72, 0.12);
 }
 
 .left-trust-dock.is-collapsed .ltd-scam-btn {
@@ -13770,28 +14667,44 @@ const hasSale = computed(() =>
   justify-content: center;
   min-height: 0;
   gap: 3px;
-  padding: 8px 4px;
-  border-radius: 14px;
+  padding: 7px 4px;
+  border-radius: 13px;
 }
 
 .ltd-scam-icon {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.38);
+  font-size: 15px;
   color: #ffffff;
-  font-size: 18px;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
+.ltd-scam-btn.is-verify .ltd-scam-icon {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 3px 8px rgba(16, 185, 129, 0.3);
+  color: #ffffff;
+}
+
+.ltd-scam-btn.is-shops .ltd-scam-icon {
+  background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
+  box-shadow: 0 3px 8px rgba(245, 158, 11, 0.3);
+  color: #ffffff;
+}
+
+.ltd-scam-btn.is-alerts .ltd-scam-icon {
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+  box-shadow: 0 3px 8px rgba(225, 29, 72, 0.3);
+  color: #ffffff;
+}
+
 .left-trust-dock.is-collapsed .ltd-scam-icon {
-  width: 30px;
-  height: 30px;
-  font-size: 16px;
+  width: 28px;
+  height: 28px;
+  font-size: 15px;
 }
 
 .ltd-scam-text {
@@ -13803,45 +14716,173 @@ const hasSale = computed(() =>
 }
 
 .ltd-scam-title {
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.2px;
-  color: #ffffff;
-  line-height: 1.25;
+  letter-spacing: 0.1px;
+  color: var(--sa-heading);
+  line-height: 1.2;
 }
 
 .ltd-scam-sub {
+  display: block;
   font-size: 10.5px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.88);
-  line-height: 1.25;
+  color: var(--sa-muted);
+  line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .ltd-scam-mini {
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 800;
-  letter-spacing: 0.3px;
-  color: #ffffff;
+  letter-spacing: 0.2px;
+  color: var(--sa-heading);
   line-height: 1;
 }
 
 .ltd-scam-ext {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  color: var(--sa-muted);
   flex-shrink: 0;
 }
 
-/* DOCK CONTACT CHANNELS */
+/* DOCK SCROLL BODY, PARTNER ECOSYSTEM & CONTACT CHANNELS */
+.ltd-scroll-body {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+}
+
+.ltd-scroll-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.ltd-scroll-body::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.25);
+  border-radius: 999px;
+}
+
+.ltd-partner-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--sa-border-strong);
+  flex-shrink: 0;
+}
+
+.ltd-partner-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ltd-partner-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 9px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--pt-border, rgba(255, 255, 255, 0.24));
+  color: var(--pt-fg, #ffffff);
+  text-decoration: none;
+  transition: transform 0.16s ease, filter 0.16s ease, box-shadow 0.16s ease;
+}
+
+.ltd-partner-card:hover {
+  transform: translateX(2px);
+  filter: brightness(1.07);
+}
+
+.left-trust-dock.is-collapsed .ltd-partner-card {
+  justify-content: center;
+  min-height: 0;
+  padding: 5px;
+  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto;
+}
+
+.left-trust-dock.is-collapsed .ltd-partner-card:hover {
+  transform: scale(1.06);
+}
+
+.ltd-partner-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.ltd-partner-img,
+.ltd-partner-fallback {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--pt-ico, #059669);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.left-trust-dock.is-collapsed .ltd-partner-img,
+.left-trust-dock.is-collapsed .ltd-partner-fallback {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.ltd-partner-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ltd-partner-name {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--pt-fg, #ffffff);
+  line-height: 1.25;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.ltd-partner-sub {
+  font-size: 10.5px;
+  color: var(--pt-sub, rgba(255, 255, 255, 0.85));
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ltd-partner-ext {
+  font-size: 13px;
+  color: var(--pt-sub, rgba(255, 255, 255, 0.88));
+  flex-shrink: 0;
+}
+
 .ltd-contact-section {
   width: 100%;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  flex: 1;
-  min-height: 0;
+  flex-shrink: 0;
 }
 
 .ltd-section-title {
@@ -14043,6 +15084,85 @@ const hasSale = computed(() =>
   color: #f87171;
 }
 
+.mobile-partner-sheet-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  margin-bottom: 10px;
+}
+
+.mobile-sheet-partner-card {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 60px;
+  padding: 10px 13px;
+  border-radius: 14px;
+  border: 1px solid var(--pt-border, rgba(255, 255, 255, 0.28));
+  color: var(--pt-fg, #ffffff);
+  text-decoration: none;
+  transition: transform 0.16s ease, filter 0.16s ease;
+}
+
+.mobile-sheet-partner-card:active {
+  transform: scale(0.985);
+}
+
+.mspc-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--pt-ico, #059669);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 18px;
+}
+
+.mspc-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.mspc-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mspc-name {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: var(--pt-fg, #ffffff);
+  line-height: 1.25;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.mspc-sub {
+  font-size: 12px;
+  color: var(--pt-sub, rgba(255, 255, 255, 0.88));
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mspc-ext {
+  font-size: 16px;
+  color: var(--pt-fg, #ffffff);
+  flex-shrink: 0;
+}
+
 .mobile-checkscam-group {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -14060,31 +15180,28 @@ const hasSale = computed(() =>
   justify-content: center;
   text-align: center;
   gap: 5px;
-  min-height: 70px;
-  padding: 9px 6px;
+  min-height: 58px;
+  padding: 8px 6px;
   margin-bottom: 0;
   border-radius: 12px;
-  background: var(--sa-top-header-bg);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: #ffffff;
+  background: var(--sa-surface-2);
+  border: 1px solid var(--sa-border-strong);
+  color: var(--sa-heading);
   text-decoration: none;
-  box-shadow: 0 6px 16px rgba(var(--sa-primary-rgb), 0.22);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
   transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
 
 .mobile-checkscam-card.is-verify {
-  background: linear-gradient(135deg, #059669 0%, #047857 100%);
-  box-shadow: 0 8px 20px rgba(5, 150, 105, 0.26);
+  border-color: rgba(16, 185, 129, 0.28);
 }
 
 .mobile-checkscam-card.is-shops {
-  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
-  box-shadow: 0 8px 20px rgba(217, 119, 6, 0.26);
+  border-color: rgba(245, 158, 11, 0.3);
 }
 
 .mobile-checkscam-card.is-alerts {
-  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-  box-shadow: 0 8px 20px rgba(220, 38, 38, 0.26);
+  border-color: rgba(225, 29, 72, 0.26);
 }
 
 .mobile-checkscam-card:active {
@@ -14092,17 +15209,30 @@ const hasSale = computed(() =>
 }
 
 .mcc-icon {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.36);
   color: #ffffff;
-  font-size: 15px;
+  font-size: 14px;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.mobile-checkscam-card.is-verify .mcc-icon {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 3px 8px rgba(16, 185, 129, 0.3);
+}
+
+.mobile-checkscam-card.is-shops .mcc-icon {
+  background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
+  box-shadow: 0 3px 8px rgba(245, 158, 11, 0.3);
+}
+
+.mobile-checkscam-card.is-alerts .mcc-icon {
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+  box-shadow: 0 3px 8px rgba(225, 29, 72, 0.3);
 }
 
 .mcc-body {
@@ -14114,7 +15244,7 @@ const hasSale = computed(() =>
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.1px;
-  color: #ffffff;
+  color: var(--sa-heading);
   line-height: 1.25;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -15521,6 +16651,221 @@ const hasSale = computed(() =>
   background: rgba(19, 26, 38, 0.88);
   color: var(--sa-primary-light);
   border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* =========================================================
+   PRODUCT CARD CUSTOM-SHAPED & GROUP-COLORED BADGES
+   ========================================================= */
+.card-img-wrap .card-badge-wrap {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  z-index: 3;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 4px 10px rgba(15, 23, 42, 0.28));
+}
+
+.card-badge-shape {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4.5px 10px;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+.card-badge-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.card-badge-ico {
+  font-size: 12px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* GROUP COLORS */
+.is-group-fire .card-badge-shape,
+.mb-item-badge.is-group-fire {
+  background: linear-gradient(135deg, #ff6a00 0%, #dc2626 100%);
+  color: #ffffff;
+}
+
+.is-group-new .card-badge-shape,
+.mb-item-badge.is-group-new {
+  background: linear-gradient(135deg, #10b981 0%, #0d9488 100%);
+  color: #ffffff;
+}
+
+.is-group-crown .card-badge-shape,
+.mb-item-badge.is-group-crown {
+  background: linear-gradient(135deg, #b45309 0%, #f59e0b 52%, #d97706 100%);
+  color: #fffbeb;
+  text-shadow: 0 1px 2px rgba(120, 53, 15, 0.45);
+}
+
+.is-group-spicy .card-badge-shape,
+.mb-item-badge.is-group-spicy {
+  background: linear-gradient(135deg, #ef4444 0%, #991b1b 100%);
+  color: #ffffff;
+}
+
+.is-group-custom .card-badge-shape,
+.mb-item-badge.is-group-custom {
+  background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+  color: #ffffff;
+}
+
+/* DISTINCT GEOMETRIC SHAPES PER GROUP */
+/* 1. Flame / Slanted Speed Ribbon (HOT, Bán chạy) */
+.is-shape-flame .card-badge-shape,
+.mb-item-badge.is-shape-flame {
+  border-radius: 11px 3px 11px 3px;
+  transform: skewX(-9deg);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+}
+
+.is-shape-flame .card-badge-inner,
+.mb-item-badge.is-shape-flame .mb-item-badge-inner {
+  transform: skewX(9deg);
+}
+
+/* 2. Botanical Leaf (Món mới) */
+.is-shape-leaf .card-badge-shape,
+.mb-item-badge.is-shape-leaf {
+  border-radius: 3px 15px 3px 15px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+/* 3. Hexagonal Royal Plaque / Crest (Đặc sản, Phải thử) */
+.is-shape-crest .card-badge-shape {
+  padding: 5px 12px;
+  clip-path: polygon(
+    7px 0%,
+    calc(100% - 7px) 0%,
+    100% 50%,
+    calc(100% - 7px) 100%,
+    7px 100%,
+    0% 50%
+  );
+}
+
+.mb-item-badge.is-shape-crest {
+  padding: 2px 9px;
+  clip-path: polygon(
+    5px 0%,
+    calc(100% - 5px) 0%,
+    100% 50%,
+    calc(100% - 5px) 100%,
+    5px 100%,
+    0% 50%
+  );
+}
+
+/* 4. Left-Pointed Pennant Tag (Cay) */
+.is-shape-pennant .card-badge-shape {
+  padding: 4.5px 10px 4.5px 13px;
+  border-radius: 0 8px 8px 0;
+  clip-path: polygon(8px 0%, 100% 0%, 100% 100%, 8px 100%, 0% 50%);
+}
+
+.mb-item-badge.is-shape-pennant {
+  padding: 2px 7px 2px 10px;
+  border-radius: 0 6px 6px 0;
+  clip-path: polygon(6px 0%, 100% 0%, 100% 100%, 6px 100%, 0% 50%);
+}
+
+/* 5. Side-Notched Ticket Stub (Custom text) */
+.is-shape-ticket .card-badge-shape {
+  padding: 4.5px 12px;
+  border-radius: 6px;
+  clip-path: polygon(
+    0% 0%,
+    100% 0%,
+    100% calc(50% - 3.5px),
+    calc(100% - 4px) 50%,
+    100% calc(50% + 3.5px),
+    100% 100%,
+    0% 100%,
+    0% calc(50% + 3.5px),
+    4px 50%,
+    0% calc(50% - 3.5px)
+  );
+}
+
+.mb-item-badge.is-shape-ticket {
+  padding: 2px 9px;
+  border-radius: 4px;
+  clip-path: polygon(
+    0% 0%,
+    100% 0%,
+    100% calc(50% - 2.5px),
+    calc(100% - 3px) 50%,
+    100% calc(50% + 2.5px),
+    100% 100%,
+    0% 100%,
+    0% calc(50% + 2.5px),
+    3px 50%,
+    0% calc(50% - 2.5px)
+  );
+}
+
+/* INLINE MINI BADGE FOR LIST VIEW & DETAIL MODAL */
+.mb-item-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.25;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.mb-item-badge.is-detail-badge {
+  font-size: 11px;
+  padding: 2.5px 9px;
+}
+
+.mb-item-badge-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+@media (max-width: 768px) {
+  .card-img-wrap .card-badge-wrap {
+    top: 7px;
+    right: 7px;
+  }
+
+  .card-badge-shape {
+    padding: 3.5px 8px;
+    font-size: 10px;
+  }
+
+  .is-shape-crest .card-badge-shape {
+    padding: 4px 10px;
+  }
+
+  .is-shape-pennant .card-badge-shape {
+    padding: 3.5px 8px 3.5px 11px;
+  }
+
+  .is-shape-ticket .card-badge-shape {
+    padding: 3.5px 10px;
+  }
+
+  .card-badge-ico {
+    font-size: 10.5px;
+  }
 }
 
 .card:hover {
@@ -18429,35 +19774,40 @@ const hasSale = computed(() =>
   }
 
   .scam-hub-grid {
+    display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
   }
 
   .scam-hub-btn {
+    flex: none;
+    max-width: none;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     text-align: center;
-    gap: 5px;
-    min-height: 70px;
-    padding: 8px 6px;
+    gap: 4px;
+    min-height: 56px;
+    padding: 7px 6px;
     border-radius: 12px;
   }
 
   .scam-hub-icon {
-    width: 30px;
-    height: 30px;
-    font-size: 15px;
+    width: 26px;
+    height: 26px;
+    font-size: 14px;
   }
 
   .scam-hub-text {
+    flex: 0 1 auto;
     align-items: center;
     width: 100%;
   }
 
   .scam-hub-title {
     font-size: 11px;
-    line-height: 1.25;
+    font-weight: 800;
+    line-height: 1.2;
     white-space: normal;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -18468,6 +19818,162 @@ const hasSale = computed(() =>
   .scam-hub-sub,
   .scam-hub-ext {
     display: none;
+  }
+
+  /* Hero-sized vibrant Partner cards on Mobile (2x height vs 38px Check Scam buttons) */
+  .partner-hub-bar {
+    display: grid;
+    grid-template-columns: repeat(var(--partner-cols, 3), minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .partner-hub-bar.is-count-1 {
+    display: flex;
+    justify-content: center;
+  }
+
+  .partner-hub-bar.is-count-1 .partner-mini-card {
+    flex: 1 1 100%;
+    max-width: 100%;
+    min-height: 76px;
+    padding: 13px 15px;
+  }
+
+  .partner-mini-card {
+    max-width: none;
+    min-height: 74px;
+    padding: 11px 13px;
+    border-radius: 16px;
+    gap: 12px;
+  }
+
+  .pmc-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 13px;
+  }
+
+  .pmc-title {
+    font-size: 16px;
+  }
+
+  .pmc-sub {
+    font-size: 12.5px;
+  }
+
+  .pmc-ext-box {
+    width: 32px;
+    height: 32px;
+  }
+
+  .partner-hub-bar.is-count-2 .partner-mini-card {
+    min-height: 74px;
+    padding: 11px 10px;
+    gap: 9px;
+  }
+
+  .partner-hub-bar.is-count-2 .pmc-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 11px;
+  }
+
+  .partner-hub-bar.is-count-2 .pmc-title {
+    font-size: 14px;
+  }
+
+  .partner-hub-bar.is-count-2 .pmc-ext-box,
+  .partner-hub-bar.is-count-2 .pmc-inline-badge {
+    display: none;
+  }
+
+  .partner-hub-bar.is-count-2 .pmc-corner-badge {
+    display: inline-block;
+  }
+
+  /* 3–4 cards on Mobile: prominent jewel-gradient Icon Tiles */
+  .partner-hub-bar.is-compact-mobile .partner-mini-card {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 6px;
+    min-height: 86px;
+    padding: 10px 5px 8px;
+    border-radius: 14px;
+  }
+
+  .partner-hub-bar.is-compact-mobile .pmc-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+  }
+
+  .partner-hub-bar.is-compact-mobile .pmc-body {
+    width: 100%;
+    align-items: center;
+  }
+
+  .partner-hub-bar.is-compact-mobile .pmc-title-row {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .partner-hub-bar.is-compact-mobile .pmc-title {
+    font-size: 11.5px;
+    line-height: 1.2;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .partner-hub-bar.is-compact-mobile .pmc-sub,
+  .partner-hub-bar.is-compact-mobile .pmc-ext-box,
+  .partner-hub-bar.is-compact-mobile .pmc-inline-badge {
+    display: none;
+  }
+
+  .partner-hub-bar.is-compact-mobile .pmc-corner-badge {
+    display: inline-block;
+  }
+
+  .pmc-corner-badge {
+    position: absolute;
+    top: -4px;
+    right: -2px;
+    padding: 1px 5px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #fde047 0%, #f59e0b 100%);
+    color: #78350f;
+    font-size: 8.5px;
+    font-weight: 900;
+    line-height: 1.3;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
+    z-index: 2;
+  }
+
+  .partner-hub-bar.is-scrollable {
+    display: flex;
+    padding-top: 4px;
+  }
+
+  .partner-hub-bar.is-scrollable .partner-mini-card {
+    flex: 0 0 calc((100% - 18px) / 4.2);
+    min-width: 78px;
+    flex-direction: column;
+    text-align: center;
+    padding: 7px 4px 6px;
+    gap: 4px;
+  }
+
+  .partner-hub-bar.is-scrollable .pmc-sub,
+  .partner-hub-bar.is-scrollable .pmc-ext-box,
+  .partner-hub-bar.is-scrollable .pmc-inline-badge {
+    display: none;
+  }
+
+  .partner-hub-bar.is-scrollable .pmc-corner-badge {
+    display: inline-block;
   }
 
   .menu-container {
@@ -20288,6 +21794,11 @@ const hasSale = computed(() =>
     min-width: 0;
   }
 
+  /* Kiểu B + Phương án 1: Logo quán -> 3 nút tròn Check -> Dải Card Đối tác -> Nút Sáng/Tối */
+  .mobile-header-clean.has-scam.has-partner .mh-name {
+    display: none;
+  }
+
   .mh-scam-bar {
     display: inline-flex;
     align-items: center;
@@ -20297,31 +21808,162 @@ const hasSale = computed(() =>
     animation: dthScamFadeIn 0.2s ease-out;
   }
 
+  .mobile-header-clean.has-scam.has-partner .mh-scam-bar {
+    margin-left: auto;
+    gap: 4px;
+  }
+
   .mh-scam-btn {
     height: 33px;
-    padding: 0 5px;
+    padding: 0 4.5px;
     border-radius: 8px;
     gap: 3px;
   }
 
   .mh-scam-ico {
-    font-size: 12px;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    color: #ffffff !important;
+    font-size: 9.5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mh-scam-btn.is-verify .mh-scam-ico {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  }
+
+  .mh-scam-btn.is-shops .mh-scam-ico {
+    background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
+  }
+
+  .mh-scam-btn.is-alerts .mh-scam-ico {
+    background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
   }
 
   .mh-scam-label {
-    font-size: 9px;
+    font-size: 8.5px;
     line-height: 1.08;
-    max-width: 46px;
+    max-width: 42px;
   }
 
   .mh-scam-btn.is-shops .mh-scam-label {
-    max-width: 31px;
+    max-width: 29px;
+  }
+
+  /* Khi có Đối tác: thu gọn 3 nút Check thành 3 nút tròn nền màu + icon trắng (ẩn chữ) */
+  .mobile-header-clean.has-scam.has-partner .mh-scam-btn {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.78);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  }
+
+  .mobile-header-clean.has-scam.has-partner .mh-scam-btn.is-verify {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  }
+
+  .mobile-header-clean.has-scam.has-partner .mh-scam-btn.is-shops {
+    background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
+  }
+
+  .mobile-header-clean.has-scam.has-partner .mh-scam-btn.is-alerts {
+    background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+  }
+
+  .mobile-header-clean.has-scam.has-partner .mh-scam-ico {
+    width: auto;
+    height: auto;
+    background: transparent !important;
+    font-size: 13.5px;
+  }
+
+  .mobile-header-clean.has-scam.has-partner .mh-scam-label {
+    display: none;
+  }
+
+  /* Dải Card Đối tác hiển thị trực tiếp (Logo ở trên - Tên ở dưới) */
+  .mh-partner-strip {
+    flex: 0 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+    animation: dthScamFadeIn 0.2s ease-out;
+  }
+
+  .mh-partner-strip::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mh-partner-btn {
+    flex: 0 0 auto;
+    min-width: 54px;
+    width: max-content;
+    max-width: none;
+    height: 46px;
+    padding: 3px 8px 3px;
+    border-radius: 10px;
+    border: 1px solid var(--pt-border, rgba(255, 255, 255, 0.38));
+    color: var(--pt-fg, #ffffff);
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    text-decoration: none;
+    text-align: center;
+    cursor: pointer;
+  }
+
+  .mh-partner-btn:active {
+    transform: scale(0.96);
+  }
+
+  .mh-pt-avatar {
+    width: 23px;
+    height: 23px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.96);
+    color: var(--pt-ico, #059669);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 12.5px;
+  }
+
+  .mh-pt-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .mh-pt-name {
+    width: auto;
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--pt-fg, #ffffff);
+    line-height: 1.15;
+    white-space: nowrap;
   }
 
   .mobile-header-clean.has-scam .mh-theme-btn {
-    width: 30px;
-    height: 30px;
-    font-size: 15px;
+    width: 29px;
+    height: 29px;
+    font-size: 14.5px;
+    flex-shrink: 0;
   }
 
   .mh-logo {
@@ -22682,6 +24324,121 @@ const hasSale = computed(() =>
 
 .pwf-map-link:hover {
   text-decoration: underline;
+}
+
+/* FOOTER COL 1 ECOSYSTEM / PARTNER CARDS */
+.pwf-partner-box {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--sa-border);
+}
+
+.pwf-partner-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 9px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--sa-heading);
+}
+
+.pwf-partner-heading i {
+  color: var(--sa-primary);
+  font-size: 14px;
+}
+
+.pwf-partner-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+  gap: 8px;
+}
+
+.pwf-partner-card {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: 11px;
+  border: 1px solid var(--pt-border, rgba(255, 255, 255, 0.24));
+  color: var(--pt-fg, #ffffff);
+  text-decoration: none;
+  min-width: 0;
+  transition: transform 0.16s ease, filter 0.16s ease;
+}
+
+.pwf-partner-card:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.07);
+}
+
+.pwf-pt-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--pt-ico, #059669);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pwf-pt-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pwf-pt-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.pwf-pt-name-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.pwf-pt-name {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--pt-fg, #ffffff);
+  white-space: normal;
+  word-break: break-word;
+}
+
+.pwf-pt-badge {
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: #fde047;
+  color: #78350f;
+  font-size: 8.5px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.pwf-pt-sub {
+  font-size: 10.5px;
+  color: var(--pt-sub, rgba(255, 255, 255, 0.86));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pwf-pt-ext {
+  font-size: 14px;
+  color: var(--pt-sub, rgba(255, 255, 255, 0.9));
+  flex-shrink: 0;
 }
 
 .sa-storefront .pwf-col-title,

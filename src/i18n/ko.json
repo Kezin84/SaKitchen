@@ -33,7 +33,8 @@
     "officialChannels": "연락처 정보",
     "collapseDock": "접기",
     "expandDock": "연락처 펼치기",
-    "allowMessageBadge": "메시지 가능"
+    "allowMessageBadge": "메시지 가능",
+    "ecosystem": "제휴 및 패밀리 서비스"
   },
   "search": {
     "placeholder": "메뉴, 재료, 가격 검색...",

@@ -30,11 +30,10 @@
       <div
         class="dth-inner"
         :class="{
-          'has-header-scam': showHeaderScam,
           'has-header-partner': showHeaderScam && activePartnerList.length > 0,
         }"
       >
-        <!-- LEFT ZONE: BRAND + BLOG + (WHEN PARTNERS EXIST) 3 CHECK SCAM BUTTONS LEFT OF SEARCH -->
+        <!-- LEFT ZONE: BRAND + PRIMARY FLAT NAVBAR (INCL. CHECK SCAM DROPDOWN) -->
         <div class="dth-left-zone">
           <div class="dth-brand-cluster">
             <div class="dth-brand" @click="onAllFilter" role="button" tabindex="0">
@@ -48,32 +47,61 @@
               </div>
             </div>
 
-            <RouterLink to="/blog" class="dth-ctrl-btn dth-blog-link" title="Blog & Cẩm nang ẩm thực">
-              <i class="ri-article-line"></i>
-              <span>Blog</span>
-            </RouterLink>
-          </div>
+            <nav class="dth-primary-nav" aria-label="Điều hướng chính">
+              <button
+                type="button"
+                class="dth-nav-item active"
+                @click="onAllFilter"
+              >
+                {{ $t('feed.navMenu') }}
+              </button>
+              <RouterLink
+                to="/bang-tin"
+                class="dth-nav-item"
+                :title="$t('footer.feedLink')"
+              >
+                {{ $t('feed.navShort') }}
+              </RouterLink>
+              <RouterLink
+                to="/blog"
+                class="dth-nav-item"
+                title="Blog & Cẩm nang ẩm thực"
+              >
+                Blog
+              </RouterLink>
 
-          <nav
-            v-if="showHeaderScam && activePartnerList.length"
-            class="dth-scam-bar is-left"
-            aria-label="Check Scam & Trusted Shops"
-          >
-            <a
-              v-for="item in CHECK_SCAM_LINKS"
-              :key="'hdr-left-' + item.key"
-              :href="item.url"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="dth-scam-btn"
-              :class="item.variant"
-              :title="`${item.title} — ${item.sub}`"
-              :aria-label="item.title"
-            >
-              <i :class="item.icon" class="dth-scam-ico"></i>
-              <span class="dth-scam-label">{{ item.headerLabel }}</span>
-            </a>
-          </nav>
+              <div class="dth-nav-dropdown">
+                <button
+                  type="button"
+                  class="dth-nav-item dth-nav-dropdown-trigger"
+                  aria-haspopup="true"
+                >
+                  <span>Check Scam</span>
+                  <i class="ri-arrow-down-s-line dth-nav-chevron"></i>
+                </button>
+                <div class="dth-nav-dropdown-menu" role="menu">
+                  <a
+                    v-for="item in CHECK_SCAM_LINKS"
+                    :key="'nav-scam-' + item.key"
+                    :href="item.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="dth-scam-dd-item"
+                    :class="item.variant"
+                    role="menuitem"
+                    @click="$event.currentTarget.blur()"
+                  >
+                    <i :class="item.icon" class="dth-scam-dd-ico"></i>
+                    <span class="dth-scam-dd-body">
+                      <span class="dth-scam-dd-title">{{ item.title }}</span>
+                      <span class="dth-scam-dd-sub">{{ item.sub }}</span>
+                    </span>
+                    <i class="ri-arrow-right-up-line dth-scam-dd-ext"></i>
+                  </a>
+                </div>
+              </div>
+            </nav>
+          </div>
         </div>
 
         <!-- INTEGRATED SEARCH CENTER -->
@@ -130,7 +158,7 @@
           </div>
         </div>
 
-        <!-- RIGHT ZONE: PARTNER BUTTONS (OR CHECK SCAM IF NO PARTNERS) + ACTIONS -->
+        <!-- RIGHT ZONE: PARTNER BUTTONS ON SCROLL + ACTIONS -->
         <div class="dth-right-zone">
           <nav
             v-if="showHeaderScam && activePartnerList.length"
@@ -152,27 +180,6 @@
                 <i v-else class="ri-store-3-fill"></i>
               </span>
               <span class="dth-pt-name">{{ p.Name }}</span>
-            </a>
-          </nav>
-
-          <nav
-            v-else-if="showHeaderScam"
-            class="dth-scam-bar"
-            aria-label="Check Scam & Trusted Shops"
-          >
-            <a
-              v-for="item in CHECK_SCAM_LINKS"
-              :key="'hdr-' + item.key"
-              :href="item.url"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="dth-scam-btn"
-              :class="item.variant"
-              :title="`${item.title} — ${item.sub}`"
-              :aria-label="item.title"
-            >
-              <i :class="item.icon" class="dth-scam-ico"></i>
-              <span class="dth-scam-label">{{ item.headerLabel }}</span>
             </a>
           </nav>
 
@@ -316,8 +323,8 @@
       <main
         class="main"
         :class="{
-          'dock-expanded': !isMobile && !loadingMain && !leftDockCollapsed,
-          'dock-collapsed': !isMobile && !loadingMain && leftDockCollapsed
+          'dock-expanded': !isMobile && !loadingMain && hasPcLeftDock && !leftDockCollapsed,
+          'dock-collapsed': !isMobile && !loadingMain && hasPcLeftDock && leftDockCollapsed
         }"
         ref="mainRef"
       >
@@ -550,8 +557,9 @@
         </div>
       </div>
 
-      <!-- CENTERED PARTNER CARDS (ON TOP) + 3 CLEAN CHECK SCAM CARDS (BELOW) -->
+      <!-- CENTERED PARTNER CARDS (PC + MOBILE) + 3 CLEAN CHECK SCAM CARDS (MOBILE) -->
       <section
+        v-if="isMobile || activePartnerList.length"
         ref="scamHubRef"
         class="scam-hub-section"
         aria-label="Partners & Check Scam Hub"
@@ -597,7 +605,7 @@
           </a>
         </div>
 
-        <div class="scam-hub-grid">
+        <div v-if="isMobile" class="scam-hub-grid">
           <a
             v-for="item in CHECK_SCAM_LINKS"
             :key="'hub-' + item.key"
@@ -855,6 +863,14 @@
             {{ $t('filter.desc') }}
           </button>
 
+          <RouterLink
+            to="/bang-tin"
+            class="filter-btn filter-feed-btn"
+          >
+            <i class="ri-newspaper-line"></i>
+            <span>{{ $t('feed.navShort') }}</span>
+          </RouterLink>
+
           <button
             class="filter-btn lang-filter"
             @click="openLangModal"
@@ -908,7 +924,7 @@
         </button>
       </div>
 
-      <!-- DESKTOP FILTER & SORT BAR (TIER 2) -->
+      <!-- DESKTOP FILTER & SORT BAR (TIER 2 - INCLUDES VIEW MODE SWITCHER) -->
       <div v-if="!isMobile" class="menu-filter-bar">
         <div class="mfb-left">
           <span class="mfb-active-cat">
@@ -930,38 +946,66 @@
           </button>
         </div>
 
-        <div class="sct-sort-group">
-          <button
-            type="button"
-            class="sct-sort-btn"
-            :class="{ active: priceSort === 'all' }"
-            @click="onAllFilter"
+        <div class="mfb-right">
+          <div
+            v-if="filteredMenu.length > 0"
+            class="menu-view-switcher is-in-filter-bar"
+            role="group"
+            :aria-label="$t('filter.viewModeLabel')"
           >
-            <span>{{ $t('filter.all') }}</span>
-          </button>
-          <button
-            type="button"
-            class="sct-sort-btn"
-            :class="{ active: priceSort === 'asc' }"
-            @click="priceSort = 'asc'"
-          >
-            <i class="ri-sort-asc"></i>
-            <span>{{ $t('filter.asc') }}</span>
-          </button>
-          <button
-            type="button"
-            class="sct-sort-btn"
-            :class="{ active: priceSort === 'desc' }"
-            @click="priceSort = 'desc'"
-          >
-            <i class="ri-sort-desc"></i>
-            <span>{{ $t('filter.desc') }}</span>
-          </button>
+            <button
+              type="button"
+              class="mvs-btn"
+              :class="{ active: menuViewMode === 'card' }"
+              @click="setMenuViewMode('card')"
+            >
+              <i class="ri-layout-grid-line"></i>
+              <span>{{ $t('filter.viewCard') }}</span>
+            </button>
+            <button
+              type="button"
+              class="mvs-btn"
+              :class="{ active: menuViewMode === 'board' }"
+              @click="setMenuViewMode('board')"
+            >
+              <i class="ri-flashlight-line"></i>
+              <span>{{ $t('filter.viewMenu') }}</span>
+            </button>
+          </div>
+
+          <div class="sct-sort-group">
+            <button
+              type="button"
+              class="sct-sort-btn"
+              :class="{ active: priceSort === 'all' }"
+              @click="onAllFilter"
+            >
+              <span>{{ $t('filter.all') }}</span>
+            </button>
+            <button
+              type="button"
+              class="sct-sort-btn"
+              :class="{ active: priceSort === 'asc' }"
+              @click="priceSort = 'asc'"
+            >
+              <i class="ri-sort-asc"></i>
+              <span>{{ $t('filter.asc') }}</span>
+            </button>
+            <button
+              type="button"
+              class="sct-sort-btn"
+              :class="{ active: priceSort === 'desc' }"
+              @click="priceSort = 'desc'"
+            >
+              <i class="ri-sort-desc"></i>
+              <span>{{ $t('filter.desc') }}</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      <!-- STANDALONE VIEW MODE SWITCHER (RIGHT ABOVE FIRST MENU GROUP) -->
-      <div v-if="filteredMenu.length > 0" class="menu-view-bar">
+      <!-- MOBILE VIEW MODE SWITCHER -->
+      <div v-if="isMobile && filteredMenu.length > 0" class="menu-view-bar">
         <div
           class="menu-view-switcher"
           role="group"
@@ -1532,6 +1576,12 @@
                   <i class="ri-arrow-right-s-line"></i>
                   <span>{{ cat }}</span>
                 </button>
+              </li>
+              <li>
+                <RouterLink to="/bang-tin" class="pwf-nav-link is-highlight">
+                  <i class="ri-newspaper-line"></i>
+                  <span>{{ $t('footer.feedLink') }}</span>
+                </RouterLink>
               </li>
               <li>
                 <RouterLink to="/blog" class="pwf-nav-link is-highlight">
@@ -2455,6 +2505,106 @@
     <i class="ri-arrow-up-line"></i>
   </button>
 
+  <!-- ===== PC FLOATING CONTACT CHAT BUTTON & COMPACT MODAL (ABOVE SCROLL TO TOP) ===== -->
+  <div
+    v-if="!isMobile && !loadingMain && shopContactList.length && !showProgressModal && !showExportModal && !showDetailSidebar"
+    class="pc-contact-chat-wrap"
+    :class="{ 'is-raised': showScrollTop }"
+  >
+    <div
+      v-if="showPcContactModal"
+      class="pc-chat-backdrop"
+      @click="showPcContactModal = false"
+    ></div>
+
+    <transition name="pc-chat-pop">
+      <div
+        v-if="showPcContactModal"
+        class="pc-chat-modal"
+        role="dialog"
+        :aria-label="$t('contact.supportInfo')"
+        @click.stop
+      >
+        <div class="pcm-header">
+          <div class="pcm-title-wrap">
+            <span class="pcm-head-ico is-ios-msg">
+              <svg class="ios-msg-svg is-static-ico" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+                <path
+                  d="M16 6.2C9.92 6.2 5 10.12 5 14.96c0 2.74 1.58 5.18 4.06 6.79-.22 1.38-.86 2.68-1.84 3.63-.26.25-.09.69.27.69 1.98-.03 3.86-.68 5.3-1.74 1.01.25 2.09.39 3.21.39 6.08 0 11-3.92 11-8.76S22.08 6.2 16 6.2Z"
+                  fill="#FFFFFF"
+                />
+              </svg>
+            </span>
+            <div class="pcm-head-text">
+              <strong>{{ $t('contact.supportInfo') }}</strong>
+              <span>{{ $t('contact.officialChannels') }}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="pcm-close-btn"
+            aria-label="Close"
+            @click="showPcContactModal = false"
+          >
+            <i class="ri-close-line"></i>
+          </button>
+        </div>
+
+        <div class="pcm-body">
+          <component
+            :is="c.Direct_link ? 'a' : 'div'"
+            v-for="c in shopContactList"
+            :key="'pcm-' + c.ID"
+            :href="c.Direct_link || undefined"
+            :target="c.Direct_link ? '_blank' : undefined"
+            :rel="c.Direct_link ? 'noopener noreferrer' : undefined"
+            class="pcm-contact-row"
+            :class="{
+              'is-msg-allowed': isContactMessageAllowed(c),
+              'is-static': !c.Direct_link,
+            }"
+          >
+            <img :src="c.URL_img" :alt="c.PLATFORM_name" class="pcm-avatar" />
+            <div class="pcm-meta">
+              <div class="pcm-name-line">
+                <span class="pcm-name">{{ c.PLATFORM_name }}</span>
+                <span v-if="isContactMessageAllowed(c)" class="contact-msg-badge is-compact">
+                  <i class="ri-message-3-fill"></i>
+                  <span>{{ $t('contact.allowMessageBadge') }}</span>
+                </span>
+              </div>
+              <div class="pcm-info">{{ c.INFO }}</div>
+            </div>
+            <i v-if="c.Direct_link" class="ri-arrow-right-up-line pcm-ext"></i>
+          </component>
+        </div>
+      </div>
+    </transition>
+
+    <button
+      type="button"
+      class="pc-contact-chat-fab"
+      :class="{ active: showPcContactModal }"
+      :title="$t('contact.supportInfo')"
+      :aria-label="$t('contact.supportInfo')"
+      @click="showPcContactModal = !showPcContactModal"
+    >
+      <i v-if="showPcContactModal" class="ri-close-line"></i>
+      <svg
+        v-else
+        class="ios-msg-svg"
+        viewBox="0 0 32 32"
+        fill="none"
+        aria-hidden="true"
+      >
+        <path
+          d="M16 6.2C9.92 6.2 5 10.12 5 14.96c0 2.74 1.58 5.18 4.06 6.79-.22 1.38-.86 2.68-1.84 3.63-.26.25-.09.69.27.69 1.98-.03 3.86-.68 5.3-1.74 1.01.25 2.09.39 3.21.39 6.08 0 11-3.92 11-8.76S22.08 6.2 16 6.2Z"
+          fill="#FFFFFF"
+        />
+      </svg>
+    </button>
+  </div>
+
   <!-- ===== FLOATING RIGHT MINI CART CARD WHEN SIDEBAR CLOSED (PA1 - DESKTOP) ===== -->
   <transition name="right-cart-dock">
     <button
@@ -2509,11 +2659,12 @@
     </button>
   </transition>
 
-  <!-- ===== FLOATING LEFT TRUST & CONTACT DOCK (PA1 - DESKTOP) ===== -->
+  <!-- ===== FLOATING LEFT PARTNER & VERTICAL AD STANDEE DOCK (PA1 - ZERO SCROLL) ===== -->
   <aside
-    v-if="!isMobile && !loadingMain"
+    v-if="!isMobile && !loadingMain && hasPcLeftDock"
     class="left-trust-dock"
     :class="{ 'is-collapsed': leftDockCollapsed }"
+    :style="{ '--ltd-reserved-h': `${leftDockReservedPx}px` }"
     @wheel="forwardWheelToMain"
   >
     <button
@@ -2526,13 +2677,20 @@
     </button>
 
     <div class="ltd-scroll-body">
-      <div v-if="activePartnerList.length" class="ltd-partner-section">
+      <div
+        v-if="activePartnerList.length"
+        class="ltd-partner-section"
+        :class="{ 'no-divider': !orderVerticalBanners.length }"
+      >
         <div v-if="!leftDockCollapsed" class="ltd-section-title">
           <i class="ri-links-fill"></i>
           <span>{{ $t('contact.ecosystem') }}</span>
         </div>
 
-        <div class="ltd-partner-list">
+        <div
+          class="ltd-partner-list"
+          :class="{ 'is-compact-grid': !leftDockCollapsed && activePartnerList.length >= 4 }"
+        >
           <a
             v-for="(p, pIdx) in activePartnerList"
             :key="'ltd-pt-' + p.ID"
@@ -2551,77 +2709,137 @@
             </div>
             <div v-if="!leftDockCollapsed" class="ltd-partner-meta">
               <div class="ltd-partner-name">{{ p.Name }}</div>
-              <div v-if="p.Subtitle" class="ltd-partner-sub">{{ p.Subtitle }}</div>
+              <div v-if="p.Subtitle && activePartnerList.length < 4" class="ltd-partner-sub">
+                {{ p.Subtitle }}
+              </div>
             </div>
-            <i v-if="!leftDockCollapsed" class="ri-arrow-right-up-line ltd-partner-ext"></i>
+            <i
+              v-if="!leftDockCollapsed && activePartnerList.length < 4"
+              class="ri-arrow-right-up-line ltd-partner-ext"
+            ></i>
           </a>
         </div>
       </div>
 
-      <div class="ltd-scam-group">
-        <a
-          v-for="item in CHECK_SCAM_LINKS"
-          :key="'ltd-scam-' + item.key"
-          :href="item.url"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="ltd-scam-btn"
-          :class="item.variant"
-          :title="`${item.title} - ${item.sub}`"
+      <div
+        v-if="orderVerticalBanners.length && activeOrderVertAd"
+        class="ltd-ad-section"
+        @mouseenter="onVertAdMouseEnter"
+        @mouseleave="onVertAdMouseLeave"
+      >
+        <button
+          v-if="leftDockCollapsed"
+          type="button"
+          class="ltd-ad-collapsed-btn"
+          :title="$t('feed.sidebarAdTitle')"
+          @click="leftDockCollapsed = false"
         >
-          <span class="ltd-scam-icon">
-            <i :class="item.icon"></i>
+          <i class="ri-megaphone-fill"></i>
+          <span v-if="orderVerticalBanners.length > 1" class="ltd-ad-mini-count">
+            {{ orderVerticalBanners.length }}
           </span>
-          <span v-if="!leftDockCollapsed" class="ltd-scam-text">
-            <span class="ltd-scam-title">{{ item.title }}</span>
-            <span class="ltd-scam-sub">{{ item.sub }}</span>
-          </span>
-          <span v-else class="ltd-scam-mini">{{ item.short }}</span>
-          <i v-if="!leftDockCollapsed" class="ri-external-link-line ltd-scam-ext"></i>
-        </a>
-      </div>
+        </button>
 
-      <div v-if="shopContactList.length" class="ltd-contact-section">
-        <div v-if="!leftDockCollapsed" class="ltd-section-title">
-          <i class="ri-customer-service-2-fill"></i>
-          <span>{{ $t('contact.officialChannels') }}</span>
-        </div>
-        <div v-else class="ltd-divider"></div>
-
-        <div class="ltd-contact-list">
-          <component
-            :is="c.Direct_link ? 'a' : 'div'"
-            v-for="c in shopContactList"
-            :key="'ltd-' + c.ID"
-            :href="c.Direct_link || undefined"
-            :target="c.Direct_link ? '_blank' : undefined"
-            :rel="c.Direct_link ? 'noopener noreferrer' : undefined"
-            class="ltd-contact-card"
-            :class="{
-              'is-msg-allowed': isContactMessageAllowed(c),
-              'is-static': !c.Direct_link
-            }"
-            :title="`${c.PLATFORM_name}: ${c.INFO}`"
-          >
-            <div class="ltd-contact-avatar-wrap">
-              <img :src="c.URL_img" class="ltd-contact-img" :alt="c.PLATFORM_name" />
-              <span
-                v-if="leftDockCollapsed && isContactMessageAllowed(c)"
-                class="ltd-msg-dot"
-              ></span>
+        <template v-else>
+          <div class="ltd-standee-head">
+            <div class="ltd-section-title">
+              <i class="ri-megaphone-line"></i>
+              <span>{{ $t('feed.sidebarAdTitle') }}</span>
             </div>
-            <div v-if="!leftDockCollapsed" class="ltd-contact-meta">
-              <div class="ltd-contact-name-row">
-                <div class="ltd-contact-name">{{ c.PLATFORM_name }}</div>
-                <span v-if="isContactMessageAllowed(c)" class="contact-msg-badge is-compact">
-                  <i class="ri-message-3-fill"></i>
-                  <span>{{ $t('contact.allowMessageBadge') }}</span>
+            <span v-if="orderVerticalBanners.length > 1" class="ltd-standee-counter">
+              {{ currentVertAdIndex + 1 }}/{{ orderVerticalBanners.length }}
+            </span>
+          </div>
+
+          <transition name="standee-fade" mode="out-in">
+            <a
+              v-if="
+                activeOrderVertAd.action === BANNER_CLICK_ACTIONS.LINK &&
+                activeOrderVertAd.normalizedLink
+              "
+              :key="'ltd-ad-link-' + activeOrderVertAd.ID"
+              :href="activeOrderVertAd.normalizedLink"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="ltd-ad-card"
+              :title="activeOrderVertAd.cleanTitle || ''"
+            >
+              <div
+                class="ltd-ad-poster has-ambient"
+                :style="getAmbientGlassStyle(activeOrderVertAd.URL)"
+              >
+                <img
+                  :src="activeOrderVertAd.URL"
+                  :alt="activeOrderVertAd.cleanTitle || logo?.Name || 'SA KITCHEN'"
+                  class="ltd-ad-img"
+                />
+                <span class="ltd-ad-corner-ico">
+                  <i class="ri-arrow-right-up-line"></i>
                 </span>
               </div>
-              <div class="ltd-contact-info">{{ c.INFO }}</div>
+              <div v-if="activeOrderVertAd.cleanTitle" class="ltd-ad-caption">
+                {{ activeOrderVertAd.cleanTitle }}
+              </div>
+            </a>
+
+            <button
+              v-else
+              :key="'ltd-ad-btn-' + activeOrderVertAd.ID"
+              type="button"
+              class="ltd-ad-card is-btn"
+              :title="activeOrderVertAd.cleanTitle || ''"
+              @click="onOrderVerticalBannerClick(activeOrderVertAd)"
+            >
+              <div
+                class="ltd-ad-poster has-ambient"
+                :style="getAmbientGlassStyle(activeOrderVertAd.URL)"
+              >
+                <img
+                  :src="activeOrderVertAd.URL"
+                  :alt="activeOrderVertAd.cleanTitle || logo?.Name || 'SA KITCHEN'"
+                  class="ltd-ad-img"
+                />
+                <span class="ltd-ad-corner-ico">
+                  <i class="ri-fullscreen-line"></i>
+                </span>
+              </div>
+              <div v-if="activeOrderVertAd.cleanTitle" class="ltd-ad-caption">
+                {{ activeOrderVertAd.cleanTitle }}
+              </div>
+            </button>
+          </transition>
+
+          <!-- AUTO-SLIDE DOTS & ARROWS WHEN MULTIPLE VERTICAL BANNERS -->
+          <div v-if="orderVerticalBanners.length > 1" class="ltd-standee-nav">
+            <button
+              type="button"
+              class="ltd-snav-btn"
+              aria-label="Previous"
+              @click="stepOrderVertAd(-1)"
+            >
+              <i class="ri-arrow-left-s-line"></i>
+            </button>
+            <div class="ltd-snav-dots">
+              <button
+                v-for="(item, idx) in orderVerticalBanners"
+                :key="'dot-' + item.ID"
+                type="button"
+                class="ltd-snav-dot"
+                :class="{ active: idx === currentVertAdIndex }"
+                :aria-label="`Banner ${idx + 1}`"
+                @click="goToOrderVertAd(idx)"
+              ></button>
             </div>
-          </component>
-        </div>
+            <button
+              type="button"
+              class="ltd-snav-btn"
+              aria-label="Next"
+              @click="stepOrderVertAd(1)"
+            >
+              <i class="ri-arrow-right-s-line"></i>
+            </button>
+          </div>
+        </template>
       </div>
     </div>
   </aside>
@@ -2663,7 +2881,11 @@
           :rel="isExternalPopupLink(activeEntryPopup.linkUrl) ? 'noopener noreferrer' : undefined"
           @click="handleEntryPopupLinkClick($event, activeEntryPopup)"
         >
-          <div v-if="activeEntryPopup.imageUrl" class="epn-img-wrap">
+          <div
+            v-if="activeEntryPopup.imageUrl"
+            class="epn-img-wrap has-ambient"
+            :style="getAmbientGlassStyle(activeEntryPopup.imageUrl)"
+          >
             <img
               :src="activeEntryPopup.imageUrl"
               :alt="activeEntryPopup.text || 'Popup notice'"
@@ -3652,7 +3874,14 @@
   >
     <div class="btn-inner">
       <div class="btn-scale">
-        <i class="ri-customer-service-fill"></i>
+        <span class="mob-ios-msg-badge" :class="{ 'is-open': activeMobilePanel === 'contact' }">
+          <svg class="ios-msg-svg" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <path
+              d="M16 6.2C9.92 6.2 5 10.12 5 14.96c0 2.74 1.58 5.18 4.06 6.79-.22 1.38-.86 2.68-1.84 3.63-.26.25-.09.69.27.69 1.98-.03 3.86-.68 5.3-1.74 1.01.25 2.09.39 3.21.39 6.08 0 11-3.92 11-8.76S22.08 6.2 16 6.2Z"
+              fill="#FFFFFF"
+            />
+          </svg>
+        </span>
         <span class="btn-label">{{ $t('mobile.contact') }}</span>
       </div>
     </div>
@@ -6109,6 +6338,9 @@ import { resolveProductBadge } from '@/utils/productBadge'
 import { getPartnerCardStyle } from '@/utils/partnerColor'
 import {
   BANNER_CLICK_ACTIONS,
+  isBannerActive,
+  isHomeBanner,
+  isOrderVerticalBanner,
   normalizeBannerAction,
   normalizeBannerLink,
   openBannerLinkInNewTab,
@@ -8497,12 +8729,8 @@ onMounted(() => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
 
-  //  AUTO BẬT / TẮT GIỎ THEO THIẾT BỊ
-  if (isMobile.value) {
-    showCart.value = false   // mobile → tắt
-  } else {
-    showCart.value = true    // desktop → bật
-  }
+  // Mặc định đóng giỏ hàng trên cả Mobile và PC (PC hiển thị thẻ Mini-Cart gọn bên phải)
+  showCart.value = false
 })
 
 watch(isMobile, (val) => {
@@ -8514,8 +8742,8 @@ watch(isMobile, (val) => {
       showDetailSidebar.value = true
     }
   } else {
-    // chuyển sang desktop
-    showCart.value = true
+    // chuyển sang desktop: giữ giỏ hàng đóng mặc định
+    showCart.value = false
     if (selectedItem.value) {
       showDetailSidebar.value = false
       showDetail.value = true
@@ -8611,6 +8839,7 @@ const bannerKey = ref(0)
 const mainRef = ref(null)
 const scamHubRef = ref(null)
 const showScrollTop = ref(false)
+const showPcContactModal = ref(false)
 const showHeaderScam = ref(false)
 const isBannerTransitioning = ref(false)
 
@@ -9690,13 +9919,130 @@ const parseBannerOrder = (item) => {
 }
 
 const bannerList = computed(() =>
-  [...(banners.value || [])].sort((a, b) => {
-    const orderDiff = parseBannerOrder(a) - parseBannerOrder(b)
-    if (orderDiff !== 0) return orderDiff
-    // Fallback: ID mới (thời gian lớn hơn) lên trước
-    return String(b.ID).localeCompare(String(a.ID))
-  })
+  (banners.value || [])
+    .filter((item) => Boolean(item?.URL) && isHomeBanner(item) && isBannerActive(item))
+    .sort((a, b) => {
+      const orderDiff = parseBannerOrder(a) - parseBannerOrder(b)
+      if (orderDiff !== 0) return orderDiff
+      // Fallback: ID mới (thời gian lớn hơn) lên trước
+      return String(b.ID).localeCompare(String(a.ID))
+    })
 )
+
+const orderVerticalBanners = computed(() =>
+  (banners.value || [])
+    .filter((item) => Boolean(item?.URL) && isOrderVerticalBanner(item) && isBannerActive(item))
+    .sort((a, b) => {
+      const orderDiff = parseBannerOrder(a) - parseBannerOrder(b)
+      if (orderDiff !== 0) return orderDiff
+      return String(b.ID).localeCompare(String(a.ID))
+    })
+    .map((b) => ({
+      ...b,
+      action: normalizeBannerAction(b.Click_action),
+      normalizedLink: normalizeBannerLink(b.Link_url),
+      cleanTitle: String(b.Title || '').trim(),
+    }))
+)
+
+const hasPcLeftDock = computed(
+  () => activePartnerList.value.length > 0 || orderVerticalBanners.value.length > 0
+)
+
+const currentVertAdIndex = ref(0)
+const vertAdHoverPaused = ref(false)
+let vertAdTimer = null
+const VERT_AD_INTERVAL = 4500
+
+const activeOrderVertAd = computed(() => {
+  const list = orderVerticalBanners.value
+  if (!list.length) return null
+  const idx = Math.min(Math.max(currentVertAdIndex.value, 0), list.length - 1)
+  return list[idx] || list[0]
+})
+
+const leftDockReservedPx = computed(() => {
+  const pCount = activePartnerList.value.length
+  let partnerH = 0
+  if (pCount > 0) {
+    const rows = pCount >= 4 ? Math.ceil(pCount / 2) : pCount
+    const rowH = pCount >= 4 ? 58 : 50
+    partnerH = 32 + rows * rowH
+  }
+  const hasCaption = Boolean(activeOrderVertAd.value?.cleanTitle)
+  const adChromeH = 26 + (hasCaption ? 34 : 0) + (orderVerticalBanners.value.length > 1 ? 26 : 0)
+  return partnerH + adChromeH
+})
+
+function stopVertAdAuto() {
+  if (vertAdTimer) {
+    clearTimeout(vertAdTimer)
+    vertAdTimer = null
+  }
+}
+
+function startVertAdAuto() {
+  stopVertAdAuto()
+  if (
+    orderVerticalBanners.value.length <= 1 ||
+    vertAdHoverPaused.value ||
+    leftDockCollapsed.value ||
+    isMobile.value
+  ) {
+    return
+  }
+  vertAdTimer = setTimeout(() => {
+    currentVertAdIndex.value = (currentVertAdIndex.value + 1) % orderVerticalBanners.value.length
+    startVertAdAuto()
+  }, VERT_AD_INTERVAL)
+}
+
+function stepOrderVertAd(delta) {
+  const total = orderVerticalBanners.value.length
+  if (total <= 1) return
+  currentVertAdIndex.value = (currentVertAdIndex.value + delta + total) % total
+  startVertAdAuto()
+}
+
+function goToOrderVertAd(idx) {
+  if (idx < 0 || idx >= orderVerticalBanners.value.length) return
+  currentVertAdIndex.value = idx
+  startVertAdAuto()
+}
+
+function onVertAdMouseEnter() {
+  vertAdHoverPaused.value = true
+  stopVertAdAuto()
+}
+
+function onVertAdMouseLeave() {
+  vertAdHoverPaused.value = false
+  startVertAdAuto()
+}
+
+watch(
+  [orderVerticalBanners, leftDockCollapsed, isMobile],
+  () => {
+    if (currentVertAdIndex.value >= orderVerticalBanners.value.length) {
+      currentVertAdIndex.value = 0
+    }
+    startVertAdAuto()
+  },
+  { immediate: true },
+)
+
+watch(hasPcLeftDock, () => {
+  nextTick(updateNoticeOverflow)
+}, { flush: 'post' })
+
+function onOrderVerticalBannerClick(ad) {
+  if (!ad) return
+  if (ad.action === BANNER_CLICK_ACTIONS.LINK && ad.normalizedLink) {
+    openBannerLinkInNewTab(ad.normalizedLink)
+    return
+  }
+  openImageModal(ad.URL, ad.normalizedLink)
+}
 
 watch(bannerList, () => {
   currentBannerIndex.value = 0
@@ -10274,7 +10620,7 @@ async function addToCart(m, evt = null, opts = null) {
     tempQty.value[m.Ma_hang] = 1
   }
 
-  //  CHỈ DESKTOP MỚI AUTO MỞ GIỎ
+  // Mặc định đóng giỏ khi vào trang, nhưng tự mở giỏ trên PC ngay khi khách thêm món
   if (!isMobile.value) {
     showCart.value = true
   }
@@ -12092,6 +12438,7 @@ onUnmounted(() => {
   }
   addedTimersByCode.clear()
   stopBannerAuto()
+  stopVertAdAuto()
   stopCardImageAuto()
   if (lazyLoadObserver) {
     lazyLoadObserver.disconnect()
@@ -12457,8 +12804,7 @@ const hasSale = computed(() =>
 
 .sa-storefront.sa-radius-sharp .card,
 .sa-storefront.sa-radius-sharp .banner,
-.sa-storefront.sa-radius-sharp .notice-bar,
-.sa-storefront.sa-radius-sharp .sidebar-right {
+.sa-storefront.sa-radius-sharp .notice-bar {
   border-radius: var(--sa-radius-card) !important;
 }
 
@@ -12472,8 +12818,7 @@ const hasSale = computed(() =>
 
 .sa-storefront.sa-radius-pill .card,
 .sa-storefront.sa-radius-pill .banner,
-.sa-storefront.sa-radius-pill .notice-bar,
-.sa-storefront.sa-radius-pill .sidebar-right {
+.sa-storefront.sa-radius-pill .notice-bar {
   border-radius: var(--sa-radius-card) !important;
 }
 
@@ -12564,13 +12909,250 @@ const hasSale = computed(() =>
 .dth-brand-cluster {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-shrink: 0;
   min-width: 0;
 }
 
-.dth-brand-cluster .dth-blog-link {
+.dth-primary-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  margin-left: 6px;
+  padding-left: 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.24);
+  flex-shrink: 0;
+}
+
+.sa-storefront .dth-nav-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 0;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.82);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
   text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.18s ease, opacity 0.18s ease;
+}
+
+.sa-storefront .dth-nav-item::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--sa-secondary-bright, #fde047);
+  transform: scaleX(0);
+  transform-origin: center;
+  opacity: 0;
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease;
+}
+
+.sa-storefront .dth-nav-item:hover {
+  color: #ffffff;
+}
+
+.sa-storefront .dth-nav-item:hover::after {
+  transform: scaleX(0.65);
+  opacity: 0.75;
+}
+
+.sa-storefront .dth-nav-item.active {
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.sa-storefront .dth-nav-item.active::after {
+  transform: scaleX(1);
+  opacity: 1;
+}
+
+.dth-nav-dropdown {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.sa-storefront .dth-nav-dropdown-trigger {
+  gap: 3px;
+}
+
+.sa-storefront .dth-nav-chevron {
+  font-size: 15px;
+  line-height: 1;
+  opacity: 0.85;
+  transition: transform 0.2s ease;
+}
+
+.dth-nav-dropdown:hover .dth-nav-dropdown-trigger,
+.dth-nav-dropdown:focus-within .dth-nav-dropdown-trigger {
+  color: #ffffff;
+}
+
+.dth-nav-dropdown:hover .dth-nav-dropdown-trigger::after,
+.dth-nav-dropdown:focus-within .dth-nav-dropdown-trigger::after {
+  transform: scaleX(0.65);
+  opacity: 0.75;
+}
+
+.dth-nav-dropdown:hover .dth-nav-chevron,
+.dth-nav-dropdown:focus-within .dth-nav-chevron {
+  transform: rotate(180deg);
+}
+
+.dth-nav-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  min-width: 268px;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--sa-surface, #ffffff);
+  border: 1px solid var(--sa-border, #e2e8f0);
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.18),
+    0 4px 12px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 120;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(6px);
+  transition:
+    opacity 0.18s ease,
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 0.18s;
+}
+
+.dth-nav-dropdown-menu::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -12px;
+  height: 12px;
+}
+
+.sa-storefront.theme-dark .dth-nav-dropdown-menu {
+  border-color: var(--sa-border-strong);
+  box-shadow:
+    0 20px 46px rgba(0, 0, 0, 0.5),
+    0 4px 14px rgba(0, 0, 0, 0.32);
+}
+
+.dth-nav-dropdown:hover .dth-nav-dropdown-menu,
+.dth-nav-dropdown:focus-within .dth-nav-dropdown-menu {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+  transition-delay: 0s;
+}
+
+.sa-storefront .dth-scam-dd-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--sa-heading);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.sa-storefront .dth-scam-dd-item:hover {
+  background: var(--sa-surface-2);
+}
+
+.sa-storefront .dth-scam-dd-ico {
+  font-size: 17px;
+  flex-shrink: 0;
+}
+
+.sa-storefront .dth-scam-dd-item.is-verify .dth-scam-dd-ico {
+  color: #10b981;
+}
+
+.sa-storefront .dth-scam-dd-item.is-shops .dth-scam-dd-ico {
+  color: #f59e0b;
+}
+
+.sa-storefront .dth-scam-dd-item.is-alerts .dth-scam-dd-ico {
+  color: #f43f5e;
+}
+
+.sa-storefront .dth-scam-dd-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sa-storefront .dth-scam-dd-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sa-heading);
+  line-height: 1.25;
+}
+
+.sa-storefront .dth-scam-dd-sub {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--sa-muted);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sa-storefront .dth-scam-dd-ext {
+  font-size: 14px;
+  color: var(--sa-muted);
+  opacity: 0.7;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, opacity 0.15s ease, color 0.15s ease;
+}
+
+.sa-storefront .dth-scam-dd-item:hover .dth-scam-dd-ext {
+  opacity: 1;
+  color: var(--sa-accent);
+  transform: translate(1px, -1px);
+}
+
+@media (max-width: 1260px) {
+  .dth-primary-nav {
+    gap: 12px;
+    margin-left: 2px;
+    padding-left: 11px;
+  }
+
+  .sa-storefront .dth-nav-item {
+    font-size: 13px;
+  }
+}
+
+.filter-btn.filter-feed-btn {
+  text-decoration: none;
+  background: var(--sa-surface-soft);
+  border: 1px solid var(--sa-border-green);
+  color: var(--sa-accent);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .dth-brand {
@@ -13597,7 +14179,34 @@ const hasSale = computed(() =>
   background: rgba(225, 29, 72, 0.08);
 }
 
-/* SEGMENTED PRICE SORT CONTROL */
+/* SEGMENTED VIEW & PRICE SORT CONTROLS IN DESKTOP FILTER BAR */
+.mfb-right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.menu-view-switcher.is-in-filter-bar {
+  padding: 3px;
+  gap: 2px;
+  border-radius: 10px;
+  border: 1px solid var(--sa-border);
+  box-shadow: none;
+}
+
+.menu-view-switcher.is-in-filter-bar .mvs-btn {
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 7px;
+  font-size: 12.5px;
+}
+
+.menu-view-switcher.is-in-filter-bar .mvs-btn i {
+  font-size: 14px;
+}
+
 .sct-sort-group {
   display: inline-flex;
   align-items: center;
@@ -13641,13 +14250,13 @@ const hasSale = computed(() =>
    ========================================================= */
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 8px var(--pc-sidebar-w, clamp(336px, 24.5vw, 368px));
+  grid-template-columns: minmax(0, 1fr);
   min-height: calc(100vh - var(--sa-header-h));
-  background: var(--sa-bg);
+  background: var(--sa-main-bg);
   width: 100%;
   max-width: 100vw;
   overflow-x: hidden;
-  transition: grid-template-columns 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: background-color 0.22s ease;
 }
 
 .layout.is-resizing-sidebar {
@@ -13656,7 +14265,12 @@ const hasSale = computed(() =>
 
 .layout.is-resizing-sidebar .sidebar-right,
 .layout.is-resizing-sidebar .sidebar-right .sidebar-content,
-.layout.is-resizing-sidebar .pc-sidebar-resizer {
+.layout.is-resizing-sidebar .pc-sidebar-resizer,
+.layout.is-resizing-sidebar .hero-container,
+.layout.is-resizing-sidebar .scam-hub-section,
+.layout.is-resizing-sidebar .sct-inner,
+.layout.is-resizing-sidebar .sct-subcat-inner,
+.layout.is-resizing-sidebar .menu-container {
   transition: none !important;
 }
 
@@ -13668,23 +14282,26 @@ const hasSale = computed(() =>
 
 .layout.hide-right,
 .layout.hide-left.hide-right {
-  grid-template-columns: minmax(0, 1fr) 0px 0px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .pc-sidebar-resizer {
-  position: sticky;
-  top: var(--sa-header-h);
-  height: calc(100vh - var(--sa-header-h));
-  width: 8px;
+  position: fixed;
+  right: calc(var(--pc-cart-dock-w, var(--pc-sidebar-w, clamp(336px, 24.5vw, 368px))) + 14px);
+  top: calc(var(--sa-header-h, 64px) + 24px);
+  bottom: 26px;
+  height: auto;
+  width: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: col-resize;
-  z-index: 25;
-  background: var(--sa-bg);
+  z-index: 47;
+  background: transparent !important;
   touch-action: none;
-  overflow: hidden;
-  transition: opacity 0.22s ease, width 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    opacity 0.22s ease,
+    right 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .pc-sidebar-resizer.is-hidden {
@@ -14158,6 +14775,10 @@ const hasSale = computed(() =>
   margin-bottom: 10px;
 }
 
+.partner-hub-bar:last-child {
+  margin-bottom: 0;
+}
+
 .partner-hub-bar.is-scrollable {
   justify-content: flex-start;
   overflow-x: auto;
@@ -14329,44 +14950,37 @@ const hasSale = computed(() =>
 }
 
 @media (min-width: 769px) {
-  .main.dock-expanded .hero-container,
-  .main.dock-expanded .scam-hub-section,
-  .main.dock-expanded .sct-inner,
-  .main.dock-expanded .sct-subcat-inner,
-  .main.dock-expanded .menu-container {
-    width: min(1360px, calc(100% - 218px));
-    margin-left: max(218px, calc((100% - 1360px) / 2));
-    margin-right: auto;
+  .layout {
+    --pc-cart-dock-w: var(--pc-sidebar-w, clamp(336px, 24.5vw, 368px));
+    --pc-left-gutter: 0px;
+    --pc-right-gutter: calc(var(--pc-cart-dock-w) + 22px);
   }
 
-  .main.dock-collapsed .hero-container,
-  .main.dock-collapsed .scam-hub-section,
-  .main.dock-collapsed .sct-inner,
-  .main.dock-collapsed .sct-subcat-inner,
-  .main.dock-collapsed .menu-container {
-    width: min(1360px, calc(100% - 78px));
-    margin-left: max(78px, calc((100% - 1360px) / 2));
-    margin-right: auto;
+  .layout.hide-right {
+    --pc-right-gutter: 116px;
   }
 
-  /* Reserve clean right gutter when Cart Sidebar is closed so Right Mini Cart Card never overlaps products */
-  .layout.hide-right .main.dock-expanded .hero-container,
-  .layout.hide-right .main.dock-expanded .scam-hub-section,
-  .layout.hide-right .main.dock-expanded .sct-inner,
-  .layout.hide-right .main.dock-expanded .sct-subcat-inner,
-  .layout.hide-right .main.dock-expanded .menu-container {
-    width: min(1360px, calc(100% - 218px - 116px));
-    margin-left: max(218px, calc((100% - 1360px) / 2));
-    margin-right: auto;
+  .main.dock-expanded {
+    --pc-left-gutter: 218px;
   }
 
-  .layout.hide-right .main.dock-collapsed .hero-container,
-  .layout.hide-right .main.dock-collapsed .scam-hub-section,
-  .layout.hide-right .main.dock-collapsed .sct-inner,
-  .layout.hide-right .main.dock-collapsed .sct-subcat-inner,
-  .layout.hide-right .main.dock-collapsed .menu-container {
-    width: min(1360px, calc(100% - 78px - 116px));
-    margin-left: max(78px, calc((100% - 1360px) / 2));
+  .main.dock-collapsed {
+    --pc-left-gutter: 78px;
+  }
+
+  .main .hero-container,
+  .main .scam-hub-section,
+  .main .sct-inner,
+  .main .sct-subcat-inner,
+  .main .menu-container {
+    width: min(1360px, calc(100% - var(--pc-left-gutter) - var(--pc-right-gutter)));
+    margin-left: max(
+      var(--pc-left-gutter),
+      calc(
+        var(--pc-left-gutter) +
+          (100% - var(--pc-left-gutter) - var(--pc-right-gutter) - 1360px) / 2
+      )
+    );
     margin-right: auto;
   }
 }
@@ -14438,7 +15052,7 @@ const hasSale = computed(() =>
   box-shadow: 0 4px 12px rgba(var(--sa-primary-rgb), 0.32);
 }
 
-.prcd-badge {
+.sa-storefront .prcd-badge {
   position: absolute;
   top: -6px;
   right: -7px;
@@ -14467,21 +15081,21 @@ const hasSale = computed(() =>
   min-width: 0;
 }
 
-.prcd-empty-title {
+.sa-storefront .prcd-empty-title {
   font-size: 12px;
   font-weight: 800;
   color: var(--sa-heading);
   line-height: 1.2;
 }
 
-.prcd-count-line {
+.sa-storefront .prcd-count-line {
   font-size: 11px;
   font-weight: 600;
   color: var(--sa-muted);
   line-height: 1.2;
 }
 
-.prcd-total {
+.sa-storefront .prcd-total {
   font-size: 13px;
   font-weight: 800;
   color: var(--sa-price);
@@ -14489,7 +15103,7 @@ const hasSale = computed(() =>
   word-break: break-word;
 }
 
-.prcd-status-tag {
+.sa-storefront .prcd-status-tag {
   padding: 2px 6px;
   border-radius: 6px;
   background: var(--sa-surface-soft);
@@ -14500,25 +15114,42 @@ const hasSale = computed(() =>
   word-break: break-word;
 }
 
-.prcd-open-cta {
+.sa-storefront .prcd-open-cta {
   width: 100%;
-  padding: 5px 6px;
+  padding: 5px 8px;
   border-radius: 999px;
-  background: var(--sa-surface-2);
-  border: 1px solid var(--sa-border-strong);
-  color: var(--sa-heading);
-  font-size: 11px;
-  font-weight: 700;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.34);
+  color: #059669;
+  font-size: 11.5px;
+  font-weight: 800;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 2px;
-  transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+  transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
-.pc-right-cart-dock:hover .prcd-open-cta {
-  background: var(--sa-accent);
-  border-color: var(--sa-accent);
+.sa-storefront .prcd-open-cta span {
+  font-weight: 800;
+}
+
+.sa-storefront.theme-dark .prcd-open-cta {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(52, 211, 153, 0.36);
+  color: #34d399;
+}
+
+.sa-storefront .pc-right-cart-dock:hover .prcd-open-cta {
+  background: #059669;
+  border-color: #059669;
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(5, 150, 105, 0.28);
+}
+
+.sa-storefront.theme-dark .pc-right-cart-dock:hover .prcd-open-cta {
+  background: #10b981;
+  border-color: #10b981;
   color: #ffffff;
 }
 
@@ -14539,10 +15170,10 @@ const hasSale = computed(() =>
 .left-trust-dock {
   position: fixed;
   left: 14px;
-  top: 130px;
-  width: 200px;
-  max-height: calc(100vh - 148px);
-  padding: 10px;
+  top: calc(var(--sa-header-h, 64px) + 12px);
+  width: 204px;
+  max-height: calc(100dvh - var(--sa-header-h, 64px) - 24px);
+  padding: 9px;
   border-radius: 20px;
   background: var(--sa-surface);
   border: 1.5px solid var(--sa-border-green);
@@ -14551,7 +15182,7 @@ const hasSale = computed(() =>
     0 2px 8px rgba(var(--sa-primary-rgb), 0.08);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   z-index: 46;
   transition:
     width 0.24s cubic-bezier(0.22, 1, 0.36, 1),
@@ -14748,34 +15379,23 @@ const hasSale = computed(() =>
   flex-shrink: 0;
 }
 
-/* DOCK SCROLL BODY, PARTNER ECOSYSTEM & CONTACT CHANNELS */
+/* DOCK BODY (ZERO SCROLLBAR) & COMPACT PARTNER ECOSYSTEM */
 .ltd-scroll-body {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  flex: 1;
+  gap: 8px;
+  flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: thin;
-}
-
-.ltd-scroll-body::-webkit-scrollbar {
-  width: 4px;
-}
-
-.ltd-scroll-body::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.25);
-  border-radius: 999px;
+  overflow: hidden;
 }
 
 .ltd-partner-section {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding-bottom: 8px;
+  gap: 5px;
+  padding-bottom: 7px;
   border-bottom: 1px dashed var(--sa-border-strong);
   flex-shrink: 0;
 }
@@ -14783,16 +15403,35 @@ const hasSale = computed(() =>
 .ltd-partner-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
+}
+
+.ltd-partner-list.is-compact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.ltd-partner-list.is-compact-grid .ltd-partner-card {
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  padding: 6px 4px;
+  min-height: 52px;
+  gap: 4px;
+}
+
+.ltd-partner-list.is-compact-grid .ltd-partner-name {
+  font-size: 11px;
 }
 
 .ltd-partner-card {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 58px;
-  padding: 9px 10px;
-  border-radius: 14px;
+  gap: 8px;
+  min-height: 46px;
+  padding: 6px 9px;
+  border-radius: 12px;
   border: 1px solid var(--pt-border, rgba(255, 255, 255, 0.24));
   color: var(--pt-fg, #ffffff);
   text-decoration: none;
@@ -14825,9 +15464,9 @@ const hasSale = computed(() =>
 
 .ltd-partner-img,
 .ltd-partner-fallback {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
   object-fit: cover;
   background: rgba(255, 255, 255, 0.95);
   color: var(--pt-ico, #059669);
@@ -14835,7 +15474,7 @@ const hasSale = computed(() =>
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .left-trust-dock.is-collapsed .ltd-partner-img,
@@ -14875,6 +15514,282 @@ const hasSale = computed(() =>
   font-size: 13px;
   color: var(--pt-sub, rgba(255, 255, 255, 0.88));
   flex-shrink: 0;
+}
+
+.ltd-partner-section.no-divider {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+/* DIGITAL STANDEE VERTICAL AD IN PC LEFT DOCK (ZERO SCROLL & UNCROPPED AT ANY ZOOM) */
+.ltd-ad-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.ltd-standee-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.ltd-standee-counter {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--sa-muted);
+  background: var(--sa-surface-2);
+  border: 1px solid var(--sa-border);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+.ltd-ad-card {
+  width: 100%;
+  padding: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--sa-surface-2);
+  border: 1px solid var(--sa-border-strong);
+  color: var(--sa-heading);
+  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  min-height: 0;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.ltd-ad-card.is-btn {
+  text-align: left;
+  font-family: inherit;
+}
+
+.ltd-ad-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--sa-accent);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+}
+
+.ltd-ad-poster {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--sa-surface-soft) 0%, var(--sa-img-bg) 100%);
+}
+
+.ltd-ad-poster.has-ambient::before {
+  content: '';
+  position: absolute;
+  inset: -12%;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--sa-ambient-img);
+  background-size: cover;
+  background-position: center;
+  filter: blur(13px) saturate(1.32);
+  transform: scale(1.08);
+  opacity: 0.6;
+}
+
+.sa-storefront.theme-dark .ltd-ad-poster.has-ambient::before {
+  opacity: 0.48;
+  filter: blur(15px) saturate(1.38) brightness(0.8);
+}
+
+.ltd-ad-poster::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.34) 0%,
+    rgba(255, 255, 255, 0.08) 55%,
+    rgba(255, 255, 255, 0.22) 100%
+  );
+}
+
+.sa-storefront.theme-dark .ltd-ad-poster::after {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(15, 23, 42, 0.25) 60%
+  );
+}
+
+.ltd-ad-img {
+  position: relative;
+  z-index: 2;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: clamp(
+    110px,
+    calc(100dvh - var(--sa-header-h, 64px) - 44px - var(--ltd-reserved-h, 110px)),
+    540px
+  );
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+  transition: transform 0.24s ease;
+}
+
+.ltd-ad-card:hover .ltd-ad-img {
+  transform: scale(1.018);
+}
+
+.ltd-standee-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  height: 20px;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+.ltd-snav-btn {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--sa-border-strong);
+  background: var(--sa-surface-2);
+  color: var(--sa-heading);
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.ltd-snav-btn:hover {
+  background: var(--sa-accent);
+  border-color: var(--sa-accent);
+  color: #ffffff;
+}
+
+.ltd-snav-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex: 1;
+}
+
+.ltd-snav-dot {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border-radius: 999px;
+  border: none;
+  background: var(--sa-border-strong);
+  cursor: pointer;
+  transition: width 0.2s ease, background-color 0.2s ease;
+}
+
+.ltd-snav-dot.active {
+  width: 16px;
+  background: var(--sa-accent);
+}
+
+.standee-fade-enter-active,
+.standee-fade-leave-active {
+  transition: opacity 0.24s ease, transform 0.24s ease;
+}
+
+.standee-fade-enter-from,
+.standee-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.98);
+}
+
+.ltd-ad-corner-ico {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 3;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #ffffff;
+  font-size: 12.5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(5px);
+}
+
+.ltd-ad-caption {
+  padding: 7px 9px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--sa-heading);
+  line-height: 1.35;
+  border-top: 1px solid var(--sa-border);
+  background: var(--sa-surface);
+}
+
+.ltd-ad-collapsed-btn {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto;
+  border-radius: 12px;
+  border: 1.5px solid var(--sa-border-green);
+  background: var(--sa-surface-soft);
+  color: var(--sa-accent);
+  font-size: 19px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    background-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.ltd-ad-collapsed-btn:hover {
+  background: var(--sa-accent);
+  color: #ffffff;
+  transform: scale(1.06);
+}
+
+.ltd-ad-mini-count {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .ltd-contact-section {
@@ -16072,36 +16987,56 @@ const hasSale = computed(() =>
 
 @media (min-width: 769px) {
   .sidebar-right {
+    position: fixed;
+    right: 14px;
+    top: calc(var(--sa-header-h, 64px) + 12px);
+    bottom: 14px;
+    width: var(--pc-cart-dock-w, var(--pc-sidebar-w, clamp(336px, 24.5vw, 368px)));
+    height: auto;
+    margin: 0;
+    border-radius: 20px;
+    border: 1.5px solid var(--sa-border-green);
+    background: var(--sa-surface);
+    box-shadow:
+      0 16px 40px rgba(15, 23, 42, 0.14),
+      0 4px 12px rgba(15, 23, 42, 0.06),
+      0 0 0 1px rgba(var(--sa-primary-rgb), 0.06);
+    z-index: 46;
     overflow: hidden;
     transition:
+      transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.24s ease,
       background-color 0.22s ease,
       border-color 0.22s ease,
-      opacity 0.26s ease,
+      box-shadow 0.22s ease,
       visibility 0s linear 0s;
   }
 
+  .sa-storefront.theme-dark .sidebar-right {
+    border-color: var(--sa-border-strong);
+    box-shadow:
+      0 18px 44px rgba(0, 0, 0, 0.48),
+      0 4px 14px rgba(0, 0, 0, 0.32);
+  }
+
   .sidebar-right .sidebar-content {
-    width: var(--pc-sidebar-w, clamp(336px, 24.5vw, 368px));
-    transition:
-      transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-      opacity 0.24s ease;
-    will-change: transform, opacity;
+    width: 100%;
+    transition: opacity 0.22s ease;
   }
 
   .sidebar-right.collapsed {
-    border-left-color: transparent;
+    transform: translateX(calc(100% + 24px));
+    box-shadow: none;
     opacity: 0;
     pointer-events: none;
     visibility: hidden;
     transition:
-      background-color 0.22s ease,
-      border-color 0.22s ease,
+      transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
       opacity 0.22s ease,
       visibility 0s linear 0.32s;
   }
 
   .sidebar-right.collapsed .sidebar-content {
-    transform: translateX(28px);
     opacity: 0;
   }
 
@@ -19226,7 +20161,7 @@ const hasSale = computed(() =>
 /* ===== GLOBAL SCROLL TO TOP FAB ===== */
 .scroll-top-fab {
   position: fixed;
-  right: calc(var(--pc-sidebar-w, clamp(336px, 24.5vw, 368px)) + 26px);
+  right: calc(var(--pc-sidebar-w, clamp(336px, 24.5vw, 368px)) + 28px);
   bottom: 24px;
   width: 42px;
   height: 42px;
@@ -19422,6 +20357,341 @@ const hasSale = computed(() =>
 .layout.hide-right + .scroll-top-fab,
 .layout.hide-left.hide-right + .scroll-top-fab {
   right: 20px;
+}
+
+/* ===== PC FLOATING CONTACT CHAT FAB & COMPACT MODAL (ABOVE SCROLL TO TOP) ===== */
+.pc-contact-chat-wrap {
+  position: fixed;
+  right: calc(var(--pc-sidebar-w, clamp(336px, 24.5vw, 368px)) + 28px);
+  bottom: 24px;
+  z-index: 1205;
+  transition:
+    right 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    bottom 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.pc-contact-chat-wrap.is-raised {
+  bottom: 76px;
+}
+
+.layout.hide-right ~ .pc-contact-chat-wrap,
+.layout.hide-left.hide-right ~ .pc-contact-chat-wrap {
+  right: 20px;
+}
+
+.sa-storefront:has(.layout.is-resizing-sidebar) .pc-contact-chat-wrap {
+  transition: none !important;
+}
+
+.pc-contact-chat-fab {
+  position: relative;
+  isolation: isolate;
+  width: 44px;
+  height: 44px;
+  margin-right: -1px;
+  border-radius: 13px;
+  border: none;
+  background: linear-gradient(180deg, #65f87f 0%, #30d158 52%, #1db93b 100%);
+  color: #ffffff;
+  font-size: 21px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.58),
+    inset 0 -1.5px 2px rgba(10, 95, 28, 0.25),
+    0 0 18px rgba(48, 209, 88, 0.62),
+    0 8px 22px rgba(29, 185, 59, 0.4);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    filter 0.2s ease;
+}
+
+.pc-contact-chat-fab:not(.active)::before,
+.pc-contact-chat-fab:not(.active)::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 15px;
+  background: radial-gradient(circle, rgba(74, 242, 108, 0.58) 0%, rgba(48, 209, 88, 0.28) 55%, transparent 75%);
+  border: 1.5px solid rgba(74, 242, 108, 0.72);
+  z-index: -1;
+  pointer-events: none;
+  animation: iosMsgPulseRing 2.4s cubic-bezier(0.2, 0.8, 0.3, 1) infinite;
+}
+
+.pc-contact-chat-fab:not(.active)::after {
+  animation-delay: 1.2s;
+}
+
+.ios-msg-svg {
+  width: 26px;
+  height: 26px;
+  display: block;
+  filter: drop-shadow(0 1.5px 2px rgba(8, 82, 24, 0.24));
+  transform-origin: 50% 56%;
+  animation: iosMsgWiggle 2.7s ease-in-out infinite;
+}
+
+.ios-msg-svg.is-static-ico {
+  width: 21px;
+  height: 21px;
+  animation: none;
+}
+
+.pc-contact-chat-fab:hover {
+  transform: translateY(-2px) scale(1.06);
+  filter: brightness(1.05);
+  box-shadow:
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.65),
+    0 0 24px rgba(48, 209, 88, 0.82),
+    0 11px 26px rgba(29, 185, 59, 0.5);
+}
+
+.pc-contact-chat-fab:active {
+  transform: scale(0.95);
+}
+
+.pc-contact-chat-fab.active {
+  border-radius: 50%;
+  background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.35);
+}
+
+@keyframes iosMsgPulseRing {
+  0% {
+    transform: scale(0.94);
+    opacity: 0.85;
+  }
+  75% {
+    transform: scale(1.58);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.62);
+    opacity: 0;
+  }
+}
+
+@keyframes iosMsgWiggle {
+  0%,
+  34%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+  6% {
+    transform: rotate(-14deg) scale(1.08);
+  }
+  12% {
+    transform: rotate(13deg) scale(1.08);
+  }
+  18% {
+    transform: rotate(-10deg) scale(1.05);
+  }
+  24% {
+    transform: rotate(9deg) scale(1.04);
+  }
+  29% {
+    transform: rotate(-4deg) scale(1.01);
+  }
+}
+
+.pcm-head-ico.is-ios-msg {
+  background: linear-gradient(180deg, #65f87f 0%, #30d158 52%, #1db93b 100%);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.52),
+    0 3px 10px rgba(48, 209, 88, 0.35);
+}
+
+.pc-chat-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: transparent;
+}
+
+.pc-chat-modal {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 12px);
+  width: 320px;
+  max-height: min(440px, calc(100dvh - 150px));
+  background: var(--sa-surface);
+  border: 1.5px solid var(--sa-border-green);
+  border-radius: 18px;
+  box-shadow:
+    0 20px 48px rgba(15, 23, 42, 0.2),
+    0 4px 14px rgba(var(--sa-primary-rgb), 0.12);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sa-storefront.theme-dark .pc-chat-modal {
+  box-shadow: 0 22px 52px rgba(0, 0, 0, 0.52);
+}
+
+.pcm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 13px 14px;
+  background: var(--sa-surface-soft);
+  border-bottom: 1px solid var(--sa-border);
+}
+
+.pcm-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pcm-head-ico {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--sa-accent) 0%, var(--sa-primary-dark) 100%);
+  color: #ffffff;
+  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pcm-head-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pcm-head-text strong {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--sa-heading);
+  line-height: 1.25;
+}
+
+.pcm-head-text span {
+  font-size: 11.5px;
+  color: var(--sa-muted);
+}
+
+.pcm-close-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--sa-border);
+  background: var(--sa-surface);
+  color: var(--sa-muted);
+  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.pcm-close-btn:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.pcm-body {
+  padding: 10px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.pcm-contact-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  background: var(--sa-surface-2);
+  border: 1px solid var(--sa-border);
+  text-decoration: none;
+  color: var(--sa-heading);
+  transition:
+    border-color 0.16s ease,
+    background-color 0.16s ease,
+    transform 0.16s ease;
+}
+
+.pcm-contact-row:not(.is-static):hover {
+  background: var(--sa-surface-soft);
+  border-color: var(--sa-accent);
+  transform: translateX(2px);
+}
+
+.pcm-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #ffffff;
+  border: 1px solid var(--sa-border);
+  flex-shrink: 0;
+}
+
+.pcm-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pcm-name-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pcm-name {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--sa-heading);
+}
+
+.pcm-info {
+  font-size: 11.5px;
+  color: var(--sa-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pcm-ext {
+  font-size: 15px;
+  color: var(--sa-muted);
+  flex-shrink: 0;
+}
+
+.pc-chat-pop-enter-active,
+.pc-chat-pop-leave-active {
+  transition:
+    opacity 0.18s ease,
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: bottom right;
+}
+
+.pc-chat-pop-enter-from,
+.pc-chat-pop-leave-to {
+  opacity: 0;
+  transform: translateY(10px) scale(0.92);
 }
 
 /* ===== FILTER BAR ===== */
@@ -21357,6 +22627,44 @@ const hasSale = computed(() =>
   justify-content: center;
 }
 
+.mobile-bottom-bar .mob-ios-msg-badge {
+  position: relative;
+  isolation: isolate;
+  width: 23px;
+  height: 23px;
+  margin-bottom: 1px;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #65f87f 0%, #30d158 52%, #1db93b 100%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.55),
+    0 0 11px rgba(48, 209, 88, 0.62),
+    0 2px 6px rgba(29, 185, 59, 0.34);
+}
+
+.mobile-bottom-bar .mob-ios-msg-badge:not(.is-open)::before {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border-radius: 8.5px;
+  border: 1.5px solid rgba(74, 242, 108, 0.72);
+  background: radial-gradient(circle, rgba(74, 242, 108, 0.45) 0%, transparent 72%);
+  z-index: -1;
+  pointer-events: none;
+  animation: iosMsgPulseRing 2.4s cubic-bezier(0.2, 0.8, 0.3, 1) infinite;
+}
+
+.mobile-bottom-bar .mob-ios-msg-badge .ios-msg-svg {
+  width: 15px;
+  height: 15px;
+}
+
+.mobile-bottom-bar .mob-ios-msg-badge.is-open .ios-msg-svg {
+  animation: none;
+}
+
 .mobile-bottom-bar .progress-live-dot {
   position: absolute;
   top: -1px;
@@ -22164,20 +23472,12 @@ const hasSale = computed(() =>
   .mobile-bottom-bar { display: none; }
 
   .layout {
-    grid-template-columns: minmax(0, 1fr) 8px var(--pc-sidebar-w, clamp(296px, 31vw, 326px));
+    --pc-cart-dock-w: var(--pc-sidebar-w, clamp(296px, 31vw, 326px));
   }
 
-  .layout.hide-right,
-  .layout.hide-left.hide-right {
-    grid-template-columns: minmax(0, 1fr) 0px 0px;
-  }
-
-  .sidebar-right .sidebar-content {
-    width: var(--pc-sidebar-w, clamp(296px, 31vw, 326px));
-  }
-
-  .scroll-top-fab {
-    right: calc(var(--pc-sidebar-w, clamp(296px, 31vw, 326px)) + 26px);
+  .scroll-top-fab,
+  .pc-contact-chat-wrap {
+    right: calc(var(--pc-sidebar-w, clamp(296px, 31vw, 326px)) + 28px);
   }
 
   .dth-inner {
@@ -22196,9 +23496,6 @@ const hasSale = computed(() =>
       min-height: calc(100dvh - var(--sa-header-h));
     }
     .main {
-      height: calc(100dvh - var(--sa-header-h));
-    }
-    .sidebar-right {
       height: calc(100dvh - var(--sa-header-h));
     }
   }
@@ -24757,7 +26054,7 @@ const hasSale = computed(() =>
     animation-delay: calc(var(--card-stagger, 0) * 26ms);
   }
 
-  .sidebar-right {
+  .sidebar-right:not(.collapsed) {
     animation: pcSidebarEnter 0.38s cubic-bezier(0.22, 1, 0.36, 1) backwards;
     animation-delay: 0.06s;
   }
@@ -31117,19 +32414,104 @@ const hasSale = computed(() =>
 }
 
 .epn-img-wrap {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   width: 100%;
-  background: var(--sa-img-bg, #f8fafc);
+  padding: 12px;
+  background: linear-gradient(
+    135deg,
+    var(--sa-surface-soft) 0%,
+    var(--sa-img-bg, #f8fafc) 52%,
+    var(--sa-surface-2) 100%
+  );
   display: flex;
   align-items: center;
   justify-content: center;
   border-bottom: 1px solid var(--sa-border, #e2e8f0);
 }
 
+.epn-img-wrap.has-ambient::before {
+  content: '';
+  position: absolute;
+  inset: -12%;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--sa-ambient-img);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(14px) saturate(1.32);
+  transform: scale(1.08);
+  opacity: 0.62;
+  transition:
+    opacity 0.28s ease,
+    transform 0.35s ease;
+}
+
+.sa-storefront.theme-dark .epn-img-wrap.has-ambient::before {
+  opacity: 0.5;
+  filter: blur(16px) saturate(1.38) brightness(0.82);
+}
+
+.epn-img-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.68) 0%, transparent 54%),
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.48) 0%,
+      rgba(255, 255, 255, 0.16) 50%,
+      rgba(255, 255, 255, 0.36) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    inset 0 -1px 0 rgba(15, 23, 42, 0.05);
+}
+
+.sa-storefront.theme-dark .epn-img-wrap::after {
+  background:
+    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.14) 0%, transparent 50%),
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(15, 23, 42, 0.28) 52%,
+      rgba(15, 23, 42, 0.48) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.34);
+}
+
 .epn-img {
-  width: 100%;
+  position: relative;
+  z-index: 2;
+  width: auto;
+  height: auto;
+  max-width: 100%;
   max-height: 54vh;
   object-fit: contain;
   display: block;
+  border-radius: 12px;
+  box-shadow:
+    0 8px 22px rgba(15, 23, 42, 0.16),
+    0 1px 3px rgba(15, 23, 42, 0.08);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sa-storefront.theme-dark .epn-img {
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.46),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.epn-content-link.is-clickable:hover .epn-img {
+  transform: scale(1.02);
 }
 
 .epn-caption {

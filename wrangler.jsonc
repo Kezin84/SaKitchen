@@ -28,6 +28,8 @@
       "/ko",
       "/ko/*",
       "/welcome",
+      "/bang-tin",
+      "/bang-tin/*",
       "/blog",
       "/blog/*",
       "/sitemap.xml"

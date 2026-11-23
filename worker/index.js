@@ -21,6 +21,7 @@ import {
   buildBlogJsonLd,
   buildBlogListJsonLd,
 } from '../src/utils/blogSeo.js'
+import { stripFeedCaptionToPlainText } from '../src/utils/feedCaption.js'
 
 const FIREBASE_RTDB_BASE =
   'https://sakitchen-default-rtdb.asia-southeast1.firebasedatabase.app'
@@ -576,6 +577,42 @@ export default {
       const assetRes = await env.ASSETS.fetch(request)
       const contentType = String(assetRes.headers.get('Content-Type') || '')
       if (request.method === 'GET' && contentType.includes('text/html')) {
+        // NewsFeed (/bang-tin & /bang-tin/:postId) SSR OpenGraph SEO
+        if (pathname === '/bang-tin' || pathname.startsWith('/bang-tin/')) {
+          const rawPostId = pathname.startsWith('/bang-tin/')
+            ? decodeURIComponent(pathname.slice('/bang-tin/'.length)).split('/')[0].trim()
+            : String(url.searchParams.get('post') || '').trim()
+          const brand = await getLiveBrandConfig(env)
+
+          if (rawPostId) {
+            const safeKey = rawPostId.replace(/[.$#[\]/]/g, '_')
+            const dbBase = String(env?.FIREBASE_DATABASE_URL || FIREBASE_RTDB_BASE).replace(/\/+$/, '')
+            const feedItem = await fetchJsonWithTimeout(`${dbBase}/feed_posts/${encodeURIComponent(safeKey)}.json`, 2000)
+            if (feedItem && typeof feedItem === 'object' && feedItem.Active !== false) {
+              const snippet = stripFeedCaptionToPlainText(feedItem.Content).replace(/\s+/g, ' ').trim()
+              const ogTitle = snippet
+                ? `${snippet.slice(0, 68)}${snippet.length > 68 ? '...' : ''} - ${brand.siteName}`
+                : `Bảng tin & Feedback - ${brand.siteName}`
+              const ogDesc = snippet ? snippet.slice(0, 180) : `Hình ảnh thực tế và phản hồi khách hàng tại ${brand.siteName}.`
+              const firstImg = Array.isArray(feedItem.Images) && feedItem.Images[0] ? String(feedItem.Images[0]).trim() : ''
+              return rewritePageHtml(assetRes, brand, url.origin, {
+                title: ogTitle,
+                description: ogDesc,
+                canonical: `${url.origin}/bang-tin/${encodeURIComponent(rawPostId)}`,
+                ogType: 'article',
+                image: firstImg ? toShareImageAssetUrl(firstImg) : '',
+              })
+            }
+          }
+
+          return rewritePageHtml(assetRes, brand, url.origin, {
+            title: `Bảng tin & Nhật ký Bếp - ${brand.siteName}`,
+            description: `Hình ảnh món ăn thực tế mỗi ngày và phản hồi từ khách hàng đã đặt món tại ${brand.siteName}.`,
+            canonical: `${url.origin}/bang-tin`,
+            ogType: 'website',
+          })
+        }
+
         // Blog List SSR SEO
         if (pathname === '/blog') {
           const [brand, blogData] = await Promise.all([

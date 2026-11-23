@@ -50,7 +50,7 @@
     "banner": {
       ".read": true,
       ".write": true,
-      ".indexOn": ["ID"]
+      ".indexOn": ["ID", "Thu_tu", "Active", "Placement"]
     },
     "logo": {
       ".read": true,
@@ -71,6 +71,11 @@
       ".read": true,
       ".write": true,
       ".indexOn": ["ID", "Sort_order"]
+    },
+    "feed_posts": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["ID", "Pinned", "Created_at", "Post_type"]
     },
     "time": {
       ".read": true,

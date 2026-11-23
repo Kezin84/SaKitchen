@@ -1,5 +1,5 @@
 // src/config/api.js
-import { ref as dbRef, get, set, update, remove, onValue } from 'firebase/database'
+import { ref as dbRef, get, set, update, remove, onValue, runTransaction } from 'firebase/database'
 import { db } from './firebase'
 import {
   ALLOWED_ADMIN_EMAILS,
@@ -25,8 +25,15 @@ import {
 } from '../utils/nccDiscount'
 import { buildUniqueProductCode } from '../utils/productCode'
 import { normalizeThemeConfig } from '../utils/storefrontTheme'
-import { normalizeBannerAction, normalizeBannerLink } from '../utils/bannerLink'
+import {
+  normalizeBannerAction,
+  normalizeBannerLink,
+  normalizeBannerPlacement,
+  normalizeVerticalBannerTarget,
+  isBannerActive,
+} from '../utils/bannerLink'
 import { normalizePartnerHexColor } from '../utils/partnerColor'
+import { sanitizeFeedCaptionHtml } from '../utils/feedCaption'
 import {
   slugifyVi,
   normalizeBlogPost,
@@ -57,6 +64,7 @@ export const SHEETS = [
   'khuyenmai_info',
   'shop_contact',
   'partners',
+  'feed_posts',
   'time',
   'thong_tin_chuyen_khoan',
   'display_config',
@@ -72,7 +80,8 @@ export const DATA_SHEETS = SHEETS.filter(
     sName !== 'live_orders' &&
     sName !== 'chiet_khau_doi_soat' &&
     sName !== 'blog_posts' &&
-    sName !== 'blog_categories',
+    sName !== 'blog_categories' &&
+    sName !== 'feed_posts',
 )
 
 export const STOREFRONT_SHEETS = [
@@ -4109,7 +4118,11 @@ function sortBannerEntries(entries) {
 
 async function addBanner(body) {
   const d = body.data || {}
-  const entries = sortBannerEntries(await readSheetEntries('banner'))
+  const placement = normalizeBannerPlacement(d.Placement)
+  const allEntries = await readSheetEntries('banner')
+  const entries = sortBannerEntries(
+    allEntries.filter((e) => normalizeBannerPlacement(e.row?.Placement) === placement),
+  )
   const newKey = createRowKey()
   const rawOrder = Number(d.Thu_tu)
   const insertIdx =
@@ -4122,9 +4135,13 @@ async function addBanner(body) {
     row: {
       ID: s(d.ID || genShortId()),
       URL: s(d.URL),
+      Title: s(d.Title),
+      Placement: placement,
+      Target_pages: normalizeVerticalBannerTarget(d.Target_pages),
       is_Important: s(d.is_Important),
       Click_action: normalizeBannerAction(d.Click_action),
       Link_url: normalizeBannerLink(d.Link_url),
+      Active: d.Active !== undefined ? isBannerActive(d) : true,
       Thu_tu: insertIdx + 1,
     },
   }
@@ -4149,14 +4166,31 @@ async function addBanner(body) {
 async function updateBanner(body) {
   const d = body.data || {}
   if (!d.ID) return { success: false }
-  const entries = sortBannerEntries(await readSheetEntries('banner'))
-  const currentIdx = entries.findIndex((e) => s(e.row.ID) === s(d.ID))
+  const allEntries = await readSheetEntries('banner')
+  const target = allEntries.find((e) => s(e.row?.ID) === s(d.ID))
+  if (!target) return { success: false }
+
+  const prevPlacement = normalizeBannerPlacement(target.row?.Placement)
+  const nextPlacement =
+    d.Placement !== undefined ? normalizeBannerPlacement(d.Placement) : prevPlacement
+
+  const entries = sortBannerEntries(
+    allEntries.filter(
+      (e) => e.key === target.key || normalizeBannerPlacement(e.row?.Placement) === nextPlacement,
+    ),
+  )
+  const currentIdx = entries.findIndex((e) => e.key === target.key)
   if (currentIdx === -1) return { success: false }
 
-  const target = entries[currentIdx]
   const nextRow = {
     ID: s(d.ID),
     URL: d.URL !== undefined ? s(d.URL) : s(target.row.URL),
+    Title: d.Title !== undefined ? s(d.Title) : s(target.row.Title),
+    Placement: nextPlacement,
+    Target_pages:
+      d.Target_pages !== undefined
+        ? normalizeVerticalBannerTarget(d.Target_pages)
+        : normalizeVerticalBannerTarget(target.row.Target_pages),
     is_Important: d.is_Important !== undefined ? s(d.is_Important) : s(target.row.is_Important),
     Click_action:
       d.Click_action !== undefined
@@ -4166,6 +4200,7 @@ async function updateBanner(body) {
       d.Link_url !== undefined
         ? normalizeBannerLink(d.Link_url)
         : normalizeBannerLink(target.row.Link_url),
+    Active: d.Active !== undefined ? isBannerActive(d) : isBannerActive(target.row),
     Thu_tu: currentIdx + 1,
   }
 
@@ -4192,6 +4227,20 @@ async function updateBanner(body) {
     }
   })
 
+  if (prevPlacement !== nextPlacement) {
+    const oldGroup = sortBannerEntries(
+      allEntries.filter(
+        (e) => e.key !== target.key && normalizeBannerPlacement(e.row?.Placement) === prevPlacement,
+      ),
+    )
+    oldGroup.forEach((entry, idx) => {
+      const pos = idx + 1
+      if (parseBannerOrder(entry.row?.Thu_tu) !== pos) {
+        updates[`banner/${entry.key}/Thu_tu`] = pos
+      }
+    })
+  }
+
   await update(dbRef(db), updates)
   return { success: true }
 }
@@ -4200,19 +4249,29 @@ async function reorderBanners(body) {
   const ids = Array.isArray(body?.ids) ? body.ids.map((id) => s(id)).filter(Boolean) : []
   if (!ids.length) return { success: false, message: 'Thiếu danh sách thứ tự banner' }
 
-  const entries = await readSheetEntries('banner')
-  const byId = new Map(entries.map((entry) => [s(entry.row?.ID), entry]))
+  const allEntries = await readSheetEntries('banner')
+  const byId = new Map(allEntries.map((entry) => [s(entry.row?.ID), entry]))
+  const firstFound = ids.map((id) => byId.get(id)).find(Boolean)
+  const placement =
+    body?.placement !== undefined
+      ? normalizeBannerPlacement(body.placement)
+      : normalizeBannerPlacement(firstFound?.row?.Placement)
+
+  const groupEntries = allEntries.filter(
+    (entry) => normalizeBannerPlacement(entry.row?.Placement) === placement,
+  )
+  const groupById = new Map(groupEntries.map((entry) => [s(entry.row?.ID), entry]))
 
   const ordered = []
   const usedKeys = new Set()
   for (const id of ids) {
-    const found = byId.get(id)
+    const found = groupById.get(id)
     if (found && !usedKeys.has(found.key)) {
       ordered.push(found)
       usedKeys.add(found.key)
     }
   }
-  for (const leftover of sortBannerEntries(entries)) {
+  for (const leftover of sortBannerEntries(groupEntries)) {
     if (!usedKeys.has(leftover.key)) {
       ordered.push(leftover)
       usedKeys.add(leftover.key)
@@ -4234,7 +4293,29 @@ async function reorderBanners(body) {
 }
 
 async function deleteBanner(body) {
-  return deleteById('banner', body.ID)
+  const targetId = s(body?.ID)
+  if (!targetId) return { success: false }
+  const allEntries = await readSheetEntries('banner')
+  const target = allEntries.find((e) => s(e.row?.ID) === targetId)
+  if (!target) return { success: false }
+
+  const placement = normalizeBannerPlacement(target.row?.Placement)
+  const remaining = sortBannerEntries(
+    allEntries.filter(
+      (e) => e.key !== target.key && normalizeBannerPlacement(e.row?.Placement) === placement,
+    ),
+  )
+  const updates = {
+    [`banner/${target.key}`]: null,
+  }
+  remaining.forEach((entry, idx) => {
+    const pos = idx + 1
+    if (parseBannerOrder(entry.row?.Thu_tu) !== pos) {
+      updates[`banner/${entry.key}/Thu_tu`] = pos
+    }
+  })
+  await update(dbRef(db), updates)
+  return { success: true }
 }
 
 // --- logo ---
@@ -4540,6 +4621,172 @@ async function reorderPartners(body) {
 
 async function deletePartner(body) {
   return deleteById('partners', body.ID)
+}
+
+// --- feed_posts (Bảng tin & Feedback) ---
+function normalizeFeedPostType(raw) {
+  const val = s(raw).trim().toLowerCase()
+  if (val === 'kitchen' || val === 'promo' || val === 'feedback') return val
+  return 'feedback'
+}
+
+function normalizeStringArray(arr) {
+  if (!Array.isArray(arr)) return []
+  return arr.map((item) => s(item).trim()).filter(Boolean)
+}
+
+async function addFeedPost(body) {
+  const d = body.data || {}
+  const id = s(d.ID || genShortId()).trim()
+  const now = Date.now()
+
+  const newRow = sanitizeRow({
+    ID: id,
+    Post_type: normalizeFeedPostType(d.Post_type),
+    Content: sanitizeFeedCaptionHtml(d.Content),
+    Images: normalizeStringArray(d.Images),
+    Product_codes: normalizeStringArray(d.Product_codes),
+    Pinned: Boolean(d.Pinned),
+    Active: isPartnerActiveFlag(d.Active),
+    Base_views: Math.max(0, Math.round(n(d.Base_views, 0))),
+    Base_hearts: Math.max(0, Math.round(n(d.Base_hearts, 0))),
+    Views: 0,
+    Like_count: 0,
+    Heart_count: 0,
+    Haha_count: 0,
+    Wow_count: 0,
+    Yummy_count: 0,
+    Trust_count: 0,
+    Created_at: n(d.Created_at, now),
+    Updated_at: now,
+  })
+
+  await set(dbRef(db, `feed_posts/${safeFirebaseKey(id)}`), newRow)
+  return { success: true, id }
+}
+
+async function updateFeedPost(body) {
+  const d = body.data || {}
+  const id = s(d.ID).trim()
+  if (!id) return { success: false }
+
+  const entries = await readSheetEntries('feed_posts')
+  const target = entries.find((e) => s(e.row.ID) === id)
+  if (!target) return { success: false }
+
+  const prev = target.row || {}
+  const nextActive = Object.prototype.hasOwnProperty.call(d, 'Active')
+    ? isPartnerActiveFlag(d.Active)
+    : isPartnerActiveFlag(prev.Active)
+  const nextPinned = Object.prototype.hasOwnProperty.call(d, 'Pinned')
+    ? Boolean(d.Pinned)
+    : Boolean(prev.Pinned)
+
+  const updatedRow = sanitizeRow({
+    ...prev,
+    ID: id,
+    Post_type: d.Post_type !== undefined ? normalizeFeedPostType(d.Post_type) : normalizeFeedPostType(prev.Post_type),
+    Content:
+      d.Content !== undefined
+        ? sanitizeFeedCaptionHtml(d.Content)
+        : sanitizeFeedCaptionHtml(prev.Content),
+    Images: d.Images !== undefined ? normalizeStringArray(d.Images) : normalizeStringArray(prev.Images),
+    Product_codes:
+      d.Product_codes !== undefined
+        ? normalizeStringArray(d.Product_codes)
+        : normalizeStringArray(prev.Product_codes),
+    Pinned: nextPinned,
+    Active: nextActive,
+    Base_views:
+      d.Base_views !== undefined
+        ? Math.max(0, Math.round(n(d.Base_views, 0)))
+        : Math.max(0, Math.round(n(prev.Base_views, 0))),
+    Base_hearts:
+      d.Base_hearts !== undefined
+        ? Math.max(0, Math.round(n(d.Base_hearts, 0)))
+        : Math.max(0, Math.round(n(prev.Base_hearts, 0))),
+    Views: Math.max(0, Math.round(n(prev.Views, 0))),
+    Like_count: Math.max(0, Math.round(n(prev.Like_count, 0))),
+    Heart_count: Math.max(0, Math.round(n(prev.Heart_count, 0))),
+    Haha_count: Math.max(0, Math.round(n(prev.Haha_count, 0))),
+    Wow_count: Math.max(0, Math.round(n(prev.Wow_count, 0))),
+    Yummy_count: Math.max(0, Math.round(n(prev.Yummy_count, 0))),
+    Trust_count: Math.max(0, Math.round(n(prev.Trust_count, 0))),
+    Created_at: n(prev.Created_at, Date.now()),
+    Updated_at: Date.now(),
+  })
+
+  await set(dbRef(db, `feed_posts/${target.key}`), updatedRow)
+  return { success: true }
+}
+
+async function deleteFeedPost(body) {
+  return deleteById('feed_posts', body.ID)
+}
+
+const _feedKeyCache = new Map()
+
+async function resolveFeedPostFirebaseKey(postId) {
+  const cleanId = s(postId).trim()
+  if (!cleanId) return ''
+  if (_feedKeyCache.has(cleanId)) return _feedKeyCache.get(cleanId)
+
+  const directKey = safeFirebaseKey(cleanId)
+  try {
+    const directSnap = await get(dbRef(db, `feed_posts/${directKey}/ID`))
+    if (directSnap.exists() && s(directSnap.val()).trim() === cleanId) {
+      _feedKeyCache.set(cleanId, directKey)
+      return directKey
+    }
+  } catch {
+    // fallback to entry scan
+  }
+
+  const entries = await readSheetEntries('feed_posts')
+  const found = entries.find((e) => s(e.row.ID).trim() === cleanId)
+  if (found) {
+    _feedKeyCache.set(cleanId, found.key)
+    return found.key
+  }
+  return ''
+}
+
+export async function incrementFeedPostView(postId) {
+  try {
+    const nodeKey = await resolveFeedPostFirebaseKey(postId)
+    if (!nodeKey) return false
+    await runTransaction(dbRef(db, `feed_posts/${nodeKey}/Views`), (cur) => {
+      return Math.max(0, Math.round(Number(cur || 0))) + 1
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function toggleFeedPostReaction(postId, reactionType, delta = 1) {
+  const fieldMap = {
+    like: 'Like_count',
+    heart: 'Heart_count',
+    haha: 'Haha_count',
+    wow: 'Wow_count',
+    yummy: 'Yummy_count',
+    trust: 'Trust_count',
+  }
+  const field = fieldMap[reactionType]
+  if (!field) return false
+
+  try {
+    const nodeKey = await resolveFeedPostFirebaseKey(postId)
+    if (!nodeKey) return false
+    const step = Number(delta) >= 0 ? 1 : -1
+    await runTransaction(dbRef(db, `feed_posts/${nodeKey}/${field}`), (cur) => {
+      return Math.max(0, Math.round(Number(cur || 0)) + step)
+    })
+    return true
+  } catch {
+    return false
+  }
 }
 
 // --- time ---
@@ -4920,6 +5167,9 @@ const ACTION_HANDLERS = {
   updatePartner,
   reorderPartners,
   deletePartner,
+  addFeedPost,
+  updateFeedPost,
+  deleteFeedPost,
   addTimeShop,
   updateTimeShop,
   deleteTimeShop,

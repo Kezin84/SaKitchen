@@ -586,6 +586,11 @@ onUnmounted(() => {
           <span>Logo &amp; SEO</span>
         </RouterLink>
 
+        <RouterLink :to="{ name: 'admin-news-feed' }" class="menu-item">
+          <i class="ri-newspaper-fill"></i>
+          <span>Bảng tin &amp; Feedback</span>
+        </RouterLink>
+
         <RouterLink to="/admin/bai-viet" class="menu-item">
           <i class="ri-article-line"></i>
           <span>Bài viết SEO (Blog)</span>
@@ -829,6 +834,11 @@ onUnmounted(() => {
         <RouterLink to="/admin/logo" class="mobile-menu-item" @click="closeMobileSidebar">
           <i class="ri-image-line"></i>
           <span>Logo &amp; SEO</span>
+        </RouterLink>
+
+        <RouterLink :to="{ name: 'admin-news-feed' }" class="mobile-menu-item" @click="closeMobileSidebar">
+          <i class="ri-newspaper-fill"></i>
+          <span>Bảng tin &amp; Feedback</span>
         </RouterLink>
 
         <RouterLink to="/admin/bai-viet" class="mobile-menu-item" @click="closeMobileSidebar">

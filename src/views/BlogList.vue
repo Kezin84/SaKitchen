@@ -33,6 +33,33 @@ const searchQuery = ref(String(route.query.q || '').trim())
 const currentPage = ref(1)
 const PAGE_SIZE = 9
 
+const CHECK_SCAM_NAV_ITEMS = [
+  {
+    key: 'verify',
+    url: 'https://checkscam8888.vercel.app/',
+    title: 'Check STK, shop giả mạo',
+    sub: 'Tra cứu STK & xác thực shop',
+    icon: 'ri-shield-check-fill',
+    variant: 'is-verify',
+  },
+  {
+    key: 'shops',
+    url: 'https://checkscam8888.vercel.app/shops',
+    title: 'Xem quán ngon',
+    sub: 'Danh sách quán uy tín, chất lượng',
+    icon: 'ri-store-2-fill',
+    variant: 'is-shops',
+  },
+  {
+    key: 'alerts',
+    url: 'https://checkscam8888.vercel.app/alerts',
+    title: 'Thông tin lừa đảo',
+    sub: 'Cảnh báo chiêu trò lừa đảo mới',
+    icon: 'ri-alarm-warning-fill',
+    variant: 'is-alerts',
+  },
+]
+
 const themeVars = computed(() => buildStorefrontThemeVars(themeConfig.value, themeMode.value))
 
 function initThemeMode() {
@@ -94,8 +121,9 @@ async function loadData() {
       .sort((a, b) => a.Order - b.Order || a.Name.localeCompare(b.Name))
 
     brand.value = resolveBrandAssets(logoRes?.data?.[0] || null, 'SA KITCHEN')
-    const displayRow = displayRes?.data?.[0] || null
-    themeConfig.value = normalizeThemeConfig(displayRow?.themeConfig)
+    const displayRow =
+      (displayRes?.data || []).find((r) => r.ID === 'DEFAULT') || displayRes?.data?.[0] || null
+    themeConfig.value = normalizeThemeConfig(displayRow?.Theme_config || displayRow?.themeConfig)
     initThemeMode()
     updateDocumentMeta()
   } catch (err) {
@@ -209,19 +237,57 @@ function formatDate(ts) {
     :class="themeMode === 'dark' ? 'theme-dark' : 'theme-light'"
     :style="themeVars"
   >
-    <!-- STICKY HEADER -->
+    <!-- STICKY HEADER (EMERALD BRAND BAR SYNCED WITH ORDER HEADER) -->
     <header class="blog-header">
       <div class="bh-inner">
-        <RouterLink to="/vi" class="bh-brand">
-          <img v-if="brand.logoUrl" :src="brand.logoUrl" :alt="brand.siteName" class="bh-logo" />
-          <div class="bh-brand-text">
-            <strong>{{ brand.siteName }}</strong>
-            <span>Blog &amp; Cẩm nang ẩm thực</span>
-          </div>
-        </RouterLink>
+        <div class="bh-brand-cluster">
+          <RouterLink to="/vi" class="bh-brand">
+            <img v-if="brand.logoUrl" :src="brand.logoUrl" :alt="brand.siteName" class="bh-logo" />
+            <div class="bh-brand-text">
+              <strong>{{ brand.siteName }}</strong>
+              <span>Blog &amp; Cẩm nang ẩm thực</span>
+            </div>
+          </RouterLink>
 
-        <nav class="bh-nav">
-          <RouterLink to="/blog" class="bh-nav-link active">Blog</RouterLink>
+          <nav class="bh-nav-links" aria-label="Điều hướng chính">
+            <RouterLink to="/vi" class="bh-nav-link">Thực đơn</RouterLink>
+            <RouterLink to="/bang-tin" class="bh-nav-link">Bảng tin</RouterLink>
+            <RouterLink to="/blog" class="bh-nav-link active">Blog</RouterLink>
+
+            <div class="bh-nav-dropdown">
+              <button
+                type="button"
+                class="bh-nav-link bh-nav-dropdown-trigger"
+                aria-haspopup="true"
+              >
+                <span>Check Scam</span>
+                <i class="ri-arrow-down-s-line bh-nav-chevron"></i>
+              </button>
+              <div class="bh-nav-dropdown-menu" role="menu">
+                <a
+                  v-for="item in CHECK_SCAM_NAV_ITEMS"
+                  :key="'bl-scam-' + item.key"
+                  :href="item.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="bh-scam-dd-item"
+                  :class="item.variant"
+                  role="menuitem"
+                  @click="$event.currentTarget.blur()"
+                >
+                  <i :class="item.icon" class="bh-scam-dd-ico"></i>
+                  <span class="bh-scam-dd-body">
+                    <span class="bh-scam-dd-title">{{ item.title }}</span>
+                    <span class="bh-scam-dd-sub">{{ item.sub }}</span>
+                  </span>
+                  <i class="ri-arrow-right-up-line bh-scam-dd-ext"></i>
+                </a>
+              </div>
+            </div>
+          </nav>
+        </div>
+
+        <div class="bh-nav">
           <button
             type="button"
             class="bh-icon-btn"
@@ -234,7 +300,7 @@ function formatDate(ts) {
             <i class="ri-restaurant-2-line"></i>
             <span>Đặt món 24/24</span>
           </RouterLink>
-        </nav>
+        </div>
       </div>
     </header>
 
@@ -466,76 +532,282 @@ function formatDate(ts) {
 .blog-header {
   position: sticky;
   top: 0;
-  z-index: 40;
-  background: var(--sa-surface, #ffffff);
-  border-bottom: 1px solid var(--sa-border, #e5e7eb);
-  backdrop-filter: blur(12px);
+  z-index: 60;
+  min-height: 64px;
+  background: var(
+    --sa-top-header-bg,
+    linear-gradient(135deg, #059669 0%, #047857 58%, #065f46 100%)
+  );
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 4px 18px rgba(var(--sa-primary-dark-rgb, 4, 120, 87), 0.18);
 }
 .bh-inner {
   max-width: 1140px;
+  min-height: 64px;
   margin: 0 auto;
-  padding: 12px 20px;
+  padding: 0 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
-.bh-brand {
+.bh-brand-cluster {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+}
+.bh-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
   text-decoration: none;
-  color: inherit;
+  color: var(--sa-on-primary, #ffffff);
+  min-width: 0;
 }
 .bh-logo {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  object-fit: cover;
-  border: 1px solid var(--sa-border, #e5e7eb);
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  object-fit: contain;
+  background: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+  flex-shrink: 0;
 }
 .bh-brand-text {
   display: flex;
   flex-direction: column;
+  gap: 1px;
+  min-width: 0;
 }
 .bh-brand-text strong {
-  font-size: 15px;
+  font-size: 15.5px;
   font-weight: 800;
+  color: var(--sa-on-primary, #ffffff);
   line-height: 1.2;
 }
 .bh-brand-text span {
   font-size: 11.5px;
-  color: var(--sa-text-muted, #6b7280);
+  font-weight: 500;
+  color: var(--sa-on-primary-muted, rgba(255, 255, 255, 0.85));
 }
 .bh-nav {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.bh-nav-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  margin-left: 6px;
+  padding-left: 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.24);
+  flex-shrink: 0;
 }
 .bh-nav-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
   text-decoration: none;
   font-size: 14px;
   font-weight: 700;
-  color: var(--sa-text-muted, #6b7280);
-  padding: 6px 10px;
-  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.82);
+  padding: 6px 0;
+  background: transparent;
+  white-space: nowrap;
+  transition: color 0.18s ease, opacity 0.18s ease;
+}
+.bh-nav-link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--sa-secondary-bright, #fde047);
+  transform: scaleX(0);
+  transform-origin: center;
+  opacity: 0;
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease;
+}
+.bh-nav-link:hover {
+  color: #ffffff;
+}
+.bh-nav-link:hover::after {
+  transform: scaleX(0.65);
+  opacity: 0.75;
 }
 .bh-nav-link.active {
+  color: #ffffff;
+  font-weight: 800;
+  background: transparent;
+}
+.bh-nav-link.active::after {
+  transform: scaleX(1);
+  opacity: 1;
+}
+.bh-nav-dropdown {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.bh-nav-dropdown-trigger {
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  gap: 3px;
+}
+.bh-nav-chevron {
+  font-size: 15px;
+  line-height: 1;
+  opacity: 0.85;
+  transition: transform 0.2s ease;
+}
+.bh-nav-dropdown:hover .bh-nav-dropdown-trigger,
+.bh-nav-dropdown:focus-within .bh-nav-dropdown-trigger {
+  color: #ffffff;
+}
+.bh-nav-dropdown:hover .bh-nav-dropdown-trigger::after,
+.bh-nav-dropdown:focus-within .bh-nav-dropdown-trigger::after {
+  transform: scaleX(0.65);
+  opacity: 0.75;
+}
+.bh-nav-dropdown:hover .bh-nav-chevron,
+.bh-nav-dropdown:focus-within .bh-nav-chevron {
+  transform: rotate(180deg);
+}
+.bh-nav-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  min-width: 268px;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--sa-surface, #ffffff);
+  border: 1px solid var(--sa-border, #e2e8f0);
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.18),
+    0 4px 12px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 120;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(6px);
+  transition:
+    opacity 0.18s ease,
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 0.18s;
+}
+.bh-nav-dropdown-menu::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -12px;
+  height: 12px;
+}
+.theme-dark .bh-nav-dropdown-menu {
+  box-shadow:
+    0 20px 46px rgba(0, 0, 0, 0.5),
+    0 4px 14px rgba(0, 0, 0, 0.32);
+}
+.bh-nav-dropdown:hover .bh-nav-dropdown-menu,
+.bh-nav-dropdown:focus-within .bh-nav-dropdown-menu {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+  transition-delay: 0s;
+}
+.bh-scam-dd-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--sa-text, #111827);
+  transition: background-color 0.15s ease;
+}
+.bh-scam-dd-item:hover {
+  background: var(--sa-surface-2, #f1f5f9);
+}
+.bh-scam-dd-ico {
+  font-size: 17px;
+  flex-shrink: 0;
+}
+.bh-scam-dd-item.is-verify .bh-scam-dd-ico {
+  color: #10b981;
+}
+.bh-scam-dd-item.is-shops .bh-scam-dd-ico {
+  color: #f59e0b;
+}
+.bh-scam-dd-item.is-alerts .bh-scam-dd-ico {
+  color: #f43f5e;
+}
+.bh-scam-dd-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.bh-scam-dd-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sa-text, #111827);
+  line-height: 1.25;
+}
+.bh-scam-dd-sub {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--sa-text-muted, #64748b);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bh-scam-dd-ext {
+  font-size: 14px;
+  color: var(--sa-text-muted, #64748b);
+  opacity: 0.7;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, opacity 0.15s ease, color 0.15s ease;
+}
+.bh-scam-dd-item:hover .bh-scam-dd-ext {
+  opacity: 1;
   color: var(--sa-accent, #059669);
-  background: var(--sa-accent-soft, rgba(5, 150, 105, 0.1));
+  transform: translate(1px, -1px);
 }
 .bh-icon-btn {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 10px;
-  border: 1px solid var(--sa-border, #e5e7eb);
-  background: var(--sa-surface-2, #f9fafb);
-  color: var(--sa-text, #111827);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--sa-on-primary, #ffffff);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 17px;
   cursor: pointer;
+  transition: all 0.16s ease;
+}
+.bh-icon-btn:hover {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+}
+.theme-dark .bh-icon-btn {
+  color: var(--sa-secondary-light, #fef08a);
 }
 .bh-order-cta {
   display: inline-flex;
@@ -550,6 +822,22 @@ function formatDate(ts) {
   text-decoration: none;
   white-space: nowrap;
   box-shadow: 0 4px 12px rgba(5, 150, 105, 0.22);
+  transition: all 0.16s ease;
+}
+.blog-header .bh-order-cta {
+  height: 38px;
+  padding: 0 15px;
+  background: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  color: var(--sa-primary-dark, #065f46);
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
+}
+.blog-header .bh-order-cta:hover {
+  background: var(--sa-secondary-bright, #fde047);
+  border-color: var(--sa-secondary-bright, #fde047);
+  color: #0f172a;
+  transform: translateY(-1px);
 }
 
 .blog-container {
@@ -976,7 +1264,7 @@ function formatDate(ts) {
     padding: 10px 14px;
   }
   .bh-brand-text span,
-  .bh-nav-link {
+  .bh-nav-links {
     display: none;
   }
   .blog-container {

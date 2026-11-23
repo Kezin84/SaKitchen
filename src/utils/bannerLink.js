@@ -6,11 +6,76 @@ export const BANNER_CLICK_ACTIONS = {
   LINK: 'link',
 }
 
+export const BANNER_PLACEMENTS = {
+  HOME: 'home',
+  FEED_VERTICAL: 'feed_vertical',
+}
+
+export const VERTICAL_BANNER_TARGETS = {
+  BOTH: 'both',
+  ORDER: 'order',
+  FEED: 'feed',
+}
+
+export function normalizeBannerPlacement(raw) {
+  const val = String(raw ?? '').trim().toLowerCase()
+  return val === BANNER_PLACEMENTS.FEED_VERTICAL
+    ? BANNER_PLACEMENTS.FEED_VERTICAL
+    : BANNER_PLACEMENTS.HOME
+}
+
+export function normalizeVerticalBannerTarget(raw) {
+  const val = String(raw ?? '').trim().toLowerCase()
+  if (val === VERTICAL_BANNER_TARGETS.ORDER) return VERTICAL_BANNER_TARGETS.ORDER
+  if (val === VERTICAL_BANNER_TARGETS.FEED) return VERTICAL_BANNER_TARGETS.FEED
+  return VERTICAL_BANNER_TARGETS.BOTH
+}
+
+export function isHomeBanner(banner) {
+  return Boolean(banner) && normalizeBannerPlacement(banner.Placement) === BANNER_PLACEMENTS.HOME
+}
+
+export function isFeedVerticalBanner(banner) {
+  return (
+    Boolean(banner) &&
+    normalizeBannerPlacement(banner.Placement) === BANNER_PLACEMENTS.FEED_VERTICAL
+  )
+}
+
+export function isOrderVerticalBanner(banner) {
+  if (!isFeedVerticalBanner(banner)) return false
+  const target = normalizeVerticalBannerTarget(banner.Target_pages)
+  return target === VERTICAL_BANNER_TARGETS.BOTH || target === VERTICAL_BANNER_TARGETS.ORDER
+}
+
+export function isNewsFeedVerticalBanner(banner) {
+  if (!isFeedVerticalBanner(banner)) return false
+  const target = normalizeVerticalBannerTarget(banner.Target_pages)
+  return target === VERTICAL_BANNER_TARGETS.BOTH || target === VERTICAL_BANNER_TARGETS.FEED
+}
+
 export function normalizeBannerAction(raw) {
   const val = String(raw ?? '').trim().toLowerCase()
   return val === BANNER_CLICK_ACTIONS.LINK
     ? BANNER_CLICK_ACTIONS.LINK
     : BANNER_CLICK_ACTIONS.POPUP
+}
+
+export function isBannerActive(banner) {
+  if (!banner) return false
+  if (banner.Active === undefined || banner.Active === null || banner.Active === '') {
+    return true
+  }
+  const val = banner.Active
+  if (
+    val === false ||
+    val === 0 ||
+    val === '0' ||
+    String(val).trim().toLowerCase() === 'false'
+  ) {
+    return false
+  }
+  return true
 }
 
 export function normalizeBannerLink(raw) {

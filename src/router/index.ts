@@ -107,6 +107,11 @@ const router = createRouter({
     },
     { path: '/login', name: 'login', component: Login },
     {
+      path: '/bang-tin/:postId?',
+      name: 'news-feed',
+      component: () => import('@/views/NewsFeed.vue'),
+    },
+    {
       path: '/blog',
       name: 'blog-list',
       component: () => import('@/views/BlogList.vue'),
@@ -149,6 +154,11 @@ const router = createRouter({
         { path: 'cau-hinh-hien-thi', name: 'admin-cau-hinh-hien-thi', component: CauHinhHienThi },
         { path: 'thong-bao', name: 'admin-thong-bao', component: Thongbao },
         { path: 'logo', name: 'admin-logo', component: Logo },
+        {
+          path: 'bang-tin',
+          name: 'admin-news-feed',
+          component: () => import('@/views/AdminNewsFeed.vue'),
+        },
         {
           path: 'bai-viet',
           name: 'admin-blog',

@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { ensureLocaleLoaded } from '@/i18n'
 import {
   getOneSheet,
   subscribeSheet,
@@ -824,7 +825,8 @@ async function loadInitialData() {
   try {
     const savedLang = currentLang.value
     if (savedLang && locale.value !== savedLang) {
-      locale.value = savedLang
+      const readyLang = await ensureLocaleLoaded(savedLang)
+      locale.value = readyLang
     }
 
     if (!route.params.postId && route.query.post) {

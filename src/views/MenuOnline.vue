@@ -1269,7 +1269,7 @@
         </div>
 
         <section
-          v-for="(sec, secIdx) in menuBoardSections"
+          v-for="(sec, secIdx) in visibleMenuBoardSections"
           :key="sec.key"
           class="mb-section"
           :style="!isMobile ? { '--card-stagger': Math.min(secIdx, 8) } : undefined"
@@ -1459,15 +1459,16 @@
         </div>
       </div>
 
-      <!-- LAZY LOAD SENTINEL (AUTO LOAD ON SCROLL) -->
+      <!-- LAZY LOAD SENTINEL (AUTO LOAD ON SCROLL FOR BOTH CARD & BOARD MODES) -->
       <div
-        v-if="menuViewMode === 'card' && hasMoreItems"
+        v-if="(menuViewMode === 'card' && hasMoreItems) || (menuViewMode === 'board' && hasMoreBoardSections)"
         ref="loadMoreSentinelRef"
         class="lazy-load-sentinel"
         aria-hidden="true"
       >
         <i class="ri-loader-4-line lazy-spin-ico"></i>
-        <span>{{ pagedMenu.length }} / {{ filteredMenu.length }}</span>
+        <span v-if="menuViewMode === 'card'">{{ pagedMenu.length }} / {{ filteredMenu.length }}</span>
+        <span v-else>{{ visibleMenuBoardSections.length }} / {{ menuBoardSections.length }}</span>
       </div>
 
       <!-- MOBILE: SEO STOREFRONT INTRO BOX + 3 CHECKSCAM BUTTONS (UNCHANGED ON MOBILE) -->
@@ -6347,6 +6348,7 @@ import {
 } from '@/utils/storefrontTheme'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { ensureLocaleLoaded } from '@/i18n'
 import {
   getStorefrontSheets,
   subscribeSheet,
@@ -6739,6 +6741,11 @@ let unsubHangHoaLive = null
 let unsubKhuyenMaiLive = null
 let unsubDisplayConfigLive = null
 let unsubPartnersLive = null
+let liveListenersTimer = null
+let storefrontLiveStarted = false
+let isUnmountedFlag = false
+let reloadDataPromise = null
+let lastReloadCompletedAt = 0
 let metaSyncTimer = null
 let toastTimer = null
 let applyingRemoteMeta = false
@@ -8566,7 +8573,7 @@ function applyTelegramProfileAutofill(tgProfile) {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   bindOrderBellUnlock()
   loadPersistedLocalState()
 
@@ -8604,36 +8611,6 @@ onMounted(() => {
     }
   }
 
-  unsubHangHoaLive = subscribeSheet('hang_hoa', (rows) => {
-    const filtered = (rows || []).filter((m) =>
-      ['Còn hàng', 'Hết hàng'].includes(m.Trang_thai),
-    )
-    if (filtered.length || rawMenu.value.length) {
-      rawMenu.value = filtered
-      filtered.forEach((m) => {
-        if (!tempQty.value[m.Ma_hang]) tempQty.value[m.Ma_hang] = 1
-      })
-      if (selectedItem.value?.Ma_hang) {
-        const updated = menu.value.find((m) => m.Ma_hang === selectedItem.value.Ma_hang)
-        if (updated) selectedItem.value = updated
-      } else if (route.params.productId || route.params.productSlug) {
-        syncDetailFromRoute()
-      }
-    }
-  })
-
-  unsubKhuyenMaiLive = subscribeSheet('khuyenmai_info', (rows) => {
-    khuyenMaiInfo.value = rows || []
-  })
-
-  unsubDisplayConfigLive = subscribeSheet('display_config', (rows) => {
-    displayConfigRows.value = rows || []
-  })
-
-  unsubPartnersLive = subscribeSheet('partners', (rows) => {
-    partners.value = rows || []
-  })
-
   const savedLang = localStorage.getItem('APP_LANG')
   const hasDeepProductLink = Boolean(
     String(route.params.productId || route.params.productSlug || '').trim(),
@@ -8644,7 +8621,8 @@ onMounted(() => {
     const tgMatchedLang = mapTelegramLangToAppLang(getTelegramUserProfile()?.languageCode)
     if (tgMatchedLang) {
       localStorage.setItem('APP_LANG', tgMatchedLang)
-      locale.value = tgMatchedLang
+      const readyLang = await ensureLocaleLoaded(tgMatchedLang)
+      locale.value = readyLang
       if (route.params.lang !== tgMatchedLang && !hasDeepProductLink) {
         redirectToLang(tgMatchedLang)
         return
@@ -8658,7 +8636,8 @@ onMounted(() => {
   if (!savedLang && hasDeepProductLink && route.params.lang) {
     const urlLang = String(route.params.lang)
     localStorage.setItem('APP_LANG', urlLang)
-    locale.value = urlLang
+    const readyLang = await ensureLocaleLoaded(urlLang)
+    locale.value = readyLang
     reloadData()
     return
   }
@@ -8703,11 +8682,16 @@ function onWindowScroll() {
   checkLoadMoreOnScroll()
 }
 
+function onMainScroll() {
+  updateScrollTopVisibility()
+  checkLoadMoreOnScroll()
+}
+
 onMounted(() => {
   window.addEventListener('scroll', onWindowScroll, { passive: true })
   nextTick(() => {
     if (mainRef.value) {
-      mainRef.value.addEventListener('scroll', updateScrollTopVisibility, { passive: true })
+      mainRef.value.addEventListener('scroll', onMainScroll, { passive: true })
       updateScrollTopVisibility()
     }
     checkAndFillViewport()
@@ -8730,7 +8714,8 @@ async function selectLanguage(lang) {
 
   localStorage.setItem('APP_LANG', lang)
 
-  locale.value = lang        //  BẮT BUỘC
+  const readyLang = await ensureLocaleLoaded(lang)
+  locale.value = readyLang        //  BẮT BUỘC
   redirectToLang(lang)
 
   await waitForPageLoaded()
@@ -8839,7 +8824,10 @@ async function removeItem(i) {
 
 const INITIAL_BATCH_SIZE = 12
 const LOAD_MORE_STEP = 12
+const INITIAL_BOARD_SECTIONS = 5
+const LOAD_MORE_BOARD_STEP = 5
 const visibleCount = ref(INITIAL_BATCH_SIZE)
+const visibleBoardSectionsCount = ref(INITIAL_BOARD_SECTIONS)
 const loadMoreSentinelRef = ref(null)
 let lazyLoadObserver = null
 
@@ -9188,12 +9176,31 @@ let sortScrollTimer = null
 
 function resetVisibleMenu() {
   visibleCount.value = INITIAL_BATCH_SIZE
+  visibleBoardSectionsCount.value = INITIAL_BOARD_SECTIONS
   nextTick(() => {
     checkAndFillViewport()
   })
 }
 
+function hasMoreVisibleEntries() {
+  if (menuViewMode.value === 'board') {
+    return visibleBoardSectionsCount.value < menuBoardSections.value.length
+  }
+  return visibleCount.value < filteredMenu.value.length
+}
+
 function loadMoreItems() {
+  if (menuViewMode.value === 'board') {
+    if (visibleBoardSectionsCount.value >= menuBoardSections.value.length) return
+    visibleBoardSectionsCount.value = Math.min(
+      menuBoardSections.value.length,
+      visibleBoardSectionsCount.value + LOAD_MORE_BOARD_STEP,
+    )
+    nextTick(() => {
+      checkAndFillViewport()
+    })
+    return
+  }
   if (visibleCount.value >= filteredMenu.value.length) return
   visibleCount.value = Math.min(
     filteredMenu.value.length,
@@ -9206,18 +9213,18 @@ function loadMoreItems() {
 
 function checkLoadMoreOnScroll() {
   const el = loadMoreSentinelRef.value
-  if (!el || visibleCount.value >= filteredMenu.value.length) return
+  if (!el || !hasMoreVisibleEntries()) return
   const rect = el.getBoundingClientRect()
-  if (rect.top <= window.innerHeight + 360) {
+  if (rect.top <= window.innerHeight + 420) {
     loadMoreItems()
   }
 }
 
 function checkAndFillViewport() {
   const el = loadMoreSentinelRef.value
-  if (!el || visibleCount.value >= filteredMenu.value.length) return
+  if (!el || !hasMoreVisibleEntries()) return
   const rect = el.getBoundingClientRect()
-  if (rect.top <= window.innerHeight + 240) {
+  if (rect.top <= window.innerHeight + 280) {
     loadMoreItems()
   }
 }
@@ -9239,22 +9246,13 @@ watch(
       },
       {
         root: null,
-        rootMargin: '360px 0px'
+        rootMargin: '420px 0px'
       }
     )
     lazyLoadObserver.observe(el)
     checkAndFillViewport()
   },
   { flush: 'post' }
-)
-
-watch(
-  () => filteredMenu.value.length,
-  () => {
-    nextTick(() => {
-      checkAndFillViewport()
-    })
-  }
 )
 
 watch(priceSort, () => {
@@ -9386,6 +9384,23 @@ const menuBoardSections = computed(() => {
   }
   return sections
 })
+
+const hasMoreBoardSections = computed(
+  () => visibleBoardSectionsCount.value < menuBoardSections.value.length,
+)
+
+const visibleMenuBoardSections = computed(() =>
+  menuBoardSections.value.slice(0, visibleBoardSectionsCount.value),
+)
+
+watch(
+  () => [filteredMenu.value.length, menuBoardSections.value.length, menuViewMode.value],
+  () => {
+    nextTick(() => {
+      checkAndFillViewport()
+    })
+  }
+)
 
 let searchScrollTimer = null
 
@@ -12427,8 +12442,59 @@ function closeCartMobile() {
 }
 
 
-async function reloadData() {
-  loadingMain.value = true
+function startStorefrontLiveListeners() {
+  if (storefrontLiveStarted || isUnmountedFlag) return
+  storefrontLiveStarted = true
+
+  unsubHangHoaLive = subscribeSheet('hang_hoa', (rows) => {
+    const filtered = (rows || []).filter((m) =>
+      ['Còn hàng', 'Hết hàng'].includes(m.Trang_thai),
+    )
+    if (filtered.length || rawMenu.value.length) {
+      rawMenu.value = filtered
+      filtered.forEach((m) => {
+        if (!tempQty.value[m.Ma_hang]) tempQty.value[m.Ma_hang] = 1
+      })
+      if (selectedItem.value?.Ma_hang) {
+        const updated = menu.value.find((m) => m.Ma_hang === selectedItem.value.Ma_hang)
+        if (updated) selectedItem.value = updated
+      } else if (route.params.productId || route.params.productSlug) {
+        syncDetailFromRoute()
+      }
+    }
+  })
+
+  unsubKhuyenMaiLive = subscribeSheet('khuyenmai_info', (rows) => {
+    khuyenMaiInfo.value = rows || []
+  })
+
+  unsubDisplayConfigLive = subscribeSheet('display_config', (rows) => {
+    displayConfigRows.value = rows || []
+  })
+
+  unsubPartnersLive = subscribeSheet('partners', (rows) => {
+    partners.value = rows || []
+  })
+}
+
+function scheduleStorefrontLiveListeners(delayMs = 3500) {
+  if (storefrontLiveStarted || liveListenersTimer || isUnmountedFlag) return
+  liveListenersTimer = setTimeout(() => {
+    liveListenersTimer = null
+    startStorefrontLiveListeners()
+  }, delayMs)
+}
+
+async function reloadData({ force = false } = {}) {
+  if (reloadDataPromise) {
+    return reloadDataPromise
+  }
+  if (!force && rawMenu.value.length > 0 && Date.now() - lastReloadCompletedAt < 4000) {
+    scheduleStorefrontLiveListeners()
+    return
+  }
+
+  loadingMain.value = rawMenu.value.length === 0
 
   const cached = getCache(UNIFIED_MENU_CACHE_KEY)
   if (cached) {
@@ -12436,38 +12502,47 @@ async function reloadData() {
     loadingMain.value = false
   }
 
-  try {
-    const json = await getStorefrontSheets()
-    thongTinChuyenKhoan.value = json.data.thong_tin_chuyen_khoan || []
+  reloadDataPromise = (async () => {
+    try {
+      const json = await getStorefrontSheets()
+      thongTinChuyenKhoan.value = json.data.thong_tin_chuyen_khoan || []
 
-    const freshData = {
-      hang_hoa: json.data.hang_hoa || [],
-      banner: json.data.banner || [],
-      thong_bao: json.data.thong_bao || [],
-      logo: json.data.logo || [],
-      shop_contact: json.data.shop_contact || [],
-      partners: json.data.partners || [],
-      khuyenmai_info: json.data.khuyenmai_info || [],
-      time: json.data.time || [],
-      thong_tin_chuyen_khoan: json.data.thong_tin_chuyen_khoan || [],
-      display_config: json.data.display_config || [],
+      const freshData = {
+        hang_hoa: json.data.hang_hoa || [],
+        banner: json.data.banner || [],
+        thong_bao: json.data.thong_bao || [],
+        logo: json.data.logo || [],
+        shop_contact: json.data.shop_contact || [],
+        partners: json.data.partners || [],
+        khuyenmai_info: json.data.khuyenmai_info || [],
+        time: json.data.time || [],
+        thong_tin_chuyen_khoan: json.data.thong_tin_chuyen_khoan || [],
+        display_config: json.data.display_config || [],
+      }
+
+      setCache(UNIFIED_MENU_CACHE_KEY, freshData)
+      applyData(freshData)
+      lastReloadCompletedAt = Date.now()
+      loadingMain.value = false
+    } catch (e) {
+      if (!cached) loadingMain.value = false
+    } finally {
+      reloadDataPromise = null
+      scheduleStorefrontLiveListeners()
     }
+  })()
 
-    setCache(UNIFIED_MENU_CACHE_KEY, freshData)
-    applyData(freshData)
-    loadingMain.value = false
-  } catch (e) {
-    if (!cached) loadingMain.value = false
-  }
+  return reloadDataPromise
 }
 
 watch(
   () => route.params.lang,
-  (lang) => {
+  async (lang) => {
     if (!lang) return
 
-    if (locale.value !== lang) {
-      locale.value = lang
+    const readyLang = await ensureLocaleLoaded(String(lang))
+    if (locale.value !== readyLang) {
+      locale.value = readyLang
     }
 
     resetVisibleMenu()
@@ -12505,6 +12580,11 @@ watch(
 )
 
 onUnmounted(() => {
+  isUnmountedFlag = true
+  if (liveListenersTimer) {
+    clearTimeout(liveListenersTimer)
+    liveListenersTimer = null
+  }
   clearStorefrontThemeFromRoot()
   for (const timer of addedTimersByCode.values()) {
     clearTimeout(timer)
@@ -12549,7 +12629,7 @@ onUnmounted(() => {
   document.removeEventListener('click', onDocumentClick)
   stopSidebarResize()
   if (mainRef.value) {
-    mainRef.value.removeEventListener('scroll', updateScrollTopVisibility)
+    mainRef.value.removeEventListener('scroll', onMainScroll)
   }
 })
 function addFromDetailSidebar(evt = null) {

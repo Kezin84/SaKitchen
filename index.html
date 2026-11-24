@@ -7,22 +7,44 @@
   <meta name="viewport"
     content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 
-  <!-- Google Tag Manager -->
-  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-  })(window,document,'script','dataLayer','GTM-PGQ3HTNH');</script>
-  <!-- End Google Tag Manager -->
-
-  <!-- Google tag (gtag.js) - GA4 (sakitchen.shop) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-8W9RJ3WEY4"></script>
+  <!-- Google Tag Manager & GA4 (queue immediately in dataLayer; load external scripts on first interaction or after load to protect LCP/TBT) -->
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
+    window.dataLayer.push({'gtm.start': new Date().getTime(), event: 'gtm.js'});
     gtag('js', new Date());
     gtag('config', 'G-8W9RJ3WEY4');
+    (function () {
+      var loaded = false;
+      var events = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
+      function loadAnalytics() {
+        if (loaded) return;
+        loaded = true;
+        for (var i = 0; i < events.length; i++) {
+          window.removeEventListener(events[i], loadAnalytics, true);
+        }
+        var gtm = document.createElement('script');
+        gtm.async = true;
+        gtm.src = 'https://www.googletagmanager.com/gtm.js?id=GTM-PGQ3HTNH';
+        document.head.appendChild(gtm);
+        var ga = document.createElement('script');
+        ga.async = true;
+        ga.src = 'https://www.googletagmanager.com/gtag/js?id=G-8W9RJ3WEY4';
+        document.head.appendChild(ga);
+      }
+      for (var i = 0; i < events.length; i++) {
+        window.addEventListener(events[i], loadAnalytics, { passive: true, once: true, capture: true });
+      }
+      if (document.readyState === 'complete') {
+        setTimeout(loadAnalytics, 3500);
+      } else {
+        window.addEventListener('load', function () {
+          setTimeout(loadAnalytics, 3500);
+        }, { once: true });
+      }
+    })();
   </script>
+  <!-- End Google Tag Manager & GA4 -->
 
   <!-- Google Fonts & Critical Origins Preconnect -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />

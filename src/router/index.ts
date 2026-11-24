@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import MenuOnline from '@/views/MenuOnline.vue'
 import { getAuthorizedAdminUser } from '@/config/adminAuth'
+import { setAppLocale } from '@/i18n'
 
 const AdminLayout = () => import('@/layouts/AdminLayout.vue')
 const Login = () => import('@/views/Login.vue')
@@ -201,6 +202,12 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
+  const paramLang = typeof to.params?.lang === 'string' ? to.params.lang : ''
+  const targetLang = SUPPORTED_LANGS.includes(paramLang) ? paramLang : getSavedLang()
+  if (targetLang !== 'vi') {
+    await setAppLocale(targetLang)
+  }
+
   const requiresAuth = to.matched.some((record) => Boolean(record.meta?.requiresAuth))
   const isLoginPage = to.name === 'login'
 

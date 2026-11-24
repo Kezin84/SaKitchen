@@ -1,0 +1,23 @@
+# SA KITCHEN
+
+> SA KITCHEN là nhà hàng ẩm thực Việt Nam tại Manila, Philippines, phục vụ cơm văn phòng, món Việt truyền thống, món nhậu và dịch vụ đi chợ hộ đặt món trực tuyến 24/24 với giao hàng nhanh.
+
+## Trang chính
+
+- [Trang chủ & Thực đơn Online](https://sakitchen.shop/): Xem thực đơn đầy đủ và đặt món trực tuyến 24/24 tại Manila.
+- [Giới thiệu SA KITCHEN](https://sakitchen.shop/welcome): Thông tin tổng quan về thương hiệu và dịch vụ của SA KITCHEN.
+- [Bảng tin & Nhật ký Bếp](https://sakitchen.shop/bang-tin): Hình ảnh món ăn thực tế hằng ngày, ưu đãi và phản hồi từ khách hàng.
+- [Blog & Cẩm nang Ẩm thực](https://sakitchen.shop/blog): Bài viết về ẩm thực Việt, gợi ý món ngon và kinh nghiệm ăn uống tại Manila, Philippines.
+
+## Thực đơn theo ngôn ngữ
+
+- [Thực đơn Tiếng Việt](https://sakitchen.shop/vi): Phiên bản tiếng Việt.
+- [English Menu](https://sakitchen.shop/en): Vietnamese food ordering menu in Manila (English).
+- [中文菜单](https://sakitchen.shop/zh-CN): 马尼拉越南美食在线点餐菜单（简体中文）。
+- [한국어 메뉴](https://sakitchen.shop/ko): 마닐라 베트남 음식 온라인 주문 메뉴 (한국어).
+- [Filipino Menu](https://sakitchen.shop/fil): Menu ng pagkaing Vietnamese sa Manila (Filipino).
+
+## Tài nguyên cho công cụ tìm kiếm
+
+- [Sitemap XML](https://sakitchen.shop/sitemap.xml): Danh sách toàn bộ đường dẫn công khai và bài viết blog của SA KITCHEN.
+- [Robots.txt](https://sakitchen.shop/robots.txt): Quy tắc thu thập dữ liệu cho trình thu thập thông tin.

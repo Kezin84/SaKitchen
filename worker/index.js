@@ -526,6 +526,29 @@ export default {
       )
     }
 
+    // Prevent SPA HTML fallback on machine-readable well-known / ARD catalog endpoints
+    if (
+      pathname.startsWith('/.well-known/') ||
+      pathname === '/.well-known' ||
+      pathname === '/ai-catalog.json' ||
+      pathname === '/ard.json'
+    ) {
+      if (env.ASSETS) {
+        const wellKnownRes = await env.ASSETS.fetch(request)
+        const wellKnownCt = String(wellKnownRes.headers.get('Content-Type') || '').toLowerCase()
+        if (wellKnownRes.ok && !wellKnownCt.includes('text/html')) {
+          return wellKnownRes
+        }
+      }
+      return new Response('Not Found', {
+        status: 404,
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Cache-Control': 'public, max-age=300',
+        },
+      })
+    }
+
     // Dynamic XML Sitemap (Storefront + All Published Blog Posts)
     if (pathname === '/sitemap.xml') {
       const blogData = await getLiveBlogData(env, url.searchParams.has('refresh'))

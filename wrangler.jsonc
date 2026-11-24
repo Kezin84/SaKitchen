@@ -32,7 +32,10 @@
       "/bang-tin/*",
       "/blog",
       "/blog/*",
-      "/sitemap.xml"
+      "/sitemap.xml",
+      "/.well-known/*",
+      "/ai-catalog.json",
+      "/ard.json"
     ]
   }
 }

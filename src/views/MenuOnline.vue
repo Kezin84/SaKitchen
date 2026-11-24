@@ -126,8 +126,13 @@
             >
               <i class="ri-close-line"></i>
             </button>
-            <button class="dth-search-submit" type="button" @click="applySearch">
-              <i class="ri-search-line"></i>
+            <button
+              class="dth-search-submit"
+              type="button"
+              :aria-label="$t('search.placeholder')"
+              @click="applySearch"
+            >
+              <i class="ri-search-line" aria-hidden="true"></i>
             </button>
           </div>
 
@@ -189,18 +194,20 @@
             type="button"
             class="dth-ctrl-btn icon-only theme-toggle-btn"
             :title="themeMode === 'dark' ? $t('common.lightMode') : $t('common.darkMode')"
+            :aria-label="themeMode === 'dark' ? $t('common.lightMode') : $t('common.darkMode')"
             @click="toggleThemeMode"
           >
-            <i :class="themeMode === 'dark' ? 'ri-sun-fill' : 'ri-moon-clear-line'"></i>
+            <i :class="themeMode === 'dark' ? 'ri-sun-fill' : 'ri-moon-clear-line'" aria-hidden="true"></i>
           </button>
 
           <button
             type="button"
             class="dth-ctrl-btn lang-btn"
             :title="$t('filter.changeLang')"
+            :aria-label="$t('filter.changeLang')"
             @click="openLangModal"
           >
-            <img :src="currentLangFlagImg" class="dth-flag-img" alt="lang" />
+            <img :src="currentLangFlagImg" class="dth-flag-img" alt="" aria-hidden="true" />
           </button>
 
           <button
@@ -237,7 +244,13 @@
     >
       <!-- ========== SIDEBAR LEFT (CHỈ DÙNG DRAWER MOBILE NẾU CẦN) ========== -->
       <aside v-if="isMobile" class="sidebar-left" :class="{ collapsed: !showCategories }">
-        <button class="toggle-btn" @click="showCategories = !showCategories">
+        <button
+          type="button"
+          class="toggle-btn"
+          :aria-label="$t('menu.category')"
+          :aria-expanded="showCategories"
+          @click="showCategories = !showCategories"
+        >
           <i
             :class="[
               showCategories
@@ -245,6 +258,7 @@
                 : 'ri-list-check',
               'toggle-icon'
             ]"
+            aria-hidden="true"
           ></i>
         </button>
 
@@ -401,9 +415,10 @@
             class="mh-theme-btn"
             :class="{ 'no-time': !shopTime && !showHeaderScam }"
             :title="themeMode === 'dark' ? $t('common.lightMode') : $t('common.darkMode')"
+            :aria-label="themeMode === 'dark' ? $t('common.lightMode') : $t('common.darkMode')"
             @click="toggleThemeMode"
           >
-            <i :class="themeMode === 'dark' ? 'ri-sun-fill' : 'ri-moon-clear-line'"></i>
+            <i :class="themeMode === 'dark' ? 'ri-sun-fill' : 'ri-moon-clear-line'" aria-hidden="true"></i>
           </button>
         </div>
         <!-- ================== SKELETON ================== -->
@@ -431,8 +446,8 @@
           :class="{ 'is-marquee': noticeOverflowing, 'is-paused': noticePaused }"
           @click="noticeOverflowing && (noticePaused = !noticePaused)"
         >
-          <div class="notice-badge" :title="$t('menu.noticeLabel')" :aria-label="$t('menu.noticeLabel')">
-            <i class="ri-volume-up-fill notice-badge-ico"></i>
+          <div class="notice-badge" :title="$t('menu.noticeLabel')">
+            <i class="ri-volume-up-fill notice-badge-ico" aria-hidden="true"></i>
             <span v-if="!isMobile" class="notice-badge-text">{{ $t('menu.noticeLabel') }}</span>
           </div>
           <div class="notice-marquee" ref="noticeViewportRef">
@@ -563,7 +578,7 @@
         class="scam-hub-section"
         aria-label="Partners & Check Scam Hub"
       >
-        <div
+        <nav
           v-if="activePartnerList.length"
           class="partner-hub-bar"
           :class="{
@@ -602,7 +617,7 @@
               <i class="ri-arrow-right-up-line pmc-ext"></i>
             </span>
           </a>
-        </div>
+        </nav>
 
         <div class="scam-hub-grid">
           <a
@@ -796,8 +811,13 @@
             <i class="app-ico ri-close-line"></i>
           </button>
 
-          <button class="search-btn" type="button" @click="applySearch">
-            <i class="ri-search-line"></i>
+          <button
+            class="search-btn"
+            type="button"
+            :aria-label="$t('search.placeholder')"
+            @click="applySearch"
+          >
+            <i class="ri-search-line" aria-hidden="true"></i>
           </button>
         </div>
         <div
@@ -871,14 +891,17 @@
           </RouterLink>
 
           <button
+            type="button"
             class="filter-btn lang-filter"
             @click="openLangModal"
             :title="$t('filter.changeLang')"
+            :aria-label="$t('filter.changeLang')"
           >
             <img
               :src="currentLangFlagImg"
               class="lang-flag-img-only"
-              alt="lang"
+              alt=""
+              aria-hidden="true"
             />
           </button>
         </div>
@@ -1171,19 +1194,30 @@
                 <!-- THANH HÀNH ĐỘNG GỘP: SỐ LƯỢNG + THÊM -->
                 <div class="card-action-bar">
                   <div class="qty-row">
-                    <button type="button" class="btn-qty" @click.stop="decTemp(entry.item)">
-                      <i class="app-ico ri-subtract-line"></i>
+                    <button
+                      type="button"
+                      class="btn-qty"
+                      :aria-label="`${$t('cart.quantity')} -`"
+                      @click.stop="decTemp(entry.item)"
+                    >
+                      <i class="app-ico ri-subtract-line" aria-hidden="true"></i>
                     </button>
 
                     <input
                       type="number"
                       min="1"
+                      :aria-label="$t('cart.quantity')"
                       v-model.number="tempQty[entry.item.Ma_hang]"
                       @click.stop
                     />
 
-                    <button type="button" class="btn-qty" @click.stop="incTemp(entry.item)">
-                      <i class="app-ico ri-add-line"></i>
+                    <button
+                      type="button"
+                      class="btn-qty"
+                      :aria-label="`${$t('cart.quantity')} +`"
+                      @click.stop="incTemp(entry.item)"
+                    >
+                      <i class="app-ico ri-add-line" aria-hidden="true"></i>
                     </button>
                   </div>
 
@@ -1736,6 +1770,7 @@
             type="button"
             class="detail-thumb dp-thumb"
             :class="{ active: idx === activeModalIndex }"
+            :aria-label="`${selectedItem.Ten_hang} ${idx + 1}`"
             @click.stop="setActiveModalImage(idx)"
           >
             <img :src="img" alt="" />
@@ -1873,12 +1908,22 @@
                 class="dpt-stepper"
                 @click.stop
               >
-                <button type="button" class="dpt-step-btn" @click="stepDetailTopping(tp, -1)">
-                  <i class="ri-subtract-line"></i>
+                <button
+                  type="button"
+                  class="dpt-step-btn"
+                  :aria-label="`${tp.item.Ten_hang} -`"
+                  @click="stepDetailTopping(tp, -1)"
+                >
+                  <i class="ri-subtract-line" aria-hidden="true"></i>
                 </button>
                 <span class="dpt-step-val">{{ getDetailToppingQty(tp.maHang) }}</span>
-                <button type="button" class="dpt-step-btn" @click="stepDetailTopping(tp, 1)">
-                  <i class="ri-add-line"></i>
+                <button
+                  type="button"
+                  class="dpt-step-btn"
+                  :aria-label="`${tp.item.Ten_hang} +`"
+                  @click="stepDetailTopping(tp, 1)"
+                >
+                  <i class="ri-add-line" aria-hidden="true"></i>
                 </button>
               </div>
             </div>
@@ -1996,6 +2041,7 @@
       class="sidebar-right"
       :class="{ collapsed: !showCart }"
       :aria-hidden="!showCart"
+      :inert="!showCart"
       @wheel="forwardWheelToMain"
     >
       <div class="sidebar-content cart-box">
@@ -2032,9 +2078,10 @@
                 type="button"
                 class="cart-hdr-icon-btn close"
                 :title="$t('cart.hideCart')"
+                :aria-label="$t('cart.hideCart')"
                 @click="closeCart"
               >
-                <i class="ri-close-line"></i>
+                <i class="ri-close-line" aria-hidden="true"></i>
               </button>
             </div>
           </div>
@@ -2113,9 +2160,10 @@
                       v-if="canModifyCartItem(i)"
                       type="button"
                       class="sc-remove-btn"
+                      :aria-label="`Remove ${i.Ten_hang}`"
                       @click.stop="removeItem(i)"
                     >
-                      <i class="ri-close-line"></i>
+                      <i class="ri-close-line" aria-hidden="true"></i>
                     </button>
                   </div>
 
@@ -2256,9 +2304,10 @@
                             v-if="canModifyCartItem(i)"
                             type="button"
                             class="sc-remove-btn"
+                            :aria-label="`Remove ${i.Ten_hang}`"
                             @click.stop="removeItem(i)"
                           >
-                            <i class="ri-close-line"></i>
+                            <i class="ri-close-line" aria-hidden="true"></i>
                           </button>
                         </div>
 
@@ -2664,9 +2713,10 @@
       type="button"
       class="ltd-collapse-btn"
       :title="leftDockCollapsed ? $t('contact.expandDock') : $t('contact.collapseDock')"
+      :aria-label="leftDockCollapsed ? $t('contact.expandDock') : $t('contact.collapseDock')"
       @click="leftDockCollapsed = !leftDockCollapsed"
     >
-      <i :class="leftDockCollapsed ? 'ri-arrow-right-s-line' : 'ri-arrow-left-s-line'"></i>
+      <i :class="leftDockCollapsed ? 'ri-arrow-right-s-line' : 'ri-arrow-left-s-line'" aria-hidden="true"></i>
     </button>
 
     <div class="ltd-scroll-body">
@@ -3037,6 +3087,7 @@
               type="button"
               class="dp-thumb"
               :class="{ active: idx === activeModalIndex }"
+              :aria-label="`${selectedItem.Ten_hang} ${idx + 1}`"
               @click="setActiveModalImage(idx)"
             >
               <img :src="img" alt="" />
@@ -3180,12 +3231,22 @@
                   class="dpt-stepper"
                   @click.stop
                 >
-                  <button type="button" class="dpt-step-btn" @click="stepDetailTopping(tp, -1)">
-                    <i class="ri-subtract-line"></i>
+                  <button
+                    type="button"
+                    class="dpt-step-btn"
+                    :aria-label="`${tp.item.Ten_hang} -`"
+                    @click="stepDetailTopping(tp, -1)"
+                  >
+                    <i class="ri-subtract-line" aria-hidden="true"></i>
                   </button>
                   <span class="dpt-step-val">{{ getDetailToppingQty(tp.maHang) }}</span>
-                  <button type="button" class="dpt-step-btn" @click="stepDetailTopping(tp, 1)">
-                    <i class="ri-add-line"></i>
+                  <button
+                    type="button"
+                    class="dpt-step-btn"
+                    :aria-label="`${tp.item.Ten_hang} +`"
+                    @click="stepDetailTopping(tp, 1)"
+                  >
+                    <i class="ri-add-line" aria-hidden="true"></i>
                   </button>
                 </div>
               </div>
@@ -3291,9 +3352,10 @@
     <button
       type="button"
       class="modal-close exm-close-btn"
+      aria-label="Close"
       @click="showExportModal = false"
     >
-      <i class="ri-close-line"></i>
+      <i class="ri-close-line" aria-hidden="true"></i>
     </button>
 
     <div class="exm-header">
@@ -3607,7 +3669,7 @@
         }"
       >
         <div class="contact-icon-wrap">
-          <img :src="c.URL_img" class="contact-icon" />
+          <img :src="c.URL_img" :alt="c.PLATFORM_name || ''" class="contact-icon" />
         </div>
 
         <div class="contact-info">
@@ -4340,11 +4402,12 @@
   <button
     v-for="l in languages"
     :key="l.code"
+    type="button"
     class="lang-item"
     :disabled="langLoading"
     @click="selectLanguage(l.code)"
   >
-    <img :src="l.flagImg" class="lang-flag" />
+    <img :src="l.flagImg" :alt="l.label" class="lang-flag" />
     <span class="lang-label">{{ l.label }}</span>
   </button>
 
@@ -4616,9 +4679,10 @@
           type="button"
           class="fcm-close-btn"
           :title="$t('cart.collapseShort')"
+          :aria-label="$t('cart.collapseShort')"
           @click="showFullCartModal = false"
         >
-          <i class="ri-close-line"></i>
+          <i class="ri-close-line" aria-hidden="true"></i>
         </button>
       </div>
     </div>
@@ -4708,17 +4772,19 @@
                     <button
                       type="button"
                       class="fcm-step-btn"
+                      :aria-label="`${i.Ten_hang} -`"
                       @click.stop="changeCartItemQtyDirect(i, -1)"
                     >
-                      <i class="ri-subtract-line"></i>
+                      <i class="ri-subtract-line" aria-hidden="true"></i>
                     </button>
                     <span class="fcm-step-val">{{ i.qty }}</span>
                     <button
                       type="button"
                       class="fcm-step-btn"
+                      :aria-label="`${i.Ten_hang} +`"
                       @click.stop="changeCartItemQtyDirect(i, 1)"
                     >
-                      <i class="ri-add-line"></i>
+                      <i class="ri-add-line" aria-hidden="true"></i>
                     </button>
                   </div>
                   <span v-else class="sc-qty-badge">x{{ i.qty }}</span>
@@ -4731,9 +4797,10 @@
                     v-if="canModifyCartItem(i)"
                     type="button"
                     class="sc-remove-btn fcm-remove-btn"
+                    :aria-label="`Remove ${i.Ten_hang}`"
                     @click.stop="removeItem(i)"
                   >
-                    <i class="ri-delete-bin-line"></i>
+                    <i class="ri-delete-bin-line" aria-hidden="true"></i>
                   </button>
                 </div>
               </div>
@@ -4865,17 +4932,19 @@
                       <button
                         type="button"
                         class="fcm-step-btn"
+                        :aria-label="`${i.Ten_hang} -`"
                         @click.stop="changeCartItemQtyDirect(i, -1)"
                       >
-                        <i class="ri-subtract-line"></i>
+                        <i class="ri-subtract-line" aria-hidden="true"></i>
                       </button>
                       <span class="fcm-step-val">{{ i.qty }}</span>
                       <button
                         type="button"
                         class="fcm-step-btn"
+                        :aria-label="`${i.Ten_hang} +`"
                         @click.stop="changeCartItemQtyDirect(i, 1)"
                       >
-                        <i class="ri-add-line"></i>
+                        <i class="ri-add-line" aria-hidden="true"></i>
                       </button>
                     </div>
                     <span v-else class="sc-qty-badge">x{{ i.qty }}</span>
@@ -4888,9 +4957,10 @@
                       v-if="canModifyCartItem(i)"
                       type="button"
                       class="sc-remove-btn fcm-remove-btn"
+                      :aria-label="`Remove ${i.Ten_hang}`"
                       @click.stop="removeItem(i)"
                     >
-                      <i class="ri-delete-bin-line"></i>
+                      <i class="ri-delete-bin-line" aria-hidden="true"></i>
                     </button>
                   </div>
                 </div>
@@ -5818,8 +5888,8 @@
 <!-- ===== MODAL GHÉP ĐƠN: QR CODE + LINK CHIA SẺ ===== -->
 <div v-if="showGroupShareModal" class="modal-overlay z-top" @click="showGroupShareModal = false">
   <div class="modal-card group-share-modal" @click.stop>
-    <button type="button" class="modal-close" @click="showGroupShareModal = false">
-      <i class="ri-close-line"></i>
+    <button type="button" class="modal-close" aria-label="Close" @click="showGroupShareModal = false">
+      <i class="ri-close-line" aria-hidden="true"></i>
     </button>
 
     <div class="gsm-header">
@@ -5900,8 +5970,8 @@
 <!-- ===== MODAL BÁO THÀNH VIÊN CHƯA HOÀN THÀNH CHỌN MÓN ===== -->
 <div v-if="showUnfinishedGuestsModal" class="modal-overlay z-top is-center-dialog" @click="showUnfinishedGuestsModal = false">
   <div class="modal-card unfinished-guests-modal" @click.stop>
-    <button type="button" class="modal-close" @click="showUnfinishedGuestsModal = false">
-      <i class="ri-close-line"></i>
+    <button type="button" class="modal-close" aria-label="Close" @click="showUnfinishedGuestsModal = false">
+      <i class="ri-close-line" aria-hidden="true"></i>
     </button>
 
     <div class="ugm-header">
@@ -5984,8 +6054,8 @@
 <!-- ===== MODAL XÁC NHẬN XÓA THÀNH VIÊN ===== -->
 <div v-if="memberToRemove" class="modal-overlay z-top is-center-dialog" @click="memberToRemove = null">
   <div class="modal-card confirm-remove-member-modal" @click.stop>
-    <button type="button" class="modal-close" @click="memberToRemove = null">
-      <i class="ri-close-line"></i>
+    <button type="button" class="modal-close" aria-label="Close" @click="memberToRemove = null">
+      <i class="ri-close-line" aria-hidden="true"></i>
     </button>
 
     <div class="ugm-header">
@@ -6027,8 +6097,8 @@
 <!-- ===== MODAL CẢNH BÁO THÀNH VIÊN NHẤN HOÀN THÀNH ===== -->
 <div v-if="showGuestNudgeModal" class="modal-overlay z-top is-center-dialog" @click="showGuestNudgeModal = false">
   <div class="modal-card guest-nudge-modal" @click.stop>
-    <button type="button" class="modal-close" @click="showGuestNudgeModal = false">
-      <i class="ri-close-line"></i>
+    <button type="button" class="modal-close" aria-label="Close" @click="showGuestNudgeModal = false">
+      <i class="ri-close-line" aria-hidden="true"></i>
     </button>
 
     <div class="ugm-header">
@@ -6081,8 +6151,8 @@
 <!-- ===== MODAL THÔNG BÁO BỊ ĐÁ KHỎI ĐƠN ===== -->
 <div v-if="showKickedModal" class="modal-overlay z-top is-center-dialog" @click="startNewOrderFromKick">
   <div class="modal-card kicked-member-modal" @click.stop>
-    <button type="button" class="modal-close" @click="startNewOrderFromKick">
-      <i class="ri-close-line"></i>
+    <button type="button" class="modal-close" aria-label="Close" @click="startNewOrderFromKick">
+      <i class="ri-close-line" aria-hidden="true"></i>
     </button>
 
     <div class="ugm-header">
@@ -8765,7 +8835,7 @@ const menuKey = computed(() => {
 const CHECK_SCAM_LINKS = computed(() => [
   {
     key: 'verify',
-    url: 'https://checkscam8888.vercel.app/',
+    url: 'https://www.checkluadao.online/',
     title: t('contact.checkScamVerify'),
     sub: t('contact.checkScamVerifySub'),
     headerLabel: t('contact.checkScamVerifyHeader'),
@@ -8775,7 +8845,7 @@ const CHECK_SCAM_LINKS = computed(() => [
   },
   {
     key: 'shops',
-    url: 'https://checkscam8888.vercel.app/shops',
+    url: 'https://www.checkluadao.online/shops',
     title: t('contact.checkScamShops'),
     sub: t('contact.checkScamShopsSub'),
     headerLabel: t('contact.checkScamShopsHeader'),
@@ -8785,7 +8855,7 @@ const CHECK_SCAM_LINKS = computed(() => [
   },
   {
     key: 'alerts',
-    url: 'https://checkscam8888.vercel.app/alerts',
+    url: 'https://www.checkluadao.online/alerts',
     title: t('contact.checkScamAlerts'),
     sub: t('contact.checkScamAlertsSub'),
     headerLabel: t('contact.checkScamAlertsHeader'),

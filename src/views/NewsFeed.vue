@@ -273,7 +273,7 @@ watch(
 const checkScamItems = computed(() => [
   {
     key: 'verify',
-    url: 'https://checkscam8888.vercel.app/',
+    url: 'https://www.checkluadao.online/',
     title: t('contact.checkScamVerify'),
     sub: t('contact.checkScamVerifySub'),
     icon: 'ri-shield-check-fill',
@@ -281,7 +281,7 @@ const checkScamItems = computed(() => [
   },
   {
     key: 'shops',
-    url: 'https://checkscam8888.vercel.app/shops',
+    url: 'https://www.checkluadao.online/shops',
     title: t('contact.checkScamShops'),
     sub: t('contact.checkScamShopsSub'),
     icon: 'ri-store-2-fill',
@@ -289,7 +289,7 @@ const checkScamItems = computed(() => [
   },
   {
     key: 'alerts',
-    url: 'https://checkscam8888.vercel.app/alerts',
+    url: 'https://www.checkluadao.online/alerts',
     title: t('contact.checkScamAlerts'),
     sub: t('contact.checkScamAlertsSub'),
     icon: 'ri-alarm-warning-fill',
@@ -985,18 +985,20 @@ onUnmounted(() => {
             class="nf-icon-btn nf-mob-search-btn"
             :class="{ active: mobileSearchOpen || Boolean(searchQuery) }"
             :title="$t('feed.searchPlaceholder')"
+            :aria-label="$t('feed.searchPlaceholder')"
             @click="toggleMobileSearch"
           >
-            <i :class="mobileSearchOpen || searchQuery ? 'ri-close-line' : 'ri-search-line'"></i>
+            <i :class="mobileSearchOpen || searchQuery ? 'ri-close-line' : 'ri-search-line'" aria-hidden="true"></i>
           </button>
 
           <button
             type="button"
             class="nf-icon-btn"
             :title="themeMode === 'dark' ? $t('common.lightMode') : $t('common.darkMode')"
+            :aria-label="themeMode === 'dark' ? $t('common.lightMode') : $t('common.darkMode')"
             @click="toggleThemeMode"
           >
-            <i :class="themeMode === 'dark' ? 'ri-sun-fill' : 'ri-moon-clear-line'"></i>
+            <i :class="themeMode === 'dark' ? 'ri-sun-fill' : 'ri-moon-clear-line'" aria-hidden="true"></i>
           </button>
 
           <a :href="menuBackLink" target="_blank" rel="noopener noreferrer" class="nf-menu-cta">
@@ -1140,6 +1142,7 @@ onUnmounted(() => {
                   type="button"
                   class="nfs-snav-dot"
                   :class="{ active: idx === currentFeedAdIdx }"
+                  :aria-label="`Banner ${idx + 1}`"
                   @click="goToFeedVertAd(idx)"
                 ></button>
               </div>
@@ -1213,15 +1216,16 @@ onUnmounted(() => {
                 v-if="searchQuery"
                 type="button"
                 class="nf-clear-btn"
+                aria-label="Clear search"
                 @click="searchQuery = ''"
               >
-                <i class="ri-close-line"></i>
+                <i class="ri-close-line" aria-hidden="true"></i>
               </button>
             </div>
           </div>
 
           <!-- MOBILE HORIZONTAL PARTNER STRIP (STORIES-STYLE COMPACT ROW) -->
-          <div
+          <nav
             v-if="activePartners.length"
             class="nf-mob-partner-strip"
             aria-label="Hệ sinh thái & Đối tác"
@@ -1245,7 +1249,7 @@ onUnmounted(() => {
               </span>
               <i class="ri-arrow-right-up-line nf-mob-pt-ext"></i>
             </a>
-          </div>
+          </nav>
 
           <!-- SKELETON -->
           <template v-if="loading">
@@ -1607,6 +1611,7 @@ onUnmounted(() => {
                   type="button"
                   class="nfs-snav-dot"
                   :class="{ active: dIdx === currentFeedAdIdx }"
+                  :aria-label="`Banner ${dIdx + 1}`"
                   @click="goToFeedVertAd(dIdx)"
                 ></button>
               </div>
@@ -1699,9 +1704,10 @@ onUnmounted(() => {
               <button
                 type="button"
                 class="nfm-sheet-close"
+                aria-label="Close"
                 @click="mobileScamSheetOpen = false"
               >
-                <i class="ri-close-line"></i>
+                <i class="ri-close-line" aria-hidden="true"></i>
               </button>
             </div>
             <div class="nfm-sheet-list">
@@ -1816,26 +1822,29 @@ onUnmounted(() => {
                   type="button"
                   class="nfd-zoom-btn"
                   :title="$t('feed.zoomImage')"
+                  :aria-label="$t('feed.zoomImage')"
                   @click="openLightbox(activeDetailPost.Images, activeDetailImgIdx)"
                 >
-                  <i class="ri-fullscreen-line"></i>
+                  <i class="ri-fullscreen-line" aria-hidden="true"></i>
                 </button>
 
                 <button
                   v-if="activeDetailPost.Images.length > 1"
                   type="button"
                   class="nfd-stage-nav is-prev"
+                  aria-label="Previous image"
                   @click="stepDetailImage(-1)"
                 >
-                  <i class="ri-arrow-left-s-line"></i>
+                  <i class="ri-arrow-left-s-line" aria-hidden="true"></i>
                 </button>
                 <button
                   v-if="activeDetailPost.Images.length > 1"
                   type="button"
                   class="nfd-stage-nav is-next"
+                  aria-label="Next image"
                   @click="stepDetailImage(1)"
                 >
-                  <i class="ri-arrow-right-s-line"></i>
+                  <i class="ri-arrow-right-s-line" aria-hidden="true"></i>
                 </button>
               </div>
 
@@ -1846,6 +1855,7 @@ onUnmounted(() => {
                   type="button"
                   class="nfd-thumb-btn"
                   :class="{ active: activeDetailImgIdx === tIdx }"
+                  :aria-label="`Image ${tIdx + 1}`"
                   @click="activeDetailImgIdx = tIdx"
                 >
                   <img :src="imgUrl" alt="" loading="lazy" />
@@ -1892,9 +1902,10 @@ onUnmounted(() => {
                   type="button"
                   class="nfd-close-btn"
                   :title="$t('feed.closeDetail')"
+                  :aria-label="$t('feed.closeDetail')"
                   @click="closePostDetail"
                 >
-                  <i class="ri-close-line"></i>
+                  <i class="ri-close-line" aria-hidden="true"></i>
                 </button>
               </div>
 
@@ -2024,17 +2035,18 @@ onUnmounted(() => {
     <Teleport to="body">
       <Transition name="fade">
         <div v-if="lightbox.open" class="nf-lightbox" @click.self="closeLightbox">
-          <button type="button" class="nfl-close" @click="closeLightbox">
-            <i class="ri-close-line"></i>
+          <button type="button" class="nfl-close" aria-label="Close" @click="closeLightbox">
+            <i class="ri-close-line" aria-hidden="true"></i>
           </button>
 
           <button
             v-if="lightbox.images.length > 1"
             type="button"
             class="nfl-nav is-prev"
+            aria-label="Previous image"
             @click.stop="stepLightbox(-1)"
           >
-            <i class="ri-arrow-left-s-line"></i>
+            <i class="ri-arrow-left-s-line" aria-hidden="true"></i>
           </button>
 
           <div class="nfl-stage" @click.self="closeLightbox">
@@ -2059,9 +2071,10 @@ onUnmounted(() => {
             v-if="lightbox.images.length > 1"
             type="button"
             class="nfl-nav is-next"
+            aria-label="Next image"
             @click.stop="stepLightbox(1)"
           >
-            <i class="ri-arrow-right-s-line"></i>
+            <i class="ri-arrow-right-s-line" aria-hidden="true"></i>
           </button>
         </div>
       </Transition>

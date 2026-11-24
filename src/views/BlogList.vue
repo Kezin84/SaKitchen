@@ -37,7 +37,7 @@ const PAGE_SIZE = 9
 const CHECK_SCAM_NAV_ITEMS = [
   {
     key: 'verify',
-    url: 'https://checkscam8888.vercel.app/',
+    url: 'https://www.checkluadao.online/',
     title: 'Check STK, shop giả mạo',
     sub: 'Tra cứu STK & xác thực shop',
     icon: 'ri-shield-check-fill',
@@ -45,7 +45,7 @@ const CHECK_SCAM_NAV_ITEMS = [
   },
   {
     key: 'shops',
-    url: 'https://checkscam8888.vercel.app/shops',
+    url: 'https://www.checkluadao.online/shops',
     title: 'Xem quán ngon',
     sub: 'Danh sách quán uy tín, chất lượng',
     icon: 'ri-store-2-fill',
@@ -53,7 +53,7 @@ const CHECK_SCAM_NAV_ITEMS = [
   },
   {
     key: 'alerts',
-    url: 'https://checkscam8888.vercel.app/alerts',
+    url: 'https://www.checkluadao.online/alerts',
     title: 'Thông tin lừa đảo',
     sub: 'Cảnh báo chiêu trò lừa đảo mới',
     icon: 'ri-alarm-warning-fill',
@@ -293,9 +293,10 @@ function formatDate(ts) {
             type="button"
             class="bh-icon-btn"
             :title="themeMode === 'dark' ? 'Chế độ sáng' : 'Chế độ tối'"
+            :aria-label="themeMode === 'dark' ? 'Chế độ sáng' : 'Chế độ tối'"
             @click="toggleThemeMode"
           >
-            <i :class="themeMode === 'dark' ? 'ri-sun-fill' : 'ri-moon-clear-line'"></i>
+            <i :class="themeMode === 'dark' ? 'ri-sun-fill' : 'ri-moon-clear-line'" aria-hidden="true"></i>
           </button>
           <RouterLink to="/vi" class="bh-order-cta">
             <i class="ri-restaurant-2-line"></i>
@@ -331,9 +332,10 @@ function formatDate(ts) {
               v-if="searchQuery"
               type="button"
               class="bs-clear"
+              aria-label="Xóa tìm kiếm"
               @click="searchQuery = ''; currentPage = 1"
             >
-              <i class="ri-close-line"></i>
+              <i class="ri-close-line" aria-hidden="true"></i>
             </button>
           </div>
         </div>

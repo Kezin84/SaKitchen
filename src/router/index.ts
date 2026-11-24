@@ -1,27 +1,27 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import MenuOnline from '@/views/MenuOnline.vue'
-import QRBanking from '@/views/QRBanking.vue'
-import NhapHang from '@/views/nhapHang.vue'
-import KhoHang from '@/views/khoHang.vue'
-import AdminLayout from '@/layouts/AdminLayout.vue'
-import Banner from '@/views/Banner.vue'
-import Thongbao from '@/views/Thongbao.vue'
-import Logo from '@/views/Logo.vue'
-import Khuyenmai from '@/views/Khuyenmai.vue'
-import OpenTime from '@/views/OpenTime.vue'
-import ContactShop from '@/views/ContactShop.vue'
-import Partners from '@/views/Partners.vue'
-import SapXepHienThi from '@/views/SapXepHienThi.vue'
-import CauHinhHienThi from '@/views/CauHinhHienThi.vue'
-import Login from '@/views/Login.vue'
-import NhapHoaDon from '@/views/nhaphoadon.vue'
-import DonHang from '@/views/donhang.vue'
-import BaoCao from '@/views/baocao.vue'
-import TinhChietKhau from '@/views/TinhChietKhau.vue'
-import ChiPhiPhatSinh from '@/views/chiPhiPhatSinh.vue'
-
-import KhachHang from '@/views/khachHang.vue'
 import { getAuthorizedAdminUser } from '@/config/adminAuth'
+
+const AdminLayout = () => import('@/layouts/AdminLayout.vue')
+const Login = () => import('@/views/Login.vue')
+const QRBanking = () => import('@/views/QRBanking.vue')
+const NhapHang = () => import('@/views/nhapHang.vue')
+const KhoHang = () => import('@/views/khoHang.vue')
+const Banner = () => import('@/views/Banner.vue')
+const Thongbao = () => import('@/views/Thongbao.vue')
+const Logo = () => import('@/views/Logo.vue')
+const Khuyenmai = () => import('@/views/Khuyenmai.vue')
+const OpenTime = () => import('@/views/OpenTime.vue')
+const ContactShop = () => import('@/views/ContactShop.vue')
+const Partners = () => import('@/views/Partners.vue')
+const SapXepHienThi = () => import('@/views/SapXepHienThi.vue')
+const CauHinhHienThi = () => import('@/views/CauHinhHienThi.vue')
+const NhapHoaDon = () => import('@/views/nhaphoadon.vue')
+const DonHang = () => import('@/views/donhang.vue')
+const BaoCao = () => import('@/views/baocao.vue')
+const TinhChietKhau = () => import('@/views/TinhChietKhau.vue')
+const ChiPhiPhatSinh = () => import('@/views/chiPhiPhatSinh.vue')
+const KhachHang = () => import('@/views/khachHang.vue')
 
 const SUPPORTED_LANGS = ['vi', 'en', 'zh-CN', 'fil', 'ko']
 

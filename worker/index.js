@@ -346,8 +346,25 @@ function shouldForceBrandRefresh(url) {
   return reqV !== cachedBrand.version
 }
 
+function withSecurityHeaders(response) {
+  const headers = new Headers(response.headers)
+  headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+  headers.set('X-Content-Type-Options', 'nosniff')
+  headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  headers.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
+  headers.set(
+    'Content-Security-Policy',
+    "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org",
+  )
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  })
+}
+
 function rewritePageHtml(response, brand, origin, seoOverride = null) {
-  if (typeof HTMLRewriter === 'undefined') return response
+  if (typeof HTMLRewriter === 'undefined') return withSecurityHeaders(response)
   const v = encodeURIComponent(brand.version)
   const defaultShareUrl = `${origin}/og-share.jpg?v=${v}`
   const faviconIcoHref = `/favicon.ico?v=${v}`
@@ -482,7 +499,7 @@ function rewritePageHtml(response, brand, origin, seoOverride = null) {
     })
   }
 
-  return rewriter.transform(response)
+  return withSecurityHeaders(rewriter.transform(response))
 }
 
 export default {

@@ -2,7 +2,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app'
 import { getDatabase } from 'firebase/database'
 import { getAuth } from 'firebase/auth'
-import { getAnalytics, isSupported as isAnalyticsSupported } from 'firebase/analytics'
 
 export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyCh88YjlsGOawKWPi6Uj63b9gBxIX4iME0',
@@ -25,15 +24,31 @@ export const app = getApps().length ? getApp() : initializeApp(firebaseConfig)
 export const db = getDatabase(app)
 export const auth = getAuth(app)
 
-// Initialize Firebase Analytics safely in browser environments
+// Defer Firebase Analytics initialization until after page load + idle so it never blocks LCP/TBT
 if (typeof window !== 'undefined') {
-  isAnalyticsSupported()
-    .then((supported) => {
-      if (supported) {
-        getAnalytics(app)
-      }
-    })
-    .catch(() => {
-      // Ignore analytics errors (e.g. adblockers or unsupported environments)
-    })
+  const bootAnalytics = () => {
+    import('firebase/analytics')
+      .then(async ({ getAnalytics, isSupported }) => {
+        if (await isSupported()) {
+          getAnalytics(app)
+        }
+      })
+      .catch(() => {
+        // Ignore analytics errors (e.g. adblockers or unsupported environments)
+      })
+  }
+
+  const scheduleAnalytics = () => {
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(bootAnalytics, { timeout: 4000 })
+    } else {
+      window.setTimeout(bootAnalytics, 2500)
+    }
+  }
+
+  if (document.readyState === 'complete') {
+    scheduleAnalytics()
+  } else {
+    window.addEventListener('load', scheduleAnalytics, { once: true })
+  }
 }

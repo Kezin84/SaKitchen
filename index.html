@@ -24,19 +24,53 @@
     gtag('config', 'G-8W9RJ3WEY4');
   </script>
 
-  <!-- Google Fonts: Be Vietnam Pro -->
+  <!-- Google Fonts & Critical Origins Preconnect -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
+  <link rel="preconnect" href="https://sakitchen-default-rtdb.asia-southeast1.firebasedatabase.app" crossorigin />
   <link
     href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap"
     rel="stylesheet"
+    media="print"
+    onload="this.media='all'"
   />
+  <noscript>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap"
+      rel="stylesheet"
+    />
+  </noscript>
 
-  <!-- Remix Icon -->
-  <link href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" rel="stylesheet" />
+  <!-- Remix Icon (non-render-blocking) -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css"
+    rel="stylesheet"
+    media="print"
+    onload="this.media='all'"
+  />
+  <noscript>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" rel="stylesheet" />
+  </noscript>
 
-  <!-- Telegram Mini App SDK (async so normal web browsers never block) -->
-  <script id="sa-tg-webapp-sdk" async src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- Telegram Mini App SDK (only load inside Telegram WebView so normal browsers skip 27 KiB download) -->
+  <script>
+    (function () {
+      try {
+        var qs = (window.location.search || '') + (window.location.hash || '');
+        var isTg =
+          /tgWebApp/i.test(qs) ||
+          Boolean(window.TelegramWebviewProxy || window.TelegramWebview || window.TelegramGameProxy) ||
+          /Telegram/i.test(navigator.userAgent || '');
+        if (!isTg) return;
+        var s = document.createElement('script');
+        s.id = 'sa-tg-webapp-sdk';
+        s.async = true;
+        s.src = 'https://telegram.org/js/telegram-web-app.js';
+        document.head.appendChild(s);
+      } catch (e) {}
+    })();
+  </script>
 
   <meta name="description" content="SA KITCHEN chuyên cung cấp ẩm thực chuẩn vị Việt Nam, cơm văn phòng, món nhậu và dịch vụ đi chợ hộ tại Manila, Philippines." />
   <meta name="keywords" content="sakitchen, sa kitchen, sa kitchen manila, đồ ăn việt manila, ẩm thực việt tại philippines, quán ăn việt philippines, ship đồ ăn manila, món nhậu manila" />

@@ -11,7 +11,7 @@
   >
     <CookingSplashIntro
       v-if="showCookingSplash"
-      :logo-url="logo?.URL || '/logo-sa.jpg'"
+      :logo-url="displayLogoUrl || '/logo-sa-sm.jpg'"
       :shop-name="logo?.Name || 'SA KITCHEN'"
       :lang="currentLang"
       :event-id="activeStorefrontTheme.introEvent"
@@ -37,7 +37,7 @@
         <div class="dth-left-zone">
           <div class="dth-brand-cluster">
             <div class="dth-brand" @click="onAllFilter" role="button" tabindex="0">
-              <img v-if="logo?.URL" :src="logo.URL" class="dth-logo" alt="" />
+              <img v-if="displayLogoUrl" :src="displayLogoUrl" class="dth-logo" alt="" />
               <div class="dth-brand-meta">
                 <div class="dth-name">{{ logo?.Name || 'SA KITCHEN' }}</div>
                 <div v-if="shopTime" class="dth-time">
@@ -264,7 +264,7 @@
 
         <div v-if="showCategories" class="sidebar-content">
           <div class="logo-box" v-if="logo">
-            <img :src="logo.URL" alt="" />
+            <img :src="displayLogoUrl" alt="" />
             <div class="logo-name">{{ logo.Name }}</div>
             <div v-if="shopTime" class="logo-time badge-online">
               <span class="dot-online"></span>
@@ -350,7 +350,7 @@
             'has-partner': showHeaderScam && activePartnerList.length > 0,
           }"
         >
-          <img :src="logo.URL" class="mh-logo" alt="" @click="onAllFilter" />
+          <img :src="displayLogoUrl" class="mh-logo" alt="" @click="onAllFilter" />
 
           <div class="mh-name" @click="onAllFilter">
             {{ logo.Name }}
@@ -1104,7 +1104,7 @@
                   <img
                     v-if="getCardImage(entry.item)"
                     :key="getCardImageKey(entry.item)"
-                    :src="getCardImage(entry.item)"
+                    :src="getCardDisplayImage(entry.item)"
                     loading="lazy"
                     decoding="async"
                     :alt="entry.item.Ten_hang || ''"
@@ -1284,6 +1284,8 @@
                 v-for="(thumb, tIdx) in sec.thumbs.slice(0, 2)"
                 :key="'mb-tl-' + sec.key + '-' + tIdx"
                 :src="thumb"
+                width="40"
+                height="40"
                 loading="lazy"
                 decoding="async"
                 class="mb-sec-thumb"
@@ -1297,6 +1299,8 @@
                   v-for="(thumb, tIdx) in sec.thumbs.slice(0, 3)"
                   :key="'mb-tm-' + sec.key + '-' + tIdx"
                   :src="thumb"
+                  width="36"
+                  height="36"
                   loading="lazy"
                   decoding="async"
                   class="mb-sec-thumb"
@@ -1317,6 +1321,8 @@
                 v-for="(thumb, tIdx) in sec.thumbs.slice(2, 4)"
                 :key="'mb-tr-' + sec.key + '-' + tIdx"
                 :src="thumb"
+                width="40"
+                height="40"
                 loading="lazy"
                 decoding="async"
                 class="mb-sec-thumb"
@@ -1511,9 +1517,11 @@
           <div class="pwf-col pwf-brand-col">
             <div class="pwf-brand-head">
               <img
-                v-if="logo?.URL"
-                :src="logo.URL"
+                v-if="displayLogoUrl"
+                :src="displayLogoUrl"
                 :alt="brandAssets.siteName"
+                loading="lazy"
+                decoding="async"
                 class="pwf-logo"
               />
               <div class="pwf-brand-meta">
@@ -2932,6 +2940,10 @@
             <img
               :src="activeEntryPopup.imageUrl"
               :alt="activeEntryPopup.text || 'Popup notice'"
+              width="420"
+              height="420"
+              fetchpriority="high"
+              decoding="async"
               class="epn-img"
             />
           </div>
@@ -4544,8 +4556,8 @@
 <!-- (2) TÊN NCC -->
 <div class="ck-ncc-wrap">
   <img
-    v-if="logo?.URL"
-    :src="logo.URL"
+    v-if="displayLogoUrl"
+    :src="displayLogoUrl"
     class="ck-ncc-logo"
     alt="logo"
   />
@@ -6313,11 +6325,18 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch, nextTick, onUnmounted } from 'vue'
-import L from 'leaflet'
-import QrcodeVue from 'qrcode.vue'
-import SeasonalOverlay from '@/components/SeasonalOverlay.vue'
+import { ref, reactive, computed, onMounted, watch, nextTick, onUnmounted, defineAsyncComponent } from 'vue'
 import CookingSplashIntro from '@/components/CookingSplashIntro.vue'
+const QrcodeVue = defineAsyncComponent(() => import('qrcode.vue'))
+const SeasonalOverlay = defineAsyncComponent(() => import('@/components/SeasonalOverlay.vue'))
+let leafletLib = null
+async function loadLeaflet() {
+  if (!leafletLib) {
+    const mod = await import('leaflet')
+    leafletLib = mod.default || mod
+  }
+  return leafletLib
+}
 import {
   buildStorefrontThemeVars,
   getStorefrontMetaThemeColor,
@@ -6386,6 +6405,8 @@ import {
   buildSeoJsonLdGraph,
   toFaviconAssetUrl,
   toMobileIconAssetUrl,
+  toOptimizedImageUrl,
+  isBrokenImageUrl,
 } from '@/utils/brandAssets'
 import {
   initTelegramMiniApp,
@@ -8881,8 +8902,9 @@ const isBannerTransitioning = ref(false)
 
 /* ===== LOAD ===== */
 onMounted(async () => {
-  nextTick(() => {
+  nextTick(async () => {
     if (mapRef.value && !map) {
+      const L = await loadLeaflet()
       map = L.map(mapRef.value, {
         worldCopyJump: true,
       }).setView([20, 0], 2)
@@ -9349,8 +9371,9 @@ const menuBoardSections = computed(() => {
     sec.items.push(item)
     if (sec.thumbs.length < 4) {
       const img = getCardImage(item)
-      if (img && !sec.thumbs.includes(img)) {
-        sec.thumbs.push(img)
+      const thumbUrl = img ? toOptimizedImageUrl(img, { width: 96, height: 96, crop: 'fill' }) : ''
+      if (thumbUrl && !sec.thumbs.includes(thumbUrl)) {
+        sec.thumbs.push(thumbUrl)
       }
     }
   }
@@ -9873,7 +9896,7 @@ const popupNotices = computed(() =>
     .filter((item) => item?.Loai_thong_bao === 'popup' && isNoticeActive(item))
     .map((item) => ({
       ...item,
-      imageUrl: String(item?.Popup_img || '').trim(),
+      imageUrl: toOptimizedImageUrl(item?.Popup_img, { width: 840, crop: 'limit' }),
       text: resolveNoticeText(item, currentLang.value),
       linkUrl: normalizePopupLink(item?.Popup_link),
     }))
@@ -10090,6 +10113,9 @@ watch(bannerList, () => {
 
 const logo = computed(() => logos.value?.[0] || null)
 const brandAssets = computed(() => resolveBrandAssets(logo.value, 'SA KITCHEN'))
+const displayLogoUrl = computed(() =>
+  toOptimizedImageUrl(logo.value?.URL, { width: 240, crop: 'limit' }),
+)
 watch(
   brandAssets,
   (assets) => {
@@ -10400,7 +10426,7 @@ function getItemBadge(item) {
   return resolveProductBadge(item.Badge, locale.value || 'vi')
 }
 
-function selectAddress(place) {
+async function selectAddress(place) {
   diaChi.value = place.display_name
   addressKeyword.value = place.display_name
   addressSuggestions.value = []
@@ -10410,6 +10436,8 @@ function selectAddress(place) {
 
   selectedLatLng.value = { lat, lon }
 
+  if (!map) return
+  const L = await loadLeaflet()
   if (!marker) {
     marker = L.marker([lat, lon]).addTo(map)
   } else {
@@ -10921,7 +10949,7 @@ function getItemImages(item) {
     ...supplementaryImageKeys.map((key) => item[key])
   ]
     .map((u) => String(u || '').trim())
-    .filter(Boolean)
+    .filter((u) => Boolean(u) && !isBrokenImageUrl(u))
 }
 
 function getValidItemImages(item) {
@@ -10945,6 +10973,12 @@ function getCardImage(item) {
   return images[idx] || images[0]
 }
 
+function getCardDisplayImage(item) {
+  const raw = getCardImage(item)
+  if (!raw) return ''
+  return toOptimizedImageUrl(raw, { width: 480, crop: 'limit' })
+}
+
 function getCardImageKey(item) {
   const id = item?.Ma_hang || 'item'
   return `${id}-${getCardImageIndex(item)}`
@@ -10952,9 +10986,12 @@ function getCardImageKey(item) {
 
 function toAmbientBlurUrl(rawUrl) {
   const url = String(rawUrl || '').trim()
-  if (!url) return ''
+  if (!url || isBrokenImageUrl(url)) return ''
   if (url.includes('res.cloudinary.com') && url.includes('/upload/')) {
-    return url.replace('/upload/', '/upload/w_72,h_72,c_fill,e_blur:900,q_auto:low,f_auto/')
+    return toOptimizedImageUrl(url, { width: 72, height: 72, crop: 'fill', quality: 'auto:low' })
+  }
+  if (/\.mm\.bing\.net\/th\b/i.test(url)) {
+    return toOptimizedImageUrl(url, { width: 64, height: 64 })
   }
   return url
 }
@@ -25070,6 +25107,8 @@ const hasSale = computed(() =>
   box-shadow: var(--sa-card-shadow);
   overflow: hidden;
   min-width: 0;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 

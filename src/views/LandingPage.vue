@@ -14,7 +14,7 @@
           <div class="radar-ring ring-2"></div>
           <div class="radar-ring ring-3"></div>
           <div class="logo-wrapper" @click="goToMenu" style="cursor: pointer;">
-            <img src="/logo-sa.jpg" alt="SA Kitchen" class="logo-img" />
+            <img src="/logo-sa-sm.jpg" alt="SA Kitchen" width="120" height="120" class="logo-img" />
           </div>
         </div>
         

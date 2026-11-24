@@ -312,7 +312,7 @@ import {
 } from '@/utils/introSplashTemplates'
 
 const props = defineProps({
-  logoUrl: { type: String, default: '/logo-sa.jpg' },
+  logoUrl: { type: String, default: '/logo-sa-sm.jpg' },
   shopName: { type: String, default: 'SA KITCHEN' },
   lang: { type: String, default: 'vi' },
   eventId: { type: String, default: 'default' },
@@ -387,7 +387,7 @@ const resolvedSubtitle = computed(() => {
   return custom || copy.value.subtitle
 })
 
-const resolvedLogoUrl = computed(() => String(props.logoUrl || '').trim() || '/logo-sa.jpg')
+const resolvedLogoUrl = computed(() => String(props.logoUrl || '').trim() || '/logo-sa-sm.jpg')
 const resolvedShopName = computed(
   () => String(props.shopName || '').trim().toUpperCase() || 'SA KITCHEN',
 )

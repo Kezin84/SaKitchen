@@ -15,9 +15,63 @@ export const DEFAULT_SEO_CONFIG = {
 export function toCloudinaryTransform(rawUrl, transform) {
   const url = String(rawUrl || '').trim()
   if (!url) return ''
-  if (url.includes('res.cloudinary.com') && url.includes('/upload/')) {
-    return url.replace('/upload/', `/upload/${transform}/`)
+  const marker = '/upload/'
+  if (url.includes('res.cloudinary.com') && url.includes(marker)) {
+    const idx = url.indexOf(marker)
+    const after = url.slice(idx + marker.length)
+    const firstSeg = after.split('/')[0] || ''
+    if (
+      /^v\d+$/.test(firstSeg) ||
+      !/^(?:[a-z]{1,3}_[^/,]+)(?:,[a-z]{1,3}_[^/,]+)*$/i.test(firstSeg)
+    ) {
+      return `${url.slice(0, idx + marker.length)}${transform}/${after}`
+    }
   }
+  return url
+}
+
+export function isBrokenImageUrl(rawUrl) {
+  const url = String(rawUrl || '').trim()
+  if (!url) return true
+  if (/\.mm\.bing\.net\/th\b/i.test(url)) {
+    try {
+      const parsed = new URL(url)
+      if (!String(parsed.searchParams.get('q') || '').trim()) return true
+    } catch {
+      return true
+    }
+  }
+  return false
+}
+
+export function toOptimizedImageUrl(
+  rawUrl,
+  { width = 400, height = 0, crop = 'limit', quality = 'auto' } = {},
+) {
+  const url = String(rawUrl || '').trim()
+  if (!url || isBrokenImageUrl(url)) return ''
+
+  if (url.includes('res.cloudinary.com') && url.includes('/upload/')) {
+    const parts = ['f_auto', `q_${quality}`]
+    if (crop) parts.push(`c_${crop}`)
+    if (width > 0) parts.push(`w_${Math.round(width)}`)
+    if (height > 0) parts.push(`h_${Math.round(height)}`)
+    return toCloudinaryTransform(url, parts.join(','))
+  }
+
+  if (/\.mm\.bing\.net\/th\b/i.test(url) && width > 0) {
+    try {
+      const parsed = new URL(url)
+      const targetW = Math.round(width)
+      const targetH = Math.round(height > 0 ? height : width)
+      parsed.searchParams.set('w', String(targetW))
+      parsed.searchParams.set('h', String(targetH))
+      return parsed.toString()
+    } catch {
+      return url
+    }
+  }
+
   return url
 }
 

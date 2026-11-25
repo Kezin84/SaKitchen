@@ -175,6 +175,15 @@ export function buildSeoJsonLdGraph(brand, origin = 'https://sakitchen.shop') {
         ...(brand?.mapUrl ? { hasMap: brand.mapUrl } : {}),
         servesCuisine: 'Vietnamese',
         priceRange: '$$',
+        openingHours: 'Mo-Su 00:00-24:00',
+        areaServed: ['Metro Manila', 'Pasay', 'Makati', 'Philippines'],
+        sameAs: [
+          'https://t.me/sakitchen7777',
+          'https://t.me/sakitchenmanila',
+          'https://www.facebook.com/sakitchen7777/',
+          'https://www.tiktok.com/@sakitchen7777',
+          'https://www.checkluadao.online/shops/-P6YqC6_2dnzVXOk1UkM',
+        ],
       },
     ],
   }

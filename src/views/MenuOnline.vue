@@ -25316,11 +25316,21 @@ const hasSale = computed(() =>
 }
 
 .mb-row.is-in-cart {
-  background: rgba(var(--sa-primary-rgb), 0.06);
+  background: rgba(var(--sa-primary-rgb), 0.14);
+  border-bottom-color: rgba(var(--sa-primary-rgb), 0.28);
+}
+
+.mb-row.is-in-cart:hover {
+  background: rgba(var(--sa-primary-rgb), 0.19);
 }
 
 .sa-storefront.theme-dark .mb-row.is-in-cart {
   background: rgba(var(--sa-primary-bright-rgb), 0.1);
+  border-bottom-color: rgba(var(--sa-primary-bright-rgb), 0.2);
+}
+
+.sa-storefront.theme-dark .mb-row.is-in-cart:hover {
+  background: rgba(var(--sa-primary-bright-rgb), 0.14);
 }
 
 .mb-row.is-out {

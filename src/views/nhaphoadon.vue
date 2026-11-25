@@ -200,6 +200,36 @@
                       <i class="app-ico ri-refresh-line"></i>
                     </button>
                   </div>
+
+                  <!-- Row 3 (Desktop): View Mode Switcher (Chi tiết / Chọn nhanh) -->
+                  <div class="nhd-catalog-view-row">
+                    <div class="nhd-view-switcher" role="group" aria-label="Chế độ hiển thị sản phẩm">
+                      <button
+                        type="button"
+                        class="nhd-vs-btn"
+                        :class="{ active: catalogViewMode === 'card' }"
+                        @click="setCatalogViewMode('card')"
+                      >
+                        <i class="ri-layout-grid-line"></i>
+                        <span>Dạng Chi Tiết</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="nhd-vs-btn"
+                        :class="{ active: catalogViewMode === 'board' }"
+                        @click="setCatalogViewMode('board')"
+                      >
+                        <i class="ri-flashlight-line"></i>
+                        <span>Dạng Chọn Nhanh</span>
+                      </button>
+                    </div>
+                    <span class="nhd-catalog-view-meta">
+                      {{ filteredProducts.length }} món
+                      <template v-if="catalogViewMode === 'board' && catalogBoardSections.length > 0">
+                        · {{ catalogBoardSections.length }} nhóm
+                      </template>
+                    </span>
+                  </div>
                 </template>
 
                 <!-- === MOBILE LAYOUT (New Requirement) === -->
@@ -337,6 +367,30 @@
             </div>
 
             <template v-if="entryMode === 'catalog'">
+              <!-- Mobile View Mode Switcher (Dạng Chi Tiết / Dạng Chọn Nhanh) -->
+              <div v-if="isMobile" class="nhd-mobile-view-bar">
+                <div class="nhd-view-switcher is-mobile-full" role="group" aria-label="Chế độ hiển thị sản phẩm">
+                  <button
+                    type="button"
+                    class="nhd-vs-btn"
+                    :class="{ active: catalogViewMode === 'card' }"
+                    @click="setCatalogViewMode('card')"
+                  >
+                    <i class="ri-layout-grid-line"></i>
+                    <span>Dạng Chi Tiết</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="nhd-vs-btn"
+                    :class="{ active: catalogViewMode === 'board' }"
+                    @click="setCatalogViewMode('board')"
+                  >
+                    <i class="ri-flashlight-line"></i>
+                    <span>Dạng Chọn Nhanh</span>
+                  </button>
+                </div>
+              </div>
+
               <!-- Filters moved to header -->
 
               <div v-if="!isLoadingProducts && searchProduct && searchProduct.trim()" class="search-result-banner">
@@ -366,21 +420,21 @@
               </div>
 
               <div class="catalog-grid-section">
-                <div class="product-grid">
                 <!-- SKELETON LOADING -->
-                <template v-if="isLoadingProducts">
-                   <div v-for="n in 12" :key="n" class="product-card product-card-horizontal skeleton-card">
-                      <div class="pc-media-horizontal skeleton-shimmer"></div>
-                      <div class="pc-content-horizontal" style="padding: 12px; display: flex; flex-direction: column; gap: 8px;">
-                         <div class="skeleton-line width-80 skeleton-shimmer"></div>
-                         <div class="skeleton-line width-60 skeleton-shimmer"></div>
-                         <div class="skeleton-line width-40 skeleton-shimmer" style="margin-top: auto;"></div>
-                      </div>
-                   </div>
-                </template>
+                <div v-if="isLoadingProducts" class="product-grid">
+                  <div v-for="n in 12" :key="n" class="product-card product-card-horizontal skeleton-card">
+                    <div class="pc-media-horizontal skeleton-shimmer"></div>
+                    <div class="pc-content-horizontal" style="padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                      <div class="skeleton-line width-80 skeleton-shimmer"></div>
+                      <div class="skeleton-line width-60 skeleton-shimmer"></div>
+                      <div class="skeleton-line width-40 skeleton-shimmer" style="margin-top: auto;"></div>
+                    </div>
+                  </div>
+                </div>
 
+                <!-- MODE 1: DẠNG CHI TIẾT (CARD GRID) -->
+                <div v-else-if="catalogViewMode === 'card'" class="product-grid">
                 <div
-                  v-if="!isLoadingProducts"
                   v-for="product in filteredProducts"
                   :key="product.Ma_hang"
                   class="product-card product-card-horizontal"
@@ -593,7 +647,213 @@
                     </div>
                   </div>
                 </div>
-              </div>
+                </div>
+
+                <!-- MODE 2: DẠNG CHỌN NHANH (MENU BOARD THEO DANH MỤC) -->
+                <div
+                  v-else-if="catalogViewMode === 'board' && catalogBoardSections.length > 0"
+                  class="nhd-menu-board"
+                >
+                  <section
+                    v-for="sec in catalogBoardSections"
+                    :key="sec.key"
+                    class="nhd-mb-section"
+                  >
+                    <header
+                      class="nhd-mb-sec-header"
+                      :class="{
+                        'has-thumbs': sec.thumbs.length > 0,
+                        'is-filtered': Boolean(selectedCategory && selectedCategory === sec.subLabel),
+                      }"
+                      :title="
+                        selectedCategory && selectedCategory === sec.subLabel
+                          ? 'Bấm để hiện lại tất cả danh mục'
+                          : 'Bấm để lọc riêng danh mục này'
+                      "
+                      @click="onBoardSectionHeaderClick(sec)"
+                    >
+                      <div v-if="!isMobile && sec.thumbs.length" class="nhd-mb-sec-thumbs is-left" aria-hidden="true">
+                        <img
+                          v-for="(thumb, tIdx) in sec.thumbs.slice(0, 2)"
+                          :key="'nhd-mb-tl-' + sec.key + '-' + tIdx"
+                          :src="thumb"
+                          width="34"
+                          height="34"
+                          loading="lazy"
+                          decoding="async"
+                          class="nhd-mb-sec-thumb"
+                          alt=""
+                        />
+                      </div>
+
+                      <div class="nhd-mb-sec-title-wrap">
+                        <div v-if="isMobile && sec.thumbs.length" class="nhd-mb-sec-thumbs is-mobile-cluster" aria-hidden="true">
+                          <img
+                            v-for="(thumb, tIdx) in sec.thumbs.slice(0, 3)"
+                            :key="'nhd-mb-tm-' + sec.key + '-' + tIdx"
+                            :src="thumb"
+                            width="30"
+                            height="30"
+                            loading="lazy"
+                            decoding="async"
+                            class="nhd-mb-sec-thumb"
+                            alt=""
+                          />
+                        </div>
+
+                        <div class="nhd-mb-sec-title-texts">
+                          <span v-if="sec.parentTag" class="nhd-mb-sec-parent">{{ sec.parentTag }}</span>
+                          <h4 class="nhd-mb-sec-title">{{ sec.title }}</h4>
+                        </div>
+
+                        <span class="nhd-mb-sec-count">{{ sec.items.length }}</span>
+                        <span
+                          v-if="selectedCategory && selectedCategory === sec.subLabel"
+                          class="nhd-mb-sec-clear"
+                        >
+                          <i class="ri-close-line"></i>
+                        </span>
+                      </div>
+
+                      <div v-if="!isMobile && sec.thumbs.length > 2" class="nhd-mb-sec-thumbs is-right" aria-hidden="true">
+                        <img
+                          v-for="(thumb, tIdx) in sec.thumbs.slice(2, 4)"
+                          :key="'nhd-mb-tr-' + sec.key + '-' + tIdx"
+                          :src="thumb"
+                          width="34"
+                          height="34"
+                          loading="lazy"
+                          decoding="async"
+                          class="nhd-mb-sec-thumb"
+                          alt=""
+                        />
+                      </div>
+                    </header>
+
+                    <div
+                      class="nhd-mb-items-grid"
+                      :class="{ 'is-single-col': sec.items.length === 1 }"
+                    >
+                      <div
+                        v-for="item in sec.items"
+                        :key="'nhd-mb-item-' + item.Ma_hang"
+                        class="nhd-mb-row"
+                        :class="{
+                          'is-out': isOutOfStock(item),
+                          'is-in-cart': getCatalogCartQty(item) > 0,
+                          'is-flash': cardHighlight[item.Ma_hang],
+                        }"
+                        @click="openProductDetail(item)"
+                      >
+                        <div class="nhd-mb-name-wrap">
+                          <span class="nhd-mb-name">
+                            <template v-if="searchProduct && searchProduct.trim()">
+                              <template
+                                v-for="(seg, sIdx) in getHighlightedSegments(item.Ten_hang, searchProduct)"
+                                :key="sIdx"
+                              >
+                                <mark v-if="seg.match" class="search-hl-mark">{{ seg.text }}</mark>
+                                <template v-else>{{ seg.text }}</template>
+                              </template>
+                            </template>
+                            <template v-else>{{ item.Ten_hang }}</template>
+                          </span>
+
+                          <span v-if="item.Size" class="nhd-mb-size-tag">{{ item.Size }}</span>
+
+                          <span v-if="getBoardDiscountPercent(item) > 0" class="nhd-mb-sale-tag">
+                            -{{ getBoardDiscountPercent(item) }}%
+                          </span>
+
+                          <span v-if="isOutOfStock(item)" class="nhd-mb-out-tag">
+                            Hết hàng
+                          </span>
+
+                          <span
+                            v-else-if="getBoardProductBadge(item)"
+                            class="nhd-mb-item-badge"
+                            :class="[
+                              `is-group-${getBoardProductBadge(item).group}`,
+                              `is-shape-${getBoardProductBadge(item).shape}`,
+                            ]"
+                          >
+                            <span class="nhd-mb-item-badge-inner">
+                              <i :class="getBoardProductBadge(item).icon"></i>
+                              <span>{{ getBoardProductBadge(item).label }}</span>
+                            </span>
+                          </span>
+
+                          <span
+                            v-if="getCatalogCartQty(item) > 0"
+                            class="nhd-mb-incart-pill"
+                            :class="{ 'is-pop': addedSuccess[item.Ma_hang] }"
+                          >
+                            ×{{ getCatalogCartQty(item) }}
+                          </span>
+                        </div>
+
+                        <span class="nhd-mb-leader" aria-hidden="true"></span>
+
+                        <div class="nhd-mb-right">
+                          <div class="nhd-mb-price-wrap">
+                            <span v-if="Number(item.Gia_Giam || 0) > 0" class="nhd-mb-old-price">
+                              {{ formatWithCurrency(item.Gia_ban, item.Don_vi_tien_te) }}
+                            </span>
+                            <div class="nhd-mb-price-line">
+                              <strong class="nhd-mb-price" :class="{ 'is-sale': Number(item.Gia_Giam || 0) > 0 }">
+                                {{
+                                  formatWithCurrency(
+                                    Number(item.Gia_Giam || 0) > 0 ? item.Gia_Giam : item.Gia_ban,
+                                    item.Don_vi_tien_te,
+                                  )
+                                }}
+                              </strong>
+                              <span v-if="item.Dvt" class="nhd-mb-unit">/{{ item.Dvt }}</span>
+                            </div>
+                          </div>
+
+                          <div v-if="getCatalogCartQty(item) > 0" class="nhd-mb-stepper" @click.stop>
+                            <button
+                              type="button"
+                              class="nhd-mb-step-btn is-minus"
+                              title="Giảm 1"
+                              aria-label="Giảm số lượng"
+                              @click="quickAdjustBoardQty(item, -1)"
+                            >
+                              <i class="ri-subtract-line"></i>
+                            </button>
+                            <span class="nhd-mb-step-qty">{{ getCatalogCartQty(item) }}</span>
+                            <button
+                              type="button"
+                              class="nhd-mb-step-btn is-plus"
+                              :class="{ added: addedSuccess[item.Ma_hang] }"
+                              :disabled="isOutOfStock(item)"
+                              title="Thêm 1"
+                              aria-label="Tăng số lượng"
+                              @click="quickAdjustBoardQty(item, 1)"
+                            >
+                              <i class="ri-add-line"></i>
+                            </button>
+                          </div>
+
+                          <button
+                            v-else
+                            type="button"
+                            class="nhd-mb-add-btn"
+                            :class="{ added: addedSuccess[item.Ma_hang] }"
+                            :disabled="isOutOfStock(item)"
+                            :title="isOutOfStock(item) ? 'Hết hàng' : 'Thêm nhanh +1'"
+                            :aria-label="'Thêm ' + item.Ten_hang"
+                            @click.stop="quickAdjustBoardQty(item, 1)"
+                          >
+                            <i v-if="addedSuccess[item.Ma_hang]" class="ri-check-line"></i>
+                            <i v-else class="ri-add-line"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                </div>
               </div>
 
               <div v-if="filteredProducts.length === 0" class="no-products">
@@ -4404,6 +4664,13 @@ import {
   findDuplicateProductMatch,
   normalizeProductNameKey,
 } from '@/utils/productCode'
+import {
+  normalizeDisplayConfig,
+  sortProductsByCategoryOrder,
+  getEffectiveParentCategory,
+} from '@/utils/displayOrder'
+import { resolveProductBadge } from '@/utils/productBadge'
+import { toOptimizedImageUrl } from '@/utils/brandAssets'
 const router = useRouter() // Initialize router
 const route = useRoute()
 
@@ -4942,6 +5209,24 @@ const donViTienTeCK = ref('VND')
 
 /* ================= CATALOG SẢN PHẨM ================= */
 const entryMode = ref('catalog') // 'catalog' | 'manual'
+const displayConfig = ref(normalizeDisplayConfig([]))
+const CATALOG_VIEW_MODE_KEY = 'nhaphoadon_catalog_view_mode_v1'
+const catalogViewMode = ref('card') // 'card' (Dạng Chi Tiết) | 'board' (Dạng Chọn Nhanh)
+try {
+  const savedCatalogMode = localStorage.getItem(CATALOG_VIEW_MODE_KEY)
+  if (savedCatalogMode === 'board' || savedCatalogMode === 'card') {
+    catalogViewMode.value = savedCatalogMode
+  }
+} catch {}
+
+function setCatalogViewMode(mode) {
+  const next = mode === 'board' ? 'board' : 'card'
+  catalogViewMode.value = next
+  try {
+    localStorage.setItem(CATALOG_VIEW_MODE_KEY, next)
+  } catch {}
+}
+
 const addedSuccessManual = ref(false) // Trạng thái nút thêm thủ công
 const showManualAddOptions = ref(false)
 const isSavingManualToDb = ref(false)
@@ -6796,11 +7081,13 @@ onMounted(async () => {
       'logo',
       'shop_contact',
       'time',
+      'display_config',
     ])
 
     khachHangList.value = json.data.khach_hang || []
     hangHoaList.value = json.data.hang_hoa || []
     donHangList.value = json.data.don_hang || []
+    displayConfig.value = normalizeDisplayConfig(json.data.display_config || [])
     hasLoadedDonHang.value = true
     syncTabsStatusFromDonHang()
     khuyenMaiList.value = json.data.khuyenmai_info || []
@@ -6884,6 +7171,10 @@ onUnmounted(() => {
   if (typeof unsubLiveOrdersRealtime === 'function') {
     unsubLiveOrdersRealtime()
     unsubLiveOrdersRealtime = null
+  }
+  for (const key of Object.keys(boardAddedTimers)) {
+    clearTimeout(boardAddedTimers[key])
+    delete boardAddedTimers[key]
   }
 })
 
@@ -8155,6 +8446,114 @@ const globalProductSearchCount = computed(() => {
 const filteredProducts = computed(() => {
   return allFilteredProducts.value
 })
+
+const catalogCartQtyByKey = computed(() => {
+  const map = Object.create(null)
+  const list = items.value || []
+  if (!list.length) return map
+  const target = getTargetMemberPayload()
+  const multiMembers = invoiceOrderMembers.value.length > 1
+  const hint = multiMembers ? getOrderPrimaryMemberHint(list) : null
+
+  for (const it of list) {
+    if (!it) continue
+    if (multiMembers && resolveMemberGroupKeyForItem(it, hint) !== target.groupKey) continue
+    const key = `${it.Ma_hang || it.maHang || ''}__${it.Size ?? it.size ?? ''}__${it.Dvt ?? it.dvt ?? ''}`
+    map[key] = (map[key] || 0) + Number(it.So_luong || it.soLuong || 0)
+  }
+  return map
+})
+
+function getCatalogCartQty(product) {
+  if (!product) return 0
+  const key = `${product.Ma_hang || ''}__${product.Size || ''}__${product.Dvt || ''}`
+  return catalogCartQtyByKey.value[key] || 0
+}
+
+const catalogBoardSections = computed(() => {
+  const rawList = filteredProducts.value || []
+  if (!rawList.length) return []
+
+  const activeLocale = selectedLang.value || 'vi'
+  const ordered = sortProductsByCategoryOrder(rawList, displayConfig.value, activeLocale)
+
+  const sectionMap = new Map()
+  for (const item of ordered) {
+    const parentLabel = getEffectiveParentCategory(item, displayConfig.value, activeLocale)
+    const subLabel = String(item?.Danh_muc || '').trim()
+    const hasChild = Boolean(subLabel && subLabel !== parentLabel)
+    const title = hasChild ? subLabel : parentLabel || subLabel || 'Khác'
+    const parentTag = hasChild ? parentLabel : ''
+    const key = `${parentLabel}::${subLabel}`
+
+    if (!sectionMap.has(key)) {
+      sectionMap.set(key, {
+        key,
+        title,
+        parentTag,
+        parentLabel: parentLabel || subLabel,
+        subLabel: subLabel || '',
+        items: [],
+        thumbs: [],
+      })
+    }
+
+    const sec = sectionMap.get(key)
+    sec.items.push(item)
+    if (sec.thumbs.length < 4) {
+      const img = cardImg(item)
+      const thumbUrl = img ? toOptimizedImageUrl(img, { width: 96, height: 96, crop: 'fill' }) : ''
+      if (thumbUrl && !sec.thumbs.includes(thumbUrl)) {
+        sec.thumbs.push(thumbUrl)
+      }
+    }
+  }
+
+  return Array.from(sectionMap.values())
+})
+
+function getBoardDiscountPercent(item) {
+  const orig = Number(item?.Gia_ban || 0)
+  const sale = Number(item?.Gia_Giam || 0)
+  if (!orig || !sale || sale >= orig) return 0
+  return Math.round(((orig - sale) / orig) * 100)
+}
+
+function getBoardProductBadge(item) {
+  return resolveProductBadge(item?.Badge, selectedLang.value || 'vi')
+}
+
+function onBoardSectionHeaderClick(sec) {
+  if (!sec?.subLabel) return
+  if (selectedCategory.value === sec.subLabel) {
+    selectedCategory.value = ''
+  } else {
+    selectedCategory.value = sec.subLabel
+  }
+  currentPage.value = 1
+}
+
+const boardAddedTimers = Object.create(null)
+
+function quickAdjustBoardQty(product, delta) {
+  if (!product) return
+  if (delta > 0 && isOutOfStock(product)) {
+    toast('error', 'Sản phẩm đang ở trạng thái HẾT HÀNG!')
+    return
+  }
+  adjustMobileCartQty(product, delta)
+  if (delta > 0) {
+    const code = product.Ma_hang
+    addedSuccess[code] = true
+    if (boardAddedTimers[code]) {
+      clearTimeout(boardAddedTimers[code])
+    }
+    boardAddedTimers[code] = setTimeout(() => {
+      addedSuccess[code] = false
+      delete boardAddedTimers[code]
+    }, 650)
+  }
+}
 
 function clearCatalogNonSearchFilters() {
   selectedCategory.value = ''
@@ -27083,5 +27482,723 @@ textarea:focus {
   display: inline-flex;
   align-items: center;
   gap: 3px;
+}
+
+/* =========================================================
+   CATALOG VIEW SWITCHER & QUICK-PICK MENU BOARD (DẠNG CHỌN NHANH)
+   ========================================================= */
+.nhd-catalog-view-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(148, 163, 184, 0.16);
+}
+
+.nhd-mobile-view-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin: 0 0 10px;
+}
+
+.nhd-view-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  box-shadow: inset 0 1px 2px rgba(2, 6, 23, 0.35);
+}
+
+.nhd-view-switcher.is-mobile-full {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 4px;
+  border-radius: 12px;
+}
+
+.nhd-vs-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, transform 0.12s ease;
+}
+
+.nhd-view-switcher.is-mobile-full .nhd-vs-btn {
+  height: 34px;
+  font-size: 12.5px;
+  border-radius: 9px;
+}
+
+.nhd-vs-btn i {
+  font-size: 14px;
+}
+
+.nhd-vs-btn:hover:not(.active) {
+  color: #f1f5f9;
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.nhd-vs-btn.active {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(16, 185, 129, 0.32);
+}
+
+.nhd-vs-btn:active {
+  transform: scale(0.97);
+}
+
+.nhd-catalog-view-meta {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #94a3b8;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.nhd-menu-board {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 2px 0 10px;
+}
+
+.nhd-mb-section {
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 13px;
+  box-shadow: 0 6px 18px rgba(2, 6, 23, 0.32);
+  overflow: hidden;
+  min-width: 0;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 260px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.nhd-mb-section:hover {
+  border-color: rgba(16, 185, 129, 0.36);
+}
+
+.nhd-mb-sec-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 46px;
+  padding: 7px 12px;
+  background: linear-gradient(135deg, #065f46 0%, #047857 52%, #059669 100%);
+  color: #ffffff;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  transition: filter 0.16s ease;
+}
+
+.nhd-mb-sec-header:hover {
+  filter: brightness(1.06);
+}
+
+.nhd-mb-sec-header.is-filtered {
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 55%, #14b8a6 100%);
+}
+
+.nhd-mb-sec-thumbs {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.nhd-mb-sec-thumb {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255, 255, 255, 0.88);
+  background: #0f172a;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s ease;
+}
+
+.nhd-mb-sec-thumbs .nhd-mb-sec-thumb + .nhd-mb-sec-thumb {
+  margin-left: -9px;
+}
+
+.nhd-mb-sec-header:hover .nhd-mb-sec-thumb {
+  transform: scale(1.06);
+}
+
+.nhd-mb-sec-title-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.nhd-mb-sec-title-texts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+.nhd-mb-sec-parent {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.55px;
+  text-transform: uppercase;
+  opacity: 0.86;
+  line-height: 1.15;
+}
+
+.nhd-mb-sec-title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: 0.35px;
+  text-transform: uppercase;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+  line-height: 1.25;
+  text-align: center;
+  word-break: break-word;
+}
+
+.nhd-mb-sec-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.nhd-mb-sec-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.34);
+  color: #ffffff;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.nhd-mb-items-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 16px;
+  row-gap: 2px;
+  padding: 8px 10px 10px;
+}
+
+.nhd-mb-items-grid.is-single-col {
+  grid-template-columns: 1fr;
+}
+
+.nhd-mb-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 9px;
+  border-bottom: 1px dashed rgba(148, 163, 184, 0.16);
+  cursor: pointer;
+  transition: background-color 0.14s ease, border-color 0.14s ease;
+  min-width: 0;
+}
+
+.nhd-mb-row:hover {
+  background: rgba(30, 41, 59, 0.72);
+}
+
+.nhd-mb-row.is-in-cart {
+  background: rgba(16, 185, 129, 0.12);
+  border-bottom-color: rgba(16, 185, 129, 0.26);
+}
+
+.nhd-mb-row.is-in-cart:hover {
+  background: rgba(16, 185, 129, 0.18);
+}
+
+.nhd-mb-row.is-flash {
+  background: rgba(34, 197, 94, 0.24);
+}
+
+.nhd-mb-row.is-out {
+  opacity: 0.52;
+}
+
+.nhd-mb-name-wrap {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+  max-width: 60%;
+}
+
+.nhd-mb-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f1f5f9;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.nhd-mb-row.is-out .nhd-mb-name {
+  text-decoration: line-through;
+  color: #94a3b8;
+}
+
+.nhd-mb-size-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  color: #7dd3fc;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.25;
+  flex-shrink: 0;
+}
+
+.nhd-mb-sale-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(244, 63, 94, 0.2);
+  color: #fda4af;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.3;
+  flex-shrink: 0;
+}
+
+.nhd-mb-out-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(239, 68, 68, 0.16);
+  color: #f87171;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.3;
+  flex-shrink: 0;
+}
+
+.nhd-mb-incart-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1.3;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.35);
+}
+
+.nhd-mb-incart-pill.is-pop {
+  animation: nhdBoardPop 0.36s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.nhd-mb-item-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1.5px 6px;
+  font-size: 9.5px;
+  font-weight: 800;
+  line-height: 1.25;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.nhd-mb-item-badge-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.nhd-mb-item-badge.is-group-fire {
+  background: linear-gradient(135deg, #ff6a00 0%, #dc2626 100%);
+  color: #ffffff;
+}
+
+.nhd-mb-item-badge.is-group-new {
+  background: linear-gradient(135deg, #10b981 0%, #0d9488 100%);
+  color: #ffffff;
+}
+
+.nhd-mb-item-badge.is-group-crown {
+  background: linear-gradient(135deg, #b45309 0%, #f59e0b 52%, #d97706 100%);
+  color: #fffbeb;
+}
+
+.nhd-mb-item-badge.is-group-spicy {
+  background: linear-gradient(135deg, #ef4444 0%, #991b1b 100%);
+  color: #ffffff;
+}
+
+.nhd-mb-item-badge.is-group-custom {
+  background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+  color: #ffffff;
+}
+
+.nhd-mb-item-badge.is-shape-flame {
+  border-radius: 9px 3px 9px 3px;
+  transform: skewX(-8deg);
+}
+
+.nhd-mb-item-badge.is-shape-flame .nhd-mb-item-badge-inner {
+  transform: skewX(8deg);
+}
+
+.nhd-mb-item-badge.is-shape-leaf {
+  border-radius: 3px 12px 3px 12px;
+}
+
+.nhd-mb-item-badge.is-shape-crest {
+  padding: 1.5px 8px;
+  clip-path: polygon(5px 0%, calc(100% - 5px) 0%, 100% 50%, calc(100% - 5px) 100%, 5px 100%, 0% 50%);
+}
+
+.nhd-mb-item-badge.is-shape-pennant {
+  padding: 1.5px 6px 1.5px 9px;
+  border-radius: 0 5px 5px 0;
+  clip-path: polygon(5px 0%, 100% 0%, 100% 100%, 5px 100%, 0% 50%);
+}
+
+.nhd-mb-item-badge.is-shape-ticket {
+  border-radius: 4px;
+}
+
+.nhd-mb-leader {
+  flex: 1;
+  min-width: 8px;
+  border-bottom: 1.5px dotted rgba(148, 163, 184, 0.34);
+  align-self: center;
+  transform: translateY(2px);
+}
+
+.nhd-mb-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.nhd-mb-price-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.18;
+}
+
+.nhd-mb-old-price {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: #64748b;
+  text-decoration: line-through;
+  font-variant-numeric: tabular-nums;
+}
+
+.nhd-mb-price-line {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  white-space: nowrap;
+}
+
+.nhd-mb-price {
+  font-size: 13px;
+  font-weight: 800;
+  color: #4ade80;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.15px;
+}
+
+.nhd-mb-price.is-sale {
+  color: #fbbf24;
+}
+
+.nhd-mb-unit {
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.nhd-mb-add-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s ease, box-shadow 0.15s ease;
+}
+
+.nhd-mb-add-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: scale(1.08);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.45);
+}
+
+.nhd-mb-add-btn:active:not(:disabled) {
+  transform: scale(0.9);
+}
+
+.nhd-mb-add-btn.added {
+  animation: nhdBoardPop 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.nhd-mb-add-btn:disabled {
+  background: rgba(51, 65, 85, 0.75);
+  color: #64748b;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.nhd-mb-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  flex-shrink: 0;
+}
+
+.nhd-mb-step-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s ease, background-color 0.15s ease;
+}
+
+.nhd-mb-step-btn.is-minus {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+}
+
+.nhd-mb-step-btn.is-minus:hover {
+  background: rgba(239, 68, 68, 0.35);
+  color: #ffffff;
+}
+
+.nhd-mb-step-btn.is-plus {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+}
+
+.nhd-mb-step-btn.is-plus:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+
+.nhd-mb-step-btn.is-plus:disabled {
+  background: rgba(51, 65, 85, 0.75);
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.nhd-mb-step-btn:active:not(:disabled) {
+  transform: scale(0.88);
+}
+
+.nhd-mb-step-qty {
+  min-width: 20px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #f8fafc;
+  font-variant-numeric: tabular-nums;
+  padding: 0 2px;
+}
+
+@keyframes nhdBoardPop {
+  0% {
+    transform: scale(0.86);
+  }
+  55% {
+    transform: scale(1.14);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Container-responsive Menu Board inside resizable PC left column */
+@container catalog-grid (max-width: 619px) {
+  .nhd-mb-items-grid {
+    grid-template-columns: 1fr;
+    padding: 6px 8px 8px;
+  }
+
+  .nhd-mb-sec-thumbs.is-right {
+    display: none;
+  }
+
+  .nhd-mb-sec-title-wrap {
+    justify-content: flex-start;
+  }
+
+  .nhd-mb-sec-title-texts {
+    align-items: flex-start;
+  }
+
+  .nhd-mb-sec-title {
+    text-align: left;
+    font-size: 13px;
+  }
+}
+
+@container catalog-grid (max-width: 360px) {
+  .nhd-mb-sec-thumbs.is-left {
+    display: none;
+  }
+
+  .nhd-mb-row {
+    padding: 6px 6px;
+    gap: 5px;
+  }
+
+  .nhd-mb-name-wrap {
+    max-width: 55%;
+  }
+
+  .nhd-mb-name {
+    font-size: 12px;
+  }
+
+  .nhd-mb-price {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .nhd-menu-board {
+    gap: 11px;
+    padding-bottom: 6px;
+  }
+
+  .nhd-mb-sec-header {
+    min-height: 46px;
+    padding: 8px 11px;
+    gap: 8px;
+  }
+
+  .nhd-mb-sec-title-wrap {
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .nhd-mb-sec-title-texts {
+    align-items: flex-start;
+    flex: 1;
+  }
+
+  .nhd-mb-sec-title {
+    font-size: 13.5px;
+    text-align: left;
+  }
+
+  .nhd-mb-sec-thumbs.is-mobile-cluster .nhd-mb-sec-thumb {
+    width: 30px;
+    height: 30px;
+    border-width: 1.5px;
+  }
+
+  .nhd-mb-sec-thumbs.is-mobile-cluster .nhd-mb-sec-thumb + .nhd-mb-sec-thumb {
+    margin-left: -9px;
+  }
+
+  .nhd-mb-items-grid {
+    grid-template-columns: 1fr;
+    padding: 6px 8px 8px;
+  }
+
+  .nhd-mb-row {
+    padding: 9px 8px;
+    gap: 6px;
+  }
+
+  .nhd-mb-name-wrap {
+    max-width: 56%;
+  }
+
+  .nhd-mb-name {
+    font-size: 13px;
+  }
+
+  .nhd-mb-price {
+    font-size: 13px;
+  }
+
+  .nhd-mb-unit {
+    font-size: 11px;
+  }
+
+  .nhd-mb-add-btn {
+    width: 31px;
+    height: 31px;
+    font-size: 16px;
+  }
+
+  .nhd-mb-step-btn {
+    width: 26px;
+    height: 26px;
+  }
 }
 </style>
